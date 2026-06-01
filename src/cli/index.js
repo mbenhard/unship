@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipResidue } from "../check/index.js";
 import { inspectProject, setupProject } from "../setup/index.js";
@@ -12,8 +13,16 @@ const flags = parseFlags(args.slice(1));
 
 try {
   if (command === "init") {
-    const result = await init({ target: flags.target || "codex", force: Boolean(flags.force) });
+    const result = await init({ target: flags.target || "all", force: Boolean(flags.force) });
     print(result, flags.json);
+    if (!result.ok) process.exitCode = 1;
+  } else if (command === "install-skill") {
+    const result = await installSkill({
+      dir: flags.dir || join(homedir(), ".agents", "skills"),
+      force: Boolean(flags.force)
+    });
+    print(result, flags.json);
+    if (!result.ok) process.exitCode = 1;
   } else if (command === "snippet") {
     await printSnippet(flags);
   } else if (command === "check") {
@@ -30,8 +39,10 @@ try {
       dryRun: Boolean(flags["dry-run"])
     });
     print(result, flags.json);
-  } else {
+  } else if (command === "help" || command === "--help" || command === "-h") {
     printHelp();
+  } else {
+    throw new Error(`Unknown command: ${command}. Use one of: init, install-skill, setup, snippet, check, doctor.`);
   }
 } catch (error) {
   if (flags.json) {
@@ -47,25 +58,92 @@ async function init({ target, force }) {
   const files = targetFiles(target, templates);
   const written = [];
   const skipped = [];
+  const stale = [];
   for (const file of files) {
     await mkdir(dirname(file.path), { recursive: true });
     try {
-      await writeFile(file.path, file.content, { flag: force ? "w" : "wx" });
-      written.push(file.path);
+      const existing = await readFile(file.path, "utf8");
+      if (existing === file.content) {
+        skipped.push(file.path);
+      } else if (file.staleGuard && !force) {
+        stale.push(file.path);
+        skipped.push(file.path);
+      } else if (file.forceOverwrite === false) {
+        skipped.push(file.path);
+      } else {
+        await writeFile(file.path, file.content, "utf8");
+        written.push(file.path);
+      }
     } catch (error) {
-      if (error.code === "EEXIST") skipped.push(file.path);
-      else throw error;
+      if (error.code !== "ENOENT") throw error;
+      await writeFile(file.path, file.content, "utf8");
+      written.push(file.path);
     }
   }
-  return { ok: true, written, skipped };
+  return {
+    ok: stale.length === 0,
+    written,
+    skipped,
+    stale,
+    next: stale.length ? ["Run npx unship init --force --json to refresh stale installed Unship instructions."] : []
+  };
+}
+
+async function installSkill({ dir, force }) {
+  const templates = await getAgentTemplates();
+  const destination = join(dir, "unship", "SKILL.md");
+  const written = [];
+  const skipped = [];
+  const stale = [];
+
+  await mkdir(dirname(destination), { recursive: true });
+  try {
+    const existing = await readFile(destination, "utf8");
+    if (existing === templates.skill) {
+      skipped.push(destination);
+    } else if (!force) {
+      stale.push(destination);
+      skipped.push(destination);
+    } else {
+      await writeFile(destination, templates.skill, "utf8");
+      written.push(destination);
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    await writeFile(destination, templates.skill, "utf8");
+    written.push(destination);
+  }
+
+  return {
+    ok: stale.length === 0,
+    written,
+    skipped,
+    stale,
+    next: stale.length
+      ? ["Run npx unship@latest install-skill --force to refresh the stale global Unship skill."]
+      : ["Restart your agent, then ask: use unship to generate 3 variants of the hero section."]
+  };
 }
 
 function targetFiles(target, templates) {
-  if (target === "codex") return [{ path: ".agents/skills/unship/SKILL.md", content: templates.skill }];
-  if (target === "antigravity") return [{ path: ".agents/skills/unship/SKILL.md", content: templates.skill }];
-  if (target === "claude") return [{ path: ".claude/skills/unship/SKILL.md", content: templates.skill }, { path: "CLAUDE.md", content: templates.claude }];
-  if (target === "opencode") return [{ path: ".opencode/skills/unship/SKILL.md", content: templates.skill }, { path: ".opencode/commands/unship.md", content: templates.opencodeCommand }];
-  if (target === "all") return [...targetFiles("codex", templates), ...targetFiles("claude", templates), ...targetFiles("opencode", templates), { path: "AGENTS.md", content: templates.agents }];
+  const skill = (path) => ({ path, content: templates.skill, staleGuard: true, forceOverwrite: true });
+  const pointer = (path, content) => ({ path, content, forceOverwrite: false });
+  const command = (path, content) => ({ path, content, staleGuard: true, forceOverwrite: true });
+
+  if (target === "codex") return [skill(".agents/skills/unship/SKILL.md"), pointer("AGENTS.md", templates.agents)];
+  if (target === "antigravity") return [skill(".agents/skills/unship/SKILL.md"), pointer("AGENTS.md", templates.agents)];
+  if (target === "claude") return [skill(".claude/skills/unship/SKILL.md"), pointer("CLAUDE.md", templates.claude)];
+  if (target === "opencode") return [skill(".opencode/skills/unship/SKILL.md"), command(".opencode/commands/unship.md", templates.opencodeCommand)];
+  if (target === "all") {
+    return [
+      skill(".agents/skills/unship/SKILL.md"),
+      skill(".claude/skills/unship/SKILL.md"),
+      skill(".opencode/skills/unship/SKILL.md"),
+      command(".opencode/commands/unship.md", templates.opencodeCommand),
+      pointer("AGENTS.md", templates.agents),
+      pointer("CLAUDE.md", templates.claude)
+    ];
+  }
   throw new Error(`Unknown init target: ${target}`);
 }
 
@@ -81,6 +159,7 @@ function parseFlags(items) {
     else if (item === "--persist") parsed.persist = items[++index];
     else if (item === "--ports") parsed.ports = items[++index];
     else if (item === "--root") parsed.root = items[++index];
+    else if (item === "--dir") parsed.dir = items[++index];
     else if (item === "--include-build") parsed["include-build"] = true;
     else if (item === "--dry-run") parsed["dry-run"] = true;
     else if (item === "--global-shortcuts") parsed["global-shortcuts"] = true;
@@ -137,7 +216,9 @@ function print(value, json) {
   } else {
     const lines = [];
     if (value.written?.length) lines.push(`Wrote ${value.written.join(", ")}`);
+    if (value.stale?.length) lines.push(`Stale existing ${value.stale.join(", ")}`);
     if (value.skipped?.length) lines.push(`Skipped existing ${value.skipped.join(", ")}`);
+    if (value.next?.length) lines.push(...value.next.map((item) => `Next: ${item}`));
     console.log(lines.length ? lines.join("\n") : "Unship initialized.");
   }
 }
@@ -166,5 +247,5 @@ function printCheck(result) {
 }
 
 function printHelp() {
-  console.log("Usage: unship init|setup|snippet|check|doctor");
+  console.log("Usage: unship init|install-skill|setup|snippet|check|doctor");
 }

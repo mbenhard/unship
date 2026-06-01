@@ -257,9 +257,34 @@ Accessibility:
 
 ## CLI Specification
 
+### `unship install-skill`
+
+Installs the global Unship skill for one-time user setup.
+
+Flags:
+
+- `--dir <skills-dir>` default `~/.agents/skills`
+- `--force`
+- `--json`
+
+Default target:
+
+- `~/.agents/skills/unship/SKILL.md`
+
+Write rules:
+
+- Create directories as needed.
+- Do not depend on the current project root.
+- Do not overwrite an existing global Unship skill unless `--force` is present.
+- If the global skill exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx unship@latest install-skill --force`.
+- JSON output includes `{ ok, written, skipped, stale, next }`.
+- Plain output is concise and agent-readable.
+
+Successful output should tell the user to restart their agent and ask for Unship naturally, for example `use unship to generate 3 variants of the hero section`.
+
 ### `unship init`
 
-Installs local agent instructions.
+Installs repo-local agent instructions. This is the fallback path for teams that want Unship instructions committed into a project; the primary user onboarding path is `unship install-skill`.
 
 Flags:
 
@@ -269,7 +294,7 @@ Flags:
 
 Default target:
 
-- `.agents/skills/unship/SKILL.md`
+- `all`: shared `.agents`, Claude, and OpenCode skill/command targets.
 
 Target output:
 
@@ -282,8 +307,10 @@ Target output:
 Write rules:
 
 - Create directories as needed.
-- Do not overwrite existing files unless `--force` is present.
-- JSON output includes `{ ok, written, skipped }`.
+- Do not overwrite existing project pointer files (`AGENTS.md`, `CLAUDE.md`) unless the user edits them manually.
+- Do not overwrite existing managed Unship skill/command files unless `--force` is present.
+- If a managed Unship skill/command file exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx unship init --force --json`.
+- JSON output includes `{ ok, written, skipped, stale, next }`.
 - Plain output is concise and agent-readable.
 
 ### `unship snippet`

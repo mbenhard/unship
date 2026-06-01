@@ -45,11 +45,16 @@ test("init writes portable skill by default", async () => {
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, true);
   assert.equal(json.written.includes(".agents/skills/unship/SKILL.md"), true);
+  assert.equal(json.written.includes(".claude/skills/unship/SKILL.md"), true);
+  assert.equal(json.written.includes(".opencode/commands/unship.md"), true);
   const skill = await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
   assert.match(skill, /Brand read/);
   assert.match(skill, /Fast Start/);
   assert.match(skill, /use unship to generate 4 variants/i);
+  assert.match(skill, /Do not build a custom switcher/i);
+  assert.match(skill, /toolbar discovers/i);
+  assert.match(skill, /project\.skillInstalled.*project\.skillCurrent/s);
   assert.doesNotMatch(skill, /unship-design/);
 });
 
@@ -81,6 +86,69 @@ test("init does not overwrite without force", async () => {
   const json = JSON.parse(second.stdout);
   assert.equal(json.ok, true);
   assert.equal(json.skipped.includes(".agents/skills/unship/SKILL.md"), true);
+});
+
+test("init fails loudly when an installed skill is stale", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "---\nname: unship\n---\n");
+
+  const result = spawnSync(process.execPath, [CLI, "init", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.equal(json.stale.includes(".agents/skills/unship/SKILL.md"), true);
+  assert.match(json.next.join("\n"), /init --force/);
+});
+
+test("install-skill writes the global agents skill", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const skillRoot = join(cwd, "global-skills");
+
+  const result = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.equal(json.written.includes(join(skillRoot, "unship", "SKILL.md")), true);
+  const skill = await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8");
+  assert.match(skill, /name: unship/);
+  assert.match(skill, /npx -y unship@latest/);
+});
+
+test("install-skill skips, fails stale, and refreshes with force", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const skillRoot = join(cwd, "global-skills");
+
+  const first = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
+  assert.equal(first.status, 0, first.stderr);
+
+  const second = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(JSON.parse(second.stdout).skipped.includes(join(skillRoot, "unship", "SKILL.md")), true);
+
+  await writeFixture(join(skillRoot, "unship", "SKILL.md"), "---\nname: unship\n---\nSTALE_MARKER_DO_NOT_KEEP\n");
+
+  const stale = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
+  assert.equal(stale.status, 1);
+  const staleJson = JSON.parse(stale.stdout);
+  assert.equal(staleJson.ok, false);
+  assert.equal(staleJson.stale.includes(join(skillRoot, "unship", "SKILL.md")), true);
+  assert.match(staleJson.next.join("\n"), /install-skill --force/);
+
+  const forced = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--force", "--json"], { cwd, encoding: "utf8" });
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.equal(JSON.parse(forced.stdout).written.includes(join(skillRoot, "unship", "SKILL.md")), true);
+  assert.doesNotMatch(await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8"), /STALE_MARKER_DO_NOT_KEEP/);
+});
+
+test("unknown commands fail instead of printing help as success", () => {
+  const result = spawnSync(process.execPath, [CLI, "next", "--json"], { encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /Unknown command: next/);
 });
 
 test("snippet prints local picker script", () => {

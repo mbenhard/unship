@@ -25,23 +25,28 @@ Parse intent this way:
 
 ## Fast Start
 
-Before reading package internals or searching `node_modules`, ask the CLI what is already true:
+Before reading package internals or searching `node_modules`, choose the CLI prefix:
+
+- If this project already lists `unship` in `package.json`, use `npx unship`.
+- Otherwise use `npx -y unship@latest` so npm does not stop for an install prompt.
+
+Ask the CLI what is already true:
 
 ```bash
-npx unship doctor --json
+npx -y unship@latest doctor --json
 ```
 
-Use `npx unship ...` for every CLI call. Do not assume a bare `unship` binary is on PATH.
+Use the same prefix for every CLI call in this project. Do not assume a bare `unship` binary is on PATH.
 
 If the picker setup is missing, run:
 
 ```bash
-npx unship setup --framework auto --json
+npx -y unship@latest setup --framework auto --json
 ```
 
 Use the returned framework, picker path, and mount status. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
 
-If `doctor` reports `skillCurrent: false`, refresh installed instructions with `npx unship init --force --json` before continuing. If `pickerFileCurrent: false`, run `npx unship setup --framework auto --json`; setup refreshes stale picker files.
+If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `npx -y unship@latest init --force --json` before continuing. If `pickerFileCurrent: false`, run `npx -y unship@latest setup --framework auto --json`; setup refreshes stale picker files.
 
 If `doctor` reports `project.previewServers`, reuse an existing preview URL before starting a new dev server. Verify it is the right app or route, then continue there. Start a dev server only when no suitable preview is reachable.
 
@@ -83,6 +88,8 @@ Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, sub
 
 Wrap each temporary group with `data-unship-pick`. Put direct child choices inside with `data-unship-option`.
 
+Do not build a custom switcher, segmented control, tab set, or app-level preference for Unship comparisons. The source variants are the product; the Unship picker toolbar is the comparison control.
+
 ```html
 <section data-unship-pick="Hero">
   <div data-unship-option="Current">...</div>
@@ -91,6 +98,8 @@ Wrap each temporary group with `data-unship-pick`. Put direct child choices insi
 ```
 
 If setup cannot patch the app automatically, inject the picker locally with `npx unship snippet` or an equivalent dev-only script include.
+
+Before stopping for human choice, open or reuse the preview page and verify the toolbar discovers the group, shows the expected option count, and switches between every option without a reload.
 
 ## Subagent Mode
 
