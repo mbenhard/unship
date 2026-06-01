@@ -31,6 +31,8 @@ Before reading package internals or searching `node_modules`, ask the CLI what i
 npx unship doctor --json
 ```
 
+Use `npx unship ...` for every CLI call. Do not assume a bare `unship` binary is on PATH.
+
 If the picker setup is missing, run:
 
 ```bash

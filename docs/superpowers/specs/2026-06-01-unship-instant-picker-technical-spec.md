@@ -333,7 +333,7 @@ Detection order:
 Adapter rules:
 
 - Next.js: copy to `public/unship-picker.js`, patch `app/layout.*` or `src/app/layout.*` with a `process.env.NODE_ENV === "development"` `next/script` mount.
-- Vite: copy to `public/unship-picker.js`, patch `index.html` with an `import.meta.env.DEV` module import.
+- Vite: copy to `public/unship-picker.js`, patch `index.html` with an `import.meta.env.DEV` module block that creates a script element for `/unship-picker.js`. Do not dynamic-import the public file.
 - Astro: copy to `public/unship-picker.js`, patch a common layout when present; otherwise return manual instructions.
 - SvelteKit: copy to `static/unship-picker.js`, create `src/hooks.client.ts` only when absent; otherwise return manual instructions.
 - Nuxt: copy to `public/unship-picker.js`, create `plugins/unship.client.ts` only when absent; otherwise return manual instructions.
@@ -436,6 +436,7 @@ The portable skill is the primary workflow artifact.
 - subagent-unavailable fallback;
 - local-only cleanup rules;
 - fast start through `npx unship doctor --json` and `npx unship setup --framework auto --json`;
+- explicit use of `npx unship`, not a bare `unship` command that may be absent from PATH;
 - stale install recovery through `skillCurrent` and `pickerFileCurrent`;
 - reuse of `doctor`-reported preview servers before starting new dev servers;
 - natural prompt parsing for requests like `use unship to generate 4 variants for hero section`;

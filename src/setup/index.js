@@ -243,20 +243,35 @@ async function patchVite(root, { dryRun }) {
     return {
       status: "manual",
       framework: "vite",
-      instructions: ["Add a dev-only module script that imports /unship-picker.js to index.html."]
+      instructions: ["Add a dev-only script element injection for /unship-picker.js to index.html."]
     };
   }
   const absolute = join(root, file);
   const original = await readFile(absolute, "utf8");
+  if (original.includes('import("/unship-picker.js")')) {
+    const next = original.replace('import("/unship-picker.js")', `(() => {
+      const script = document.createElement("script");
+      script.src = "/unship-picker.js";
+      script.setAttribute("data-unship-dev", "");
+      document.head.appendChild(script);
+    })()`);
+    if (!dryRun) await writeFile(absolute, next, "utf8");
+    return { status: dryRun ? "would-patch" : "patched", framework: "vite", file };
+  }
   if (original.includes("unship-picker.js")) return { status: "existing", framework: "vite", file };
 
   const snippet = `  <script type="module">
-    if (import.meta.env.DEV) import("/unship-picker.js");
+    if (import.meta.env.DEV) {
+      const script = document.createElement("script");
+      script.src = "/unship-picker.js";
+      script.setAttribute("data-unship-dev", "");
+      document.head.appendChild(script);
+    }
   </script>
 `;
   const next = original.replace("</body>", `${snippet}</body>`);
   if (next === original) {
-    return { status: "manual", framework: "vite", file, instructions: ["Insert the dev-only import snippet before </body>."] };
+    return { status: "manual", framework: "vite", file, instructions: ["Insert the dev-only script element injection before </body>."] };
   }
   if (!dryRun) await writeFile(absolute, next, "utf8");
   return { status: dryRun ? "would-patch" : "patched", framework: "vite", file };

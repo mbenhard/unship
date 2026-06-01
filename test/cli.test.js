@@ -152,8 +152,29 @@ test("setup auto detects vite and patches index html", async () => {
   assert.equal(json.framework, "vite");
   assert.equal(json.mount.status, "patched");
   assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
-  assert.match(await readFile(join(cwd, "index.html"), "utf8"), /import\.meta\.env\.DEV/);
-  assert.match(await readFile(join(cwd, "index.html"), "utf8"), /\/unship-picker\.js/);
+  const html = await readFile(join(cwd, "index.html"), "utf8");
+  assert.match(html, /import\.meta\.env\.DEV/);
+  assert.match(html, /document\.createElement\("script"\)/);
+  assert.match(html, /src = "\/unship-picker\.js"/);
+  assert.doesNotMatch(html, /import\("\/unship-picker\.js"\)/);
+});
+
+test("setup repairs stale vite dynamic import mount", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
+  await writeFixture(
+    join(cwd, "index.html"),
+    '<div id="root"></div>\n<script type="module">\n  if (import.meta.env.DEV) import("/unship-picker.js");\n</script>\n</body>\n'
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.mount.status, "patched");
+  const html = await readFile(join(cwd, "index.html"), "utf8");
+  assert.match(html, /document\.createElement\("script"\)/);
+  assert.doesNotMatch(html, /import\("\/unship-picker\.js"\)/);
 });
 
 test("setup astro patches a common layout when present", async () => {
