@@ -415,7 +415,7 @@ JSON output:
 
 ### `unship doctor`
 
-Prints package name, version, Node version, detected framework, skill installation status, picker file status, dev mount status, likely live preview servers, residue diagnostics, and a short local-only reminder.
+Prints package name, version, Node version, detected framework, skill installation status, whether installed skills are current, picker file status, whether the picker file matches the current package, dev mount status, likely live preview servers, residue diagnostics, and a short local-only reminder.
 
 ## Agent Instruction Specification
 
@@ -436,6 +436,7 @@ The portable skill is the primary workflow artifact.
 - subagent-unavailable fallback;
 - local-only cleanup rules;
 - fast start through `npx unship doctor --json` and `npx unship setup --framework auto --json`;
+- stale install recovery through `skillCurrent` and `pickerFileCurrent`;
 - reuse of `doctor`-reported preview servers before starting new dev servers;
 - natural prompt parsing for requests like `use unship to generate 4 variants for hero section`;
 - `npx unship check` verification before final response.

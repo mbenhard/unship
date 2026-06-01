@@ -132,7 +132,7 @@ function print(value, json) {
     printSetup(value);
   } else if (value.packageName) {
     const preview = value.project.previewServers.length ? value.project.previewServers.map((server) => server.url).join(", ") : "none detected";
-    console.log(`${value.packageName} ${value.version}\nNode ${value.node}\nFramework ${value.project.framework}\nSkill installed ${value.project.skillInstalled ? "yes" : "no"}\nPicker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}\nDev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}\nPreview servers ${preview}\n${value.reminder}`);
+    console.log(`${value.packageName} ${value.version}\nNode ${value.node}\nFramework ${value.project.framework}\nSkill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}\nPicker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}\nDev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}\nPreview servers ${preview}\n${value.reminder}`);
   } else {
     const lines = [];
     if (value.written?.length) lines.push(`Wrote ${value.written.join(", ")}`);

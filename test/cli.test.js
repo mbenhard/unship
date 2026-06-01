@@ -125,6 +125,20 @@ test("setup next copies picker and injects dev-only script in app layout", async
   assert.equal(layoutAfterSecondRun.match(/unship-picker/g).length, 1);
 });
 
+test("setup refreshes an out-of-date picker file", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
+  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
+  await writeFixture(join(cwd, "public", "unship-picker.js"), "old picker\n");
+
+  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.picker.status, "updated");
+  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
+});
+
 test("setup auto detects vite and patches index html", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
@@ -243,7 +257,9 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.match(json.reminder, /local preview tooling/);
   assert.equal(json.project.framework, "next");
   assert.equal(json.project.skillInstalled, true);
+  assert.equal(json.project.skillCurrent, false);
   assert.equal(json.project.pickerFileFound, true);
+  assert.equal(json.project.pickerFileCurrent, false);
   assert.equal(json.project.devMountFound, true);
   assert.equal(json.residue.ok, false);
   assert.equal(json.residue.diagnostics.some((item) => item.file === "app/page.tsx"), true);

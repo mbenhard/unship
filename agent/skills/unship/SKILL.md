@@ -39,6 +39,8 @@ npx unship setup --framework auto --json
 
 Use the returned framework, picker path, and mount status. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
 
+If `doctor` reports `skillCurrent: false`, refresh installed instructions with `npx unship init --force --json` before continuing. If `pickerFileCurrent: false`, run `npx unship setup --framework auto --json`; setup refreshes stale picker files.
+
 If `doctor` reports `project.previewServers`, reuse an existing preview URL before starting a new dev server. Verify it is the right app or route, then continue there. Start a dev server only when no suitable preview is reachable.
 
 ## Brand read

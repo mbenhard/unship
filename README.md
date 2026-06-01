@@ -44,6 +44,7 @@ npx unship doctor --json
 ```
 
 `doctor` also reports likely live preview servers so agents can reuse an existing dev server instead of starting another one.
+It reports stale installed skills or picker files too; use `npx unship init --force` to refresh instructions and rerun `npx unship setup` to refresh the picker.
 
 ## Temporary Markup Contract
 

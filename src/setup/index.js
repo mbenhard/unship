@@ -2,6 +2,8 @@ import { access, copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/p
 import { dirname, join, relative, sep } from "node:path";
 
 const FRAMEWORKS = new Set(["auto", "next", "vite", "astro", "sveltekit", "nuxt", "angular", "universal"]);
+const BUNDLED_SKILL = new URL("../../agent/skills/unship/SKILL.md", import.meta.url);
+const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
 const SKILL_PATHS = [
   ".agents/skills/unship/SKILL.md",
   ".claude/skills/unship/SKILL.md",
@@ -41,7 +43,7 @@ export async function setupProject({ root = process.cwd(), framework = "auto", f
 
 export async function inspectProject({ root = process.cwd(), previewPorts } = {}) {
   const detected = await detectProject(root);
-  const skillInstalled = await existsAny(root, SKILL_PATHS);
+  const skillFile = await firstExisting(root, SKILL_PATHS);
   const pickerFile = await firstExisting(root, PICKER_CANDIDATES);
   const devMount = await findFirstText(root, "unship-picker");
   const previewServers = await detectPreviewServers({
@@ -51,9 +53,12 @@ export async function inspectProject({ root = process.cwd(), previewPorts } = {}
   return {
     framework: detected.framework,
     signals: detected.signals,
-    skillInstalled,
+    skillInstalled: Boolean(skillFile),
+    skillFile,
+    skillCurrent: skillFile ? await fileMatches(join(root, skillFile), BUNDLED_SKILL) : false,
     pickerFileFound: Boolean(pickerFile),
     pickerFile,
+    pickerFileCurrent: pickerFile ? await fileMatches(join(root, pickerFile), BUNDLED_PICKER) : false,
     devMountFound: Boolean(devMount),
     devMountFile: devMount?.file || null,
     previewServers
@@ -152,11 +157,17 @@ function decodeHtml(value) {
 async function installPicker({ root, path, force, dryRun }) {
   const destination = join(root, path);
   if (await existsPath(destination)) {
-    if (!force) return { path, status: "existing" };
+    if (await fileMatches(destination, BUNDLED_PICKER)) {
+      if (!force) return { path, status: "existing" };
+    } else if (!force) {
+      if (dryRun) return { path, status: "would-update" };
+      await copyFile(BUNDLED_PICKER, destination);
+      return { path, status: "updated" };
+    }
   }
   if (dryRun) return { path, status: force ? "would-overwrite" : "would-copy" };
   await mkdir(dirname(destination), { recursive: true });
-  await copyFile(new URL("../picker/unship-picker.js", import.meta.url), destination);
+  await copyFile(BUNDLED_PICKER, destination);
   return { path, status: force ? "overwritten" : "copied" };
 }
 
@@ -380,6 +391,18 @@ async function existsPath(path) {
   try {
     await access(path);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fileMatches(path, referenceUrl) {
+  try {
+    const [left, right] = await Promise.all([
+      readFile(path, "utf8"),
+      readFile(referenceUrl, "utf8")
+    ]);
+    return left === right;
   } catch {
     return false;
   }

@@ -27,6 +27,7 @@ Read in this order:
 - `npx unship check` must distinguish allowed installed instructions from forbidden preview artifacts.
 - `npx unship doctor --json` and `npx unship setup --framework auto --json` are the fast path for capable agents.
 - Doctor reports likely live preview servers so agents should reuse an existing dev server before starting another.
+- Doctor reports stale installed skills and picker files so agents can upgrade existing repos without spelunking.
 
 ## Archive Status
 

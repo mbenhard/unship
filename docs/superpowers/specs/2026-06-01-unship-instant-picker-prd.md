@@ -388,6 +388,7 @@ Small diagnostic command for agent fast paths:
 - detected framework;
 - installed skill status;
 - picker file status;
+- whether installed skill and picker files match the current package;
 - dev mount status;
 - likely live preview servers on common framework ports;
 - cleanup residue diagnostics;
@@ -410,7 +411,7 @@ Use Unship to try a few better pricing section directions.
 The agent should:
 
 1. inspect the existing source and design system;
-2. run `npx unship doctor --json`, reuse a reported preview server when suitable, and run `npx unship setup --framework auto --json` when setup is missing;
+2. run `npx unship doctor --json`, refresh stale installed instructions with `npx unship init --force --json`, reuse a reported preview server when suitable, and run `npx unship setup --framework auto --json` when setup or picker refresh is needed;
 3. identify the target files and preview URL;
 4. create temporary variants using the attribute contract;
 5. tell the user to compare in the browser;
