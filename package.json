@@ -1,0 +1,27 @@
+{
+  "name": "unship",
+  "version": "0.1.0",
+  "description": "Tiny local DOM picker for temporary agent-authored UI variants.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "unship": "./src/cli/index.js"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "agent",
+    "src"
+  ],
+  "scripts": {
+    "check": "node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/setup/index.js && node --check src/picker/unship-picker.js",
+    "test": "node --test",
+    "verify": "npm run check && npm test && npm pack --dry-run"
+  },
+  "devDependencies": {
+    "playwright": "^1.53.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
