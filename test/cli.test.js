@@ -53,7 +53,9 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /Fast Start/);
   assert.match(skill, /use unship to generate 4 variants/i);
   assert.match(skill, /Do not build a custom switcher/i);
-  assert.match(skill, /toolbar discovers/i);
+  assert.match(skill, /Do not start, open, or automate a browser by default/i);
+  assert.match(skill, /detected preview servers as hints/i);
+  assert.doesNotMatch(skill, /Before stopping for human choice, open or reuse the preview page/i);
   assert.match(skill, /project\.skillInstalled.*project\.skillCurrent/s);
   assert.doesNotMatch(skill, /unship-design/);
 });

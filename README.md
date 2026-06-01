@@ -14,7 +14,7 @@ Restart your agent, then ask naturally:
 use unship to generate 3 variants of the hero section
 ```
 
-The installed skill checks the project, wires the local picker when needed, creates source-level variants, verifies the toolbar, and later cleans every Unship artifact before shipping.
+The installed skill checks the project, wires the local picker when needed, creates source-level variants, hands off comparison to you, and later cleans every Unship artifact before shipping.
 
 ## Repo-Local Fallback
 
@@ -106,7 +106,7 @@ generate 3 copywriting variants for the pricing section with unship
 generate 4 variants of the CTA row in the onboarding section with unship
 ```
 
-The installed skill teaches the agent to inspect the existing design language, set up the picker if needed, create source-level variants, and stop for a human choice.
+The installed skill teaches the agent to inspect the existing design language, set up the picker if needed, create source-level variants, and stop for a human choice. Agents should not start, open, or automate a browser by default; detected preview servers are hints for the human, not proof targets for agent visual QA.
 
 Agents should not build a separate tab control, segmented switcher, or app setting for comparison. The `data-unship-*` markup is the source contract and the picker toolbar is the comparison UI.
 

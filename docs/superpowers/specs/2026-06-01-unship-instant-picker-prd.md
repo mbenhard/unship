@@ -36,7 +36,7 @@ Unship is a local design lens:
 1. The agent creates temporary alternatives in the real app source.
 2. The app renders those alternatives as normal HTML.
 3. A tiny picker script discovers the alternatives and toggles visibility instantly.
-4. The human compares variants in the browser.
+4. The agent stops and lets the human compare variants in their own browser preview.
 5. The human tells the agent which option to keep in chat.
 6. The agent removes losing options, removes Unship markup, and verifies cleanup.
 
@@ -414,10 +414,10 @@ Use Unship to try a few better pricing section directions.
 The agent should:
 
 1. inspect the existing source and design system;
-2. run `npx unship doctor --json`, refresh stale installed instructions with `npx unship init --force --json`, reuse a reported preview server when suitable, and run `npx unship setup --framework auto --json` when setup or picker refresh is needed;
-3. identify the target files and preview URL;
+2. run `npx unship doctor --json`, refresh stale installed instructions with `npx unship init --force --json`, report detected preview servers as hints only, and run `npx unship setup --framework auto --json` when setup or picker refresh is needed;
+3. identify the target files and any detected preview hints;
 4. create temporary variants using the attribute contract;
-5. tell the user to compare in the browser;
+5. tell the user which option labels to compare in their own browser preview;
 6. wait for the user to say which option to keep in chat;
 7. keep the chosen source and remove every other option;
 8. remove picker/script/attributes/markers;
@@ -428,7 +428,7 @@ The user should not need to run commands.
 
 ### Brand Read
 
-Before authoring variants, the agent must inspect the existing UI source and, when possible, the rendered page. It should identify:
+Before authoring variants, the agent must inspect the existing UI source. It should identify:
 
 - components and design-system primitives;
 - tokens, utility classes, or CSS variables;
@@ -440,6 +440,8 @@ Before authoring variants, the agent must inspect the existing UI source and, wh
 - explicit brand/product constraints.
 
 Variants must be derived from that vocabulary unless the user explicitly asks to depart from it.
+
+The agent must not start, open, or automate a browser by default. It may mention `doctor`-detected preview servers as hints, but those detections are not proof that the correct route or app is ready. Browser automation is reserved for explicit user requests, uncertain/manual setup, or changes to Unship's picker/setup implementation.
 
 ### Instruction Precedence
 

@@ -466,7 +466,7 @@ The portable skill is the primary workflow artifact.
 - fast start through `npx unship doctor --json` and `npx unship setup --framework auto --json`;
 - explicit use of `npx unship`, not a bare `unship` command that may be absent from PATH;
 - stale install recovery through `skillCurrent` and `pickerFileCurrent`;
-- reuse of `doctor`-reported preview servers before starting new dev servers;
+- detect-only preview handling: mention `doctor`-reported preview servers as hints, but do not start, open, or automate a browser by default;
 - natural prompt parsing for requests like `use unship to generate 4 variants for hero section`;
 - `npx unship check` verification before final response.
 
