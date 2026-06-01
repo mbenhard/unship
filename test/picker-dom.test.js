@@ -195,6 +195,36 @@ test("picker group button opens a menu for choosing groups", async () => {
   await browser.close();
 });
 
+test("picker group menu omits the active group and shows current option summaries", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`
+      <section data-unship-pick="Hero">
+        <div data-unship-option="Current">Hero A</div>
+        <div data-unship-option="Visual" hidden>Hero B</div>
+      </section>
+      <section data-unship-pick="Pricing">
+        <div data-unship-option="Simple">Price A</div>
+        <div data-unship-option="Detailed" hidden>Price B</div>
+      </section>
+      <section data-unship-pick="Footer">
+        <div data-unship-option="Short">Footer A</div>
+        <div data-unship-option="Expanded" hidden>Footer B</div>
+      </section>
+      <script>${await readFile(PICKER, "utf8")}</script>
+    `);
+
+    await page.getByRole("button", { name: /Active group Hero/ }).click();
+    const menuText = await page.locator("[data-unship-toolbar]").evaluate((host) =>
+      Array.from(host.shadowRoot.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent.trim())
+    );
+    assert.deepEqual(menuText, ["PricingSimple", "FooterShort"]);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("picker global shortcuts are opt-in and guarded", async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();

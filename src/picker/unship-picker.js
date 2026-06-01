@@ -1,181 +1,442 @@
 (() => {
-    if (window.__unshipPicker) return;
-    const e = "data-unship-option", t = document.currentScript, n = "local" === t?.getAttribute("data-unship-persist"), i = t?.hasAttribute("data-unship-global-shortcuts"), o = new WeakMap, a = new WeakMap;
-    let r, l, s, d, p, c = [], u = 0, b = !1, h = "bottom", m = !1;
-    const f = {
-        version: "0.1.0",
-        rescan: g,
-        destroy: function() {
-            p?.disconnect(), document.removeEventListener("focusin", A, !0), document.removeEventListener("keydown", E), 
-            window.visualViewport?.removeEventListener("resize", O), l?.host.remove(), delete window.__unshipPicker;
-        },
-        getState: function() {
-            return {
-                groups: c.map(e => ({
-                    label: e.label,
-                    displayLabel: e.displayLabel,
-                    activeOptionIndex: e.activeOptionIndex,
-                    options: e.options.map(e => e.label)
-                })),
-                activeGroupIndex: u,
-                toolbarMode: 0 === c.length ? "none" : 1 === c.length ? "single" : "multi"
-            };
-        }
+  if (window.__unshipPicker) return;
+
+  const OPTION_ATTR = "data-unship-option";
+  const GROUP_SELECTOR = "[data-unship-pick]";
+  const currentScript = document.currentScript;
+  const persistLocal = currentScript?.getAttribute("data-unship-persist") === "local";
+  const useGlobalShortcuts = currentScript?.hasAttribute("data-unship-global-shortcuts");
+
+  const originalDisplayByOption = new WeakMap();
+  const selectedIndexByGroup = new WeakMap();
+
+  let host;
+  let root;
+  let liveRegion;
+  let observer;
+  let groups = [];
+  let activeGroupIndex = 0;
+  let menuOpen = false;
+  let placement = "bottom";
+  let rescanQueued = false;
+
+  const api = {
+    version: "0.1.0",
+    rescan,
+    destroy,
+    getState
+  };
+
+  function rescan() {
+    groups = Array.from(document.querySelectorAll(GROUP_SELECTOR)).map(toGroup).filter(Boolean);
+    disambiguateGroupLabels(groups);
+    if (activeGroupIndex >= groups.length) activeGroupIndex = Math.max(0, groups.length - 1);
+    if (groups.length < 2) menuOpen = false;
+    groups.forEach(applyGroupVisibility);
+    render();
+  }
+
+  function destroy() {
+    observer?.disconnect();
+    document.removeEventListener("focusin", handleDocumentFocus, true);
+    document.removeEventListener("keydown", handleGlobalKeydown);
+    window.visualViewport?.removeEventListener("resize", syncViewportBounds);
+    window.visualViewport?.removeEventListener("scroll", syncViewportBounds);
+    host?.remove();
+    delete window.__unshipPicker;
+  }
+
+  function getState() {
+    return {
+      groups: groups.map((group) => ({
+        label: group.label,
+        displayLabel: group.displayLabel,
+        activeOptionIndex: group.activeOptionIndex,
+        options: group.options.map((option) => option.label)
+      })),
+      activeGroupIndex,
+      toolbarMode: groups.length === 0 ? "none" : groups.length === 1 ? "single" : "multi"
     };
-    function g() {
-        c = Array.from(document.querySelectorAll("[data-unship-pick]")).map(v).filter(Boolean), 
-        function(e) {
-            const t = new Map, n = new Map;
-            e.forEach(e => t.set(e.label, (t.get(e.label) || 0) + 1)), e.forEach(e => {
-                const i = (n.get(e.label) || 0) + 1;
-                n.set(e.label, i), e.displayLabel = t.get(e.label) > 1 ? `${e.label} ${i}` : e.label;
-            });
-        }(c), u >= c.length && (u = Math.max(0, c.length - 1)), c.length < 2 && (b = !1), 
-        c.forEach(x), k();
+  }
+
+  function toGroup(element, groupIndex) {
+    const options = Array.from(element.children)
+      .filter((child) => child.hasAttribute(OPTION_ATTR))
+      .map((child, optionIndex) => ({
+        element: child,
+        label: child.getAttribute(OPTION_ATTR) || `Option ${optionIndex + 1}`,
+        index: optionIndex
+      }));
+
+    if (!options.length) return null;
+
+    const label = element.getAttribute("data-unship-pick") || `Group ${groupIndex + 1}`;
+    const activeOptionIndex =
+      selectedIndexByGroup.get(element) ??
+      restorePersistedSelection(groupIndex, label, options) ??
+      findVisibleOptionIndex(options);
+
+    return {
+      element,
+      index: groupIndex,
+      label,
+      displayLabel: label,
+      options,
+      activeOptionIndex: clamp(activeOptionIndex, options.length)
+    };
+  }
+
+  function disambiguateGroupLabels(nextGroups) {
+    const totals = new Map();
+    const seen = new Map();
+
+    nextGroups.forEach((group) => totals.set(group.label, (totals.get(group.label) || 0) + 1));
+    nextGroups.forEach((group) => {
+      const count = (seen.get(group.label) || 0) + 1;
+      seen.set(group.label, count);
+      group.displayLabel = totals.get(group.label) > 1 ? `${group.label} ${count}` : group.label;
+    });
+  }
+
+  function findVisibleOptionIndex(options) {
+    const index = options.findIndex((option) => {
+      const element = option.element;
+      return !element.hidden && getComputedStyle(element).display !== "none";
+    });
+    return index === -1 ? 0 : index;
+  }
+
+  function applyGroupVisibility(group) {
+    group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
+    group.options.forEach((option, index) => {
+      if (index === group.activeOptionIndex) showOption(option.element);
+      else hideOption(option.element);
+    });
+    selectedIndexByGroup.set(group.element, group.activeOptionIndex);
+  }
+
+  function showOption(element) {
+    if (element.hidden) element.hidden = false;
+
+    if (originalDisplayByOption.has(element)) {
+      const originalDisplay = originalDisplayByOption.get(element);
+      if (originalDisplay) element.style.display = originalDisplay;
+      else if (element.style.display) element.style.removeProperty("display");
+    } else if (element.style.display) {
+      element.style.removeProperty("display");
     }
-    function v(t, i) {
-        const o = Array.from(t.children).filter(t => t.hasAttribute(e)).map((t, n) => ({
-            element: t,
-            label: t.getAttribute(e) || `Option ${n + 1}`,
-            index: n
-        }));
-        if (!o.length) return null;
-        const r = t.getAttribute("data-unship-pick") || `Group ${i + 1}`, l = a.get(t) ?? function(e, t, i) {
-            if (!n) return;
-            try {
-                const n = localStorage.getItem(S(e, t)), o = i.findIndex(e => e.label === n);
-                return -1 === o ? void 0 : o;
-            } catch {
-                return;
-            }
-        }(i, r, o) ?? function(e) {
-            const t = e.findIndex(e => !e.element.hidden && "none" !== getComputedStyle(e.element).display);
-            return -1 === t ? 0 : t;
-        }(o);
-        return {
-            element: t,
-            index: i,
-            label: r,
-            displayLabel: r,
-            options: o,
-            activeOptionIndex: M(l, o.length)
-        };
+  }
+
+  function hideOption(element) {
+    if (!originalDisplayByOption.has(element)) {
+      originalDisplayByOption.set(element, element.style.display || "");
     }
-    function x(e) {
-        e.options.forEach((t, n) => {
-            n === e.activeOptionIndex ? function(e) {
-                e.hidden && (e.hidden = !1);
-                const t = o.get(e);
-                t && e.style.display !== t ? e.style.display = t : !t && e.style.display && e.style.removeProperty("display");
-            }(t.element) : function(e) {
-                o.has(e) || o.set(e, e.style.display || "");
-                e.hidden || (e.hidden = !0);
-                "none" !== e.style.display && (e.style.display = "none");
-            }(t.element);
-        }), a.set(e.element, e.activeOptionIndex);
+    if (!element.hidden) element.hidden = true;
+    if (element.style.display !== "none") element.style.display = "none";
+  }
+
+  function switchOption(delta) {
+    const group = groups[activeGroupIndex];
+    if (!group) return;
+
+    group.activeOptionIndex = wrap(group.activeOptionIndex + delta, group.options.length);
+    applyGroupVisibility(group);
+    persistSelection(group);
+    render();
+    repairFocus(group.options[group.activeOptionIndex].element);
+    announce(group);
+  }
+
+  function switchGroup(delta) {
+    if (groups.length < 2) return;
+
+    activeGroupIndex = wrap(activeGroupIndex + delta, groups.length);
+    menuOpen = false;
+    render();
+    announce(groups[activeGroupIndex]);
+  }
+
+  function pickGroup(index) {
+    if (!Number.isInteger(index) || !groups[index]) return;
+
+    activeGroupIndex = index;
+    menuOpen = false;
+    render();
+    announce(groups[activeGroupIndex]);
+  }
+
+  function render() {
+    if (!root) return;
+
+    const group = groups[activeGroupIndex];
+    if (!group) {
+      root.innerHTML = "";
+      root.append(liveRegion);
+      return;
     }
-    function y(e) {
-        const t = c[u];
-        if (!t) return;
-        const i = t.options[t.activeOptionIndex].element, o = !0;
-        t.activeOptionIndex = T(t.activeOptionIndex + e, t.options.length), x(t), function(e) {
-            if (!n) return;
-            try {
-                localStorage.setItem(S(e.index, e.label), e.options[e.activeOptionIndex].label);
-            } catch {}
-        }(t), k(), function(e, t, n) {
-            if (!n) return;
-            i = t, i.hasAttribute("tabindex") && i.tabIndex >= 0 || /^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(i.tagName) && !i.disabled ? (t.focus({
-                preventScroll: !0
-            }), d = t) : setTimeout(() => l.querySelector(".label")?.focus({
-                preventScroll: !0
-            }));
-            var i;
-        }(i, t.options[t.activeOptionIndex].element, o), L(t);
+
+    group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
+    const option = group.options[group.activeOptionIndex];
+    const mode = groups.length === 1 ? "single" : "multi";
+
+    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}" role="group" aria-label="Unship variant picker">
+      ${groups.length > 1 ? groupButton(group) : ""}
+      ${groups.length > 1 ? menu() : ""}
+      <div class="row">
+        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option">‹</button>
+        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</button>
+        <button class="next nav" type="button" data-action="next" aria-label="Next option">›</button>
+      </div>
+    </div>`;
+    root.append(liveRegion);
+  }
+
+  function groupButton(group) {
+    return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
+      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span><span class="caret">▾</span>
+    </button>`;
+  }
+
+  function menu() {
+    const items = groups
+      .map((group, index) => {
+        if (index === activeGroupIndex) return "";
+        const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
+        return `<button class="menuitem" type="button" role="menuitem" data-action="pick-group" data-index="${index}" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-option">${escapeHtml(option.label)}</span></button>`;
+      })
+      .join("");
+
+    return `<div class="menu" role="menu" aria-hidden="${!menuOpen}">${items}</div>`;
+  }
+
+  function handleToolbarClick(event) {
+    const button = event.target.closest?.("[data-action]");
+    if (!button) return;
+
+    const action = button.dataset.action;
+    if (action === "previous") switchOption(-1);
+    else if (action === "next") switchOption(1);
+    else if (action === "toggle-menu") {
+      menuOpen = !menuOpen;
+      render();
+    } else if (action === "pick-group") {
+      pickGroup(Number(button.dataset.index));
     }
-    function w(e) {
-        c.length < 2 || (u = T(u + e, c.length), b = !1, L(c[u]), k());
+  }
+
+  function handleToolbarMouseDown(event) {
+    if (event.target.closest?.("button")) event.preventDefault();
+  }
+
+  function handleToolbarKeydown(event) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      switchOption(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      switchOption(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      switchGroup(-1);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      switchGroup(1);
+    } else if (event.key === "Escape") {
+      if (!menuOpen) {
+        document.activeElement?.blur();
+        return;
+      }
+      event.preventDefault();
+      menuOpen = false;
+      render();
     }
-    function k() {
-        if (!l) return;
-        const e = c[u];
-        if (!e) return void (l.innerHTML = "");
-        const t = e.options[e.activeOptionIndex];
-        e.activeOptionIndex = M(e.activeOptionIndex, e.options.length);
-        const n = 1 === c.length ? "single" : "multi";
-        l.innerHTML = `<style>\n      .dock{position:fixed;left:var(--unship-left,50%);bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;max-width:var(--unship-max-width,calc(100vw - 20px));display:grid;gap:2px;padding:5px;border:1px solid rgba(255,255,255,.32);border-radius:999px;background:rgba(24,24,27,.72);backdrop-filter:blur(18px) saturate(1.4);color:white;font:500 13px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 10px 24px rgba(0,0,0,.18)}\n      .dock.top{top:14px;bottom:auto}\n      .dock.multi{border-radius:18px}\n      .row{display:flex;align-items:center;gap:2px}\n      button{min-width:44px;min-height:36px;border:0;border-radius:999px;background:transparent;color:inherit;font:inherit;cursor:pointer}\n      button:hover{background:rgba(255,255,255,.12)}\n      button:focus-visible{outline:2px solid white;outline-offset:2px}\n      .label{min-width:0;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px}\n      .group{width:100%;min-height:30px;font-size:12px;opacity:.86}\n      .menu{display:grid;gap:2px;border-top:1px solid rgba(255,255,255,.14);padding-top:4px}\n      .menuitem{justify-content:flex-start;min-height:32px;text-align:left;padding:0 10px}\n      .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}\n      @media (prefers-reduced-motion:reduce){*{transition:none!important}}\n      @media (prefers-reduced-transparency:reduce){.dock{background:rgba(24,24,27,.96);backdrop-filter:none}}\n      @supports not ((backdrop-filter:blur(1px))){.dock{background:rgba(24,24,27,.96)}}\n    </style><div class="dock ${n} ${h}" role="group" aria-label="Unship variant picker">\n      ${c.length > 1 ? `<button class="group" type="button" aria-haspopup="menu" aria-expanded="${b}" aria-label="Active group ${q(e.displayLabel)}">${q(e.displayLabel)} ${e.activeOptionIndex + 1}/${e.options.length}</button>` : ""}\n      <div class="row">\n        <button class="prev" type="button" aria-label="Previous option">‹</button>\n        <button class="label" type="button" aria-label="${q(e.displayLabel)}, ${q(t.label)}, option ${e.activeOptionIndex + 1} of ${e.options.length}">${q(1 === c.length ? `${e.displayLabel}: ${t.label}` : t.label)}</button>\n        <button class="next" type="button" aria-label="Next option">›</button>\n      </div>\n      ${c.length > 1 && b ? `<div class="menu" role="menu">${c.map((e, t) => {
-            const n = e.options[M(e.activeOptionIndex, e.options.length)];
-            return `<button class="menuitem" type="button" role="menuitem" data-index="${t}" aria-label="${q(e.displayLabel)}, ${q(n.label)}">${q(e.displayLabel)}: ${q(n.label)}</button>`;
-        }).join("")}</div>` : ""}\n    </div>`, l.append(s);
-        const i = l.querySelector(".prev"), o = l.querySelector(".next");
-        [ i, o ].forEach(e => e.addEventListener("mousedown", e => e.preventDefault())), 
-        i.addEventListener("click", () => y(-1)), o.addEventListener("click", () => y(1)), 
-        l.querySelector(".group")?.addEventListener("click", () => {
-            b = !b, k();
-        }), l.querySelectorAll(".menuitem").forEach(e => e.addEventListener("click", () => {
-            return t = Number(e.dataset.index), u = t, b = !1, L(c[u]), void k();
-            var t;
-        }));
+  }
+
+  function handleGlobalKeydown(event) {
+    if (root?.activeElement || isTypingTarget(event.target)) return;
+
+    if (event.key === "ArrowLeft") switchOption(-1);
+    else if (event.key === "ArrowRight") switchOption(1);
+    else if (event.key === "ArrowUp") switchGroup(-1);
+    else if (event.key === "ArrowDown") switchGroup(1);
+  }
+
+  function isTypingTarget(target) {
+    return Boolean(
+      target &&
+        (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) ||
+          target.isContentEditable ||
+          target.closest?.("[data-unship-ignore-shortcuts],[role='application']"))
+    );
+  }
+
+  function repairFocus(incomingOption) {
+    if (isFocusable(incomingOption)) {
+      incomingOption.focus({ preventScroll: true });
+      return;
     }
-    function $(e) {
-        "ArrowLeft" === e.key ? (e.preventDefault(), y(-1)) : "ArrowRight" === e.key ? (e.preventDefault(), 
-        y(1)) : "ArrowUp" === e.key ? (e.preventDefault(), w(-1)) : "ArrowDown" === e.key ? (e.preventDefault(), 
-        w(1)) : "Escape" === e.key && (b ? (e.preventDefault(), b = !1, k()) : document.activeElement?.blur());
+    setTimeout(() => root?.querySelector(".label")?.focus({ preventScroll: true }));
+  }
+
+  function isFocusable(element) {
+    return Boolean(
+      element &&
+        ((element.hasAttribute("tabindex") && element.tabIndex >= 0) ||
+          (/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) && !element.disabled))
+    );
+  }
+
+  function announce(group) {
+    const option = group.options[group.activeOptionIndex];
+    liveRegion.textContent = `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`;
+  }
+
+  function queueRescan() {
+    if (rescanQueued) return;
+    rescanQueued = true;
+    requestAnimationFrame(() => {
+      rescanQueued = false;
+      rescan();
+    });
+  }
+
+  function handleDocumentFocus(event) {
+    placeAwayFrom(event.target);
+  }
+
+  function placeAwayFrom(target) {
+    if (!target || host?.contains(target)) return;
+
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const rect = target.getBoundingClientRect?.();
+    placement = rect && rect.bottom > viewportHeight - 96 ? "top" : "bottom";
+    root?.querySelector(".dock")?.classList.toggle("top", placement === "top");
+    root?.querySelector(".dock")?.classList.toggle("bottom", placement !== "top");
+  }
+
+  function syncViewportBounds() {
+    if (!host) return;
+
+    const visualViewport = window.visualViewport;
+    const widths = [visualViewport?.width, window.innerWidth, window.outerWidth, window.screen?.width].filter(
+      (width) => Number.isFinite(width) && width > 0
+    );
+    const width = Math.min(...widths);
+    const center = (visualViewport?.offsetLeft || 0) + width / 2;
+    const visibleBottom = visualViewport
+      ? Math.max(14, window.innerHeight - visualViewport.height - visualViewport.offsetTop + 14)
+      : 14;
+    const visibleTop = visualViewport ? Math.max(14, visualViewport.offsetTop + 14) : 14;
+
+    host.style.setProperty("--unship-left", `${center}px`);
+    host.style.setProperty("--unship-max-width", `${Math.max(240, width - 20)}px`);
+    host.style.setProperty("--unship-bottom", `${visibleBottom}px`);
+    host.style.setProperty("--unship-top", `${visibleTop}px`);
+  }
+
+  function restorePersistedSelection(groupIndex, label, options) {
+    if (!persistLocal) return undefined;
+    try {
+      const savedLabel = localStorage.getItem(storageKey(groupIndex, label));
+      const savedIndex = options.findIndex((option) => option.label === savedLabel);
+      return savedIndex === -1 ? undefined : savedIndex;
+    } catch {
+      return undefined;
     }
-    function E(e) {
-        var t;
-        l?.activeElement || (t = e.target, t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable || Boolean(t.closest?.("[data-unship-ignore-shortcuts],[role='application']")))) || ("ArrowLeft" === e.key ? y(-1) : "ArrowRight" === e.key ? y(1) : "ArrowUp" === e.key ? w(-1) : "ArrowDown" === e.key && w(1));
-    }
-    function L(e) {
-        const t = e.options[e.activeOptionIndex];
-        s.textContent = `${e.displayLabel}, ${t.label}, option ${e.activeOptionIndex + 1} of ${e.options.length}`;
-    }
-    function I() {
-        m || (m = !0, requestAnimationFrame(() => {
-            m = !1, g();
-        }));
-    }
-    function A(t) {
-        d = t.target.closest?.(`[${e}]`) || d, function(e) {
-            if (!e || r?.contains(e)) return;
-            const t = window.visualViewport?.height || window.innerHeight, n = e.getBoundingClientRect?.();
-            h = n && n.bottom > t - 96 ? "top" : "bottom", l?.querySelector(".dock")?.classList.toggle("top", "top" === h);
-        }(t.target);
-    }
-    function O() {
-        if (!r) return;
-        const e = window.visualViewport, t = [ e?.width, window.innerWidth, window.outerWidth, window.screen?.width ].filter(e => Number.isFinite(e) && e > 0), n = Math.min(...t), i = (e?.offsetLeft || 0) + n / 2;
-        r.style.setProperty("--unship-left", `${i}px`), r.style.setProperty("--unship-max-width", `${Math.max(240, n - 20)}px`);
-    }
-    function S(e, t) {
-        return `unship:${location.pathname}:${e}:${t}`;
-    }
-    function M(e, t) {
-        return Math.min(Math.max(e, 0), t - 1);
-    }
-    function T(e, t) {
-        return (e % t + t) % t;
-    }
-    function q(e) {
-        return String(e).replace(/[&<>"']/g, e => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        }[e]));
-    }
-    window.__unshipPicker = f, function() {
-        const e = document.createElement("div");
-        e.setAttribute("data-unship-toolbar", ""), document.documentElement.append(e), r = e, 
-        O(), window.visualViewport?.addEventListener("resize", O), l = e.attachShadow({
-            mode: "open"
-        }), l.addEventListener("keydown", $), s = document.createElement("div"), s.setAttribute("aria-live", "polite"), 
-        s.className = "sr";
-    }(), g(), p = new MutationObserver(I), p.observe(document.documentElement, {
-        childList: !0,
-        subtree: !0,
-        attributes: !0,
-        attributeFilter: [ "data-unship-pick", "data-unship-option", "hidden" ]
-    }), document.addEventListener("focusin", A, !0), i && document.addEventListener("keydown", E);
+  }
+
+  function persistSelection(group) {
+    if (!persistLocal) return;
+    try {
+      localStorage.setItem(storageKey(group.index, group.label), group.options[group.activeOptionIndex].label);
+    } catch {}
+  }
+
+  function storageKey(groupIndex, label) {
+    return `unship:${location.pathname}:${groupIndex}:${label}`;
+  }
+
+  function clamp(value, length) {
+    return Math.min(Math.max(value, 0), length - 1);
+  }
+
+  function wrap(value, length) {
+    return ((value % length) + length) % length;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[character]);
+  }
+
+  function style() {
+    return `<style>
+      .dock{--ease:cubic-bezier(.37,0,.63,1);--dur:.42s;--h:26px;--nav:var(--h);--r:11px;--gap:5px;--navfs:16px;--fs:12px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(256px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border:1px solid rgba(255,255,255,.14);border-radius:calc(var(--r) + var(--gap));background:rgba(24,24,27,.94);backdrop-filter:blur(18px) saturate(1.25);color:#fafafa;font:500 var(--fs)/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 14px 32px rgba(0,0,0,.3)}
+      .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
+      button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+      button:focus-visible{outline:2px solid #fafafa;outline-offset:2px}
+      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .75em 0 .9em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .16s ease}
+      .group:hover{background:rgba(255,255,255,.08)}
+      .open .group{background:rgba(255,255,255,.13)}
+      .group-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .group-count{margin-left:auto;opacity:.5;font-variant-numeric:tabular-nums}
+      .caret{opacity:.55;font-size:.8em;transition:transform var(--dur) var(--ease)}
+      .open .caret{transform:rotate(180deg)}
+      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .16s ease}
+      .open .menu{max-height:200px;opacity:1;visibility:visible}
+      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .75em 0 .9em;border-radius:var(--r);text-align:left;transition:background .12s ease}
+      .menuitem:hover{background:rgba(255,255,255,.08)}
+      .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .menu-option{margin-left:auto;opacity:.5;font-size:.9em;white-space:nowrap}
+      .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
+      .open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:1px solid rgba(255,255,255,.1)}
+      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);border-radius:999px;transition:background .12s ease,transform .14s ease}
+      .nav:hover{background:rgba(255,255,255,.12)}
+      .nav:active{transform:scale(.86)}
+      .label{flex:1;min-width:0;text-align:center;padding:0 .4em;min-height:var(--h);display:grid;place-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:var(--r)}
+      .label:hover{background:rgba(255,255,255,.06)}
+      .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+      @media (prefers-reduced-transparency:reduce){.dock{background:rgba(24,24,27,.98);backdrop-filter:none}}
+      @supports not ((backdrop-filter:blur(1px))){.dock{background:rgba(24,24,27,.98)}}
+    </style>`;
+  }
+
+  function init() {
+    host = document.createElement("div");
+    host.setAttribute("data-unship-toolbar", "");
+    document.documentElement.append(host);
+
+    syncViewportBounds();
+    window.visualViewport?.addEventListener("resize", syncViewportBounds);
+    window.visualViewport?.addEventListener("scroll", syncViewportBounds);
+
+    root = host.attachShadow({ mode: "open" });
+    root.addEventListener("click", handleToolbarClick);
+    root.addEventListener("mousedown", handleToolbarMouseDown);
+    root.addEventListener("keydown", handleToolbarKeydown);
+
+    liveRegion = document.createElement("div");
+    liveRegion.setAttribute("aria-live", "polite");
+    liveRegion.className = "sr";
+
+    rescan();
+    observer = new MutationObserver(queueRescan);
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-unship-pick", OPTION_ATTR, "hidden"]
+    });
+    document.addEventListener("focusin", handleDocumentFocus, true);
+    if (useGlobalShortcuts) document.addEventListener("keydown", handleGlobalKeydown);
+  }
+
+  window.__unshipPicker = api;
+  init();
 })();
