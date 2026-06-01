@@ -14,6 +14,7 @@ Primary references:
 - Codex skills: `https://developers.openai.com/codex/skills`
 - Codex `AGENTS.md`: `https://developers.openai.com/codex/guides/agents-md`
 - Codex app and CLI commands: `https://developers.openai.com/codex/app/commands`, `https://developers.openai.com/codex/cli/slash-commands`
+- Antigravity skills and migration docs: `https://antigravity.google/docs/skills`, `https://antigravity.google/docs/gcli-migration`
 - Claude Code memory and skills: `https://code.claude.com/docs/en/memory`, `https://code.claude.com/docs/en/slash-commands`
 - OpenCode skills and commands: `https://dev.opencode.ai/docs/skills`, `https://dev.opencode.ai/docs/commands`
 - Apple Human Interface Guidelines: materials, accessibility, buttons, keyboards, motion, and layout
@@ -292,6 +293,7 @@ Installs or updates local agent instructions.
 Supported targets:
 
 - `--target codex`
+- `--target antigravity`
 - `--target claude`
 - `--target opencode`
 - `--target all`
@@ -305,13 +307,14 @@ Harness-specific optional outputs:
 
 - Claude: `.claude/skills/unship/SKILL.md`
 - Claude project memory pointer: `CLAUDE.md` importing `@AGENTS.md` when useful
+- Antigravity skill: `.agents/skills/unship/SKILL.md`
 - OpenCode skill: `.opencode/skills/unship/SKILL.md`
 - OpenCode slash command shim: `.opencode/commands/unship.md`
 - Project pointer: `AGENTS.md`
 
 `AGENTS.md` and `CLAUDE.md` should be short pointers, not the full Unship procedure. The full workflow belongs in `SKILL.md` so it loads on demand instead of bloating standing context.
 
-Codex should use `.agents/skills/unship/SKILL.md` as the portable project skill path. Do not default to `.codex/skills`.
+Codex and Antigravity should use `.agents/skills/unship/SKILL.md` as the portable project skill path. Do not default to `.codex/skills` or legacy Antigravity/Gemini paths.
 
 It must not start a daemon or create session state.
 

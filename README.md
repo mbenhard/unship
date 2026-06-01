@@ -11,10 +11,13 @@ npx unship init
 Use harness-specific targets when needed:
 
 ```bash
+npx unship init --target antigravity
 npx unship init --target claude
 npx unship init --target opencode
 npx unship init --target all
 ```
+
+Codex and Antigravity both use the portable workspace skill at `.agents/skills/unship/SKILL.md`.
 
 ## Set Up A Local App
 

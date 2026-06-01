@@ -62,6 +62,7 @@ async function init({ target, force }) {
 
 function targetFiles(target, templates) {
   if (target === "codex") return [{ path: ".agents/skills/unship/SKILL.md", content: templates.skill }];
+  if (target === "antigravity") return [{ path: ".agents/skills/unship/SKILL.md", content: templates.skill }];
   if (target === "claude") return [{ path: ".claude/skills/unship/SKILL.md", content: templates.skill }, { path: "CLAUDE.md", content: templates.claude }];
   if (target === "opencode") return [{ path: ".opencode/skills/unship/SKILL.md", content: templates.skill }, { path: ".opencode/commands/unship.md", content: templates.opencodeCommand }];
   if (target === "all") return [...targetFiles("codex", templates), ...targetFiles("claude", templates), ...targetFiles("opencode", templates), { path: "AGENTS.md", content: templates.agents }];

@@ -53,11 +53,23 @@ test("init writes portable skill by default", async () => {
   assert.doesNotMatch(skill, /unship-design/);
 });
 
-test("init all writes claude and opencode shims", async () => {
+test("init antigravity writes workspace skill", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const result = spawnSync(process.execPath, [CLI, "init", "--target", "antigravity", "--json"], { cwd, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.equal(json.written.includes(".agents/skills/unship/SKILL.md"), true);
+  assert.match(await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+});
+
+test("init all writes shared skill plus claude and opencode shims", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const result = spawnSync(process.execPath, [CLI, "init", "--target", "all", "--json"], { cwd, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).ok, true);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.equal(json.written.includes(".agents/skills/unship/SKILL.md"), true);
   assert.match(await readFile(join(cwd, ".claude", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
   assert.match(await readFile(join(cwd, ".opencode", "commands", "unship.md"), "utf8"), /Use the Unship skill/);
 });

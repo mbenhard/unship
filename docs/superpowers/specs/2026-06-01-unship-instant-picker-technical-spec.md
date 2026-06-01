@@ -263,7 +263,7 @@ Installs local agent instructions.
 
 Flags:
 
-- `--target codex|claude|opencode|all`
+- `--target codex|antigravity|claude|opencode|all`
 - `--force`
 - `--json`
 
@@ -274,9 +274,10 @@ Default target:
 Target output:
 
 - `codex`: `.agents/skills/unship/SKILL.md` and optional short `AGENTS.md` pointer if none exists.
+- `antigravity`: `.agents/skills/unship/SKILL.md`.
 - `claude`: `.claude/skills/unship/SKILL.md` and `CLAUDE.md` importing `@AGENTS.md` when useful.
 - `opencode`: `.opencode/skills/unship/SKILL.md` and `.opencode/commands/unship.md`.
-- `all`: all of the above.
+- `all`: the shared Codex/Antigravity skill target plus Claude and OpenCode outputs.
 
 Write rules:
 
