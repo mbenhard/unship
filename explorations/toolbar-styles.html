@@ -133,6 +133,40 @@ header p{margin:0;color:#71717a;font-size:13px}
   --text:#f4f4f5; --hover-bg:rgba(255,255,255,.08); --sel-bg:rgba(255,255,255,.13);
   --divider:1px solid rgba(255,255,255,.09);
 }
+
+/* 08 Paper — white, gray hairline, two-layer macOS shadow */
+.s8 .dock{
+  --surface:#fff; --edge:1px solid #e4e4e7; --r:14px;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 10px 28px rgba(0,0,0,.1);
+  --text:#18181b; --muted:.55;
+  --hover-bg:#f4f4f5; --sel-bg:#ececef;
+  --divider:1px solid #ececef;
+}
+.s8 .dock .grp.on,.s8 .dock .mi.sel{box-shadow:inset 0 0 0 1px #e0e0e3}
+
+/* 09 Porcelain Inset — light neumorphism, recessed track, embossed selection */
+.s9 .dock{
+  --surface:linear-gradient(180deg,#f6f6f7,#e9e9ec);
+  --edge:1px solid #dcdce0; --r:18px;
+  --shadow:inset 0 1px 0 #fff,0 12px 28px rgba(0,0,0,.12);
+  --text:#27272a; --muted:.55;
+  --hover-bg:rgba(0,0,0,.04); --sel-bg:#e3e3e7;
+  --divider:1px solid rgba(0,0,0,.07);
+}
+.s9 .dock .grp.on{background:#e3e3e7;box-shadow:inset 0 2px 5px rgba(0,0,0,.1),inset 0 -1px 0 rgba(255,255,255,.7)}
+.s9 .dock .mi.sel{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14),inset 0 1px 0 #fff}
+.s9 .dock .nav{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 1px 0 #fff}
+
+/* 10 Print Offset — off-white, solid black border, hard offset shadow, mono */
+.s10 .dock{
+  --surface:#faf9f6; --edge:1.5px solid #111; --r:9px;
+  --fs:11.5px; --font:ui-monospace,"SF Mono",Menlo,monospace;
+  --shadow:4px 4px 0 #111;
+  --text:#111; --muted:.6;
+  --hover-bg:#efede8; --sel-bg:#111;
+  --divider:1.5px solid #111;
+}
+.s10 .dock .grp.on,.s10 .dock .mi.sel{background:#111;color:#faf9f6}
 </style>
 </head>
 <body>
@@ -327,6 +361,96 @@ header p{margin:0;color:#71717a;font-size:13px}
   <div class="card-head">
     <span class="num">07</span><h2>Soft Graphite</h2>
     <p>zinc-700 surface · 22px radius · huge diffuse ambient shadow</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s8">
+  <div class="card-head">
+    <span class="num">08</span><h2>Paper</h2>
+    <p>white · gray hairline · two-layer macOS shadow</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s9">
+  <div class="card-head">
+    <span class="num">09</span><h2>Porcelain Inset</h2>
+    <p>porcelain gradient · recessed active track · embossed white selection</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s10">
+  <div class="card-head">
+    <span class="num">10</span><h2>Print Offset</h2>
+    <p>off-white · 1.5px black border · hard 4px offset shadow · mono type</p>
   </div>
   <div class="stage">
     <div class="dock">
