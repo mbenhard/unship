@@ -337,6 +337,7 @@ async function applyPlan(plan, mode) {
           await writeFile(file.path, file.content, "utf8");
           file.status = file.state === "legacy" && file.role === "command" ? "legacy-replaced-with-shim" : "written";
           file.operation = "wrote";
+          delete file.content;
         } else if (file.operation === "remove") {
           await rm(file.path, { force: true, recursive: true });
           file.status = "removed";

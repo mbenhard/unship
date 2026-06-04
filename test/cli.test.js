@@ -99,6 +99,7 @@ test("install all yes writes shared and claude targets then reruns current", asy
 
   assert.equal(first.status, 0, first.stderr);
   assert.equal(JSON.parse(first.stdout).ok, true);
+  assert.equal(first.stdout.includes('"content"'), false);
   assert.match(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
   assert.match(await readFile(join(home, ".claude", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
   const command = await readFile(join(home, ".claude", "commands", "unship.md"), "utf8");
