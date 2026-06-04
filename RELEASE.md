@@ -32,6 +32,7 @@ The package should publish only these files:
 - `src/agent/index.js`
 - `src/check/index.js`
 - `src/cli/index.js`
+- `src/install/index.js`
 - `src/picker/unship-picker.js`
 - `src/setup/index.js`
 
@@ -84,5 +85,5 @@ npm exec @unship/cli@next -- snippet
 Promote when satisfied:
 
 ```bash
-npm dist-tag add @unship/cli@0.1.0 latest
+npm dist-tag add @unship/cli@0.1.1 latest
 ```

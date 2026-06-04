@@ -202,7 +202,7 @@ mkdir -p /tmp/unship-pack
 npm pack --pack-destination /tmp/unship-pack
 
 cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz
+npm install -D /tmp/unship-pack/unship-cli-0.1.1.tgz
 ./node_modules/.bin/unship doctor --json
 ```
 

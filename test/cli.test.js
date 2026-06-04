@@ -659,7 +659,7 @@ test("doctor json preserves compatibility fields and adds unship summary", async
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.packageName, "@unship/cli");
-  assert.equal(json.version, "0.1.0");
+  assert.equal(json.version, "0.1.1");
   assert.equal(typeof json.node, "string");
   assert.equal(json.project.framework, "next");
   assert.equal(json.residue.ok, false);
@@ -693,6 +693,6 @@ test("doctor reports a live preview server so agents can reuse it", async () => 
 test("doctor plain output reports doctor details", () => {
   const result = spawnSync(process.execPath, [CLI, "doctor"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /@unship\/cli 0\.1\.0/);
+  assert.match(result.stdout, /@unship\/cli 0\.1\.1/);
   assert.match(result.stdout, /local preview tooling/);
 });
