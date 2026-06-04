@@ -495,7 +495,7 @@
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes menuIn{from{max-height:0;opacity:0}to{max-height:min(264px,calc(100vh - 168px));opacity:1}}
       @keyframes itemIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-      @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
+      @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
       .menu-anim .menu{animation:menuIn .2s cubic-bezier(.22,.61,.36,1)}

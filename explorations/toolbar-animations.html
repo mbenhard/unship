@@ -63,7 +63,7 @@ header p{margin:0;color:#71717a;font-size:13px}
 .dock .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ============ shared motion plumbing ============ */
-@keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
+@keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
 @keyframes swapOut{to{opacity:0;transform:translate(calc(var(--dx,0px) * -1),0)}}
 .dock[data-dir="next"] .row{--dx:var(--amp,0px)}
 .dock[data-dir="prev"] .row{--dx:calc(var(--amp,0px) * -1)}
