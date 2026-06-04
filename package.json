@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "unship": "./src/cli/index.js"
+    "unship": "src/cli/index.js"
   },
   "files": [
     "README.md",
