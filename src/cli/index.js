@@ -449,10 +449,25 @@ function printSetup(result) {
 
 function printCheck(result) {
   if (result.ok) {
-    console.log("No Unship preview artifacts found.");
+    console.log(result.summary?.message || "No Unship preview artifacts found.");
     return;
   }
-  console.log(result.diagnostics.map((item) => `${item.file}:${item.line}:${item.column} ${item.message} (${item.pattern})`).join("\n"));
+
+  const lines = [result.summary?.message || "Unship cleanup required."];
+  if (result.explorations?.length) {
+    lines.push("Explorations:");
+    for (const item of result.explorations) {
+      const labels = item.options?.length
+        ? `: ${item.options.join(", ")}`
+        : item.uncertainOptions?.length
+          ? `: uncertain labels ${item.uncertainOptions.join(", ")}`
+          : "";
+      lines.push(`- ${item.pick} in ${item.file}${labels}`);
+    }
+    lines.push("");
+  }
+  lines.push(...result.diagnostics.map((item) => `${item.file}:${item.line}:${item.column} ${item.message} (${item.pattern})`));
+  console.log(lines.join("\n"));
 }
 
 function printHelp() {

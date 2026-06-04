@@ -596,7 +596,7 @@ test("check command returns non-zero for source residue", async () => {
   assert.equal(JSON.parse(result.stdout).ok, false);
 });
 
-test("check command plain output includes cleanup diagnostics", async () => {
+test("check command plain output includes cleanup summary before diagnostics", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await import("node:fs/promises").then(({ mkdir, writeFile }) =>
     mkdir(join(cwd, "src"), { recursive: true }).then(() =>
@@ -605,6 +605,8 @@ test("check command plain output includes cleanup diagnostics", async () => {
   );
   const result = spawnSync(process.execPath, [CLI, "check"], { cwd, encoding: "utf8" });
   assert.equal(result.status, 1);
+  assert.match(result.stdout, /^Unship cleanup required: 1 artifact across 1 file\./);
+  assert.match(result.stdout, /Explorations:\n- Hero in src\/App\.jsx/);
   assert.match(result.stdout, /src\/App\.jsx:1:6/);
   assert.match(result.stdout, /Remove temporary Unship picker markup/);
 });
@@ -628,6 +630,9 @@ test("check json includes structured exploration summaries", async () => {
   assert.equal(Array.isArray(json.diagnostics), true);
   assert.deepEqual(json.explorations[0].options, ["Current", "Proof"]);
   assert.equal(json.cleanupRequired, true);
+  assert.equal(json.summary.artifactCount, 3);
+  assert.equal(json.summary.explorationCount, 1);
+  assert.match(json.summary.message, /Unship cleanup required/);
 });
 
 test("doctor reports package, project setup state, and residue", async () => {

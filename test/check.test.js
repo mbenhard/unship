@@ -74,6 +74,47 @@ test("check summarizes unship explorations with option labels and line ranges", 
   ]);
 });
 
+test("check includes grouped cleanup summary", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "Hero.jsx"),
+    `<section data-unship-pick="Hero">
+  <div data-unship-option="Current">A</div>
+  <div data-unship-option="Proof" hidden>B</div>
+</section>
+`,
+    "utf8"
+  );
+  await writeFile(join(root, "src", "mount.html"), '<script src="/unship-picker.js"></script>\n', "utf8");
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.summary, {
+    artifactCount: 4,
+    fileCount: 2,
+    explorationCount: 1,
+    files: ["src/Hero.jsx", "src/mount.html"],
+    message: "Unship cleanup required: 4 artifacts across 2 files."
+  });
+});
+
+test("check summary reports clean projects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(join(root, "src", "App.jsx"), "<main>Clean</main>\n", "utf8");
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.summary, {
+    artifactCount: 0,
+    fileCount: 0,
+    explorationCount: 0,
+    files: [],
+    message: "No Unship preview artifacts found."
+  });
+});
+
 test("check keeps duplicate group labels as separate explorations", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
   await mkdir(join(root, "src"), { recursive: true });

@@ -45,10 +45,12 @@ export async function checkUnshipResidue({ root = process.cwd(), includeBuild = 
     diagnostics.push(...scanText(rel, text));
     explorations.push(...scanExplorations(rel, text));
   }
+  const summary = summarizeCleanup({ diagnostics, explorations });
   return {
     ok: diagnostics.length === 0,
     diagnostics,
     explorations,
+    summary,
     cleanupRequired: diagnostics.length > 0
   };
 }
@@ -109,6 +111,26 @@ export function scanExplorations(file, text) {
       rangeConfidence: group.rangeConfidence
     };
   });
+}
+
+export function summarizeCleanup({ diagnostics = [], explorations = [] } = {}) {
+  const files = [...new Set(diagnostics.map((item) => item.file))].sort();
+  const artifactCount = diagnostics.length;
+  const fileCount = files.length;
+  const explorationCount = explorations.length;
+  return {
+    artifactCount,
+    fileCount,
+    explorationCount,
+    files,
+    message: artifactCount
+      ? `Unship cleanup required: ${artifactCount} ${plural("artifact", artifactCount)} across ${fileCount} ${plural("file", fileCount)}.`
+      : "No Unship preview artifacts found."
+  };
+}
+
+function plural(word, count) {
+  return count === 1 ? word : `${word}s`;
 }
 
 function elementForAttribute(text, attrOffset, lineStarts) {
