@@ -487,17 +487,17 @@
 
   function style() {
     return `<style>
-      .dock{--ease:cubic-bezier(0,0,.2,1);--dur:.18s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
+      .dock{--ease:cubic-bezier(.32,.72,0,1);--dur:.28s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
       button:focus-visible{outline:0;background:rgba(255,255,255,.12)}
-      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .14s ease,color .14s ease}
+      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .18s ease,color .18s ease}
       .group:hover{background:rgba(255,255,255,.12)}
       .open .group{background:#f5f5f5;color:#000}
       .open .group .group-count{opacity:.55}
       .group-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
-      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
+      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .16s ease,visibility 0s linear var(--dur)}
       .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
       .menuitem:hover{background:rgba(255,255,255,.12)}
@@ -520,13 +520,15 @@
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes menuIn{from{max-height:0}to{max-height:min(264px,calc(100vh - 168px))}}
       @keyframes itemIn{from{opacity:0}}
+      @keyframes groupIn{from{background:rgba(255,255,255,.12);color:#fff}}
       @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
-      .menu-anim .menu{animation:menuIn .22s cubic-bezier(.22,.61,.36,1)}
-      .menu-anim .menuitem{animation:itemIn .22s ease .18s backwards}
-      .menu-anim .menuitem:nth-child(2){animation-delay:.22s}
-      .menu-anim .menuitem:nth-child(n+3){animation-delay:.26s}
+      .menu-anim .menu{animation:menuIn var(--dur) var(--ease)}
+      .menu-anim .group{animation:groupIn var(--dur) var(--ease)}
+      .menu-anim .menuitem{animation:itemIn .24s ease .22s backwards}
+      .menu-anim .menuitem:nth-child(2){animation-delay:.26s}
+      .menu-anim .menuitem:nth-child(n+3){animation-delay:.3s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
       .dock[data-dir="next"] .group{--dx:0px;--dy:8px}

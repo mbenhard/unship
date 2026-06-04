@@ -34,6 +34,8 @@ This is a design artifact. The picker only changes after a winner is picked, in 
 
 - 2026-06-04 (round 5, review feedback): (a) menu item reveal simplified to the godly overlay rule — container unmasks via max-height only, items are a pure staggered opacity fade (240ms ease, 30ms cascade, 300ms total), removing the compound slide+expand+double-fade; (b) picking a group from the menu now plays the same contract animation as closing — `pickGroup` updates the visible group/label texts on the live dock and routes through `closeMenu()` instead of re-rendering; the hidden menu list goes stale but is rebuilt by the render required before it can reopen.
 
+- 2026-06-04 (round 6, review feedback): expand/contract unified onto one motion spec — `--dur:.28s` and `--ease:cubic-bezier(.32,.72,0,1)` (quick start, soft landing) drive the panel unmask, the contraction, and the nav-row shift symmetrically. Items now intro AFTER the expansion (two-beat rhythm: 220ms base delay, 40ms stagger, 240ms fades), per review. The active group pill blooms from its hover tone (`groupIn`, same dur/ease) instead of snapping white, continuous with the pressed state. Group hover/state color transition 180ms. An experiment with no item intro at all was tried and rejected.
+
 ## Page Structure
 
 - Header: title, one-line context, host-tone toggle (light/dark stage behind the docks).
