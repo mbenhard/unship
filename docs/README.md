@@ -6,11 +6,13 @@ This folder now tracks the hard-reset Unship direction: a tiny local DOM picker 
 
 Read in this order:
 
-1. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
-2. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
-3. `docs/superpowers/plans/2026-06-01-unship-instant-picker-implementation-plan.md`
-4. `docs/plans/2026-06-01-unship-instant-picker-prd-review.md`
-5. `docs/plans/current-run.md`
+1. `docs/plans/current-run.md`
+2. `docs/superpowers/specs/2026-06-04-unship-agent-fast-prototyping-design.md`
+3. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
+4. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
+5. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
+
+Older implementation plans are execution records, not current behavior specs.
 
 ## Current Product Decisions
 
