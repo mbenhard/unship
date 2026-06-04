@@ -77,6 +77,52 @@ test("toolbar uses CSS chevrons instead of font arrow glyphs", async () => {
   }
 });
 
+test("toolbar animates only the changing counter number", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`
+      <section data-unship-pick="Treatment">
+        <div data-unship-option="A">A</div>
+        <div data-unship-option="B" hidden>B</div>
+        <div data-unship-option="C" hidden>C</div>
+      </section>
+      <section data-unship-pick="Density">
+        <div data-unship-option="Simple">D</div>
+      </section>
+      <script>${picker}</script>
+    `);
+
+    await page.getByRole("button", { name: /next option/i }).click();
+    const counter = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const root = host.shadowRoot;
+      return {
+        text: root.querySelector(".group-count").textContent.trim(),
+        currentText: root.querySelector(".group-count-current").textContent.trim(),
+        totalText: root.querySelector(".group-count-total").textContent.trim(),
+        currentAnimates: root.querySelector(".group-count-current").classList.contains("swap"),
+        totalAnimates: root.querySelector(".group-count-total").classList.contains("swap"),
+        nextDy: getComputedStyle(root.querySelector(".group-count-current")).getPropertyValue("--dy").trim()
+      };
+    });
+
+    assert.equal(counter.text, "2/3");
+    assert.equal(counter.currentText, "2");
+    assert.equal(counter.totalText, "3");
+    assert.equal(counter.currentAnimates, true);
+    assert.equal(counter.totalAnimates, false);
+    assert.equal(counter.nextDy, "8px");
+
+    await page.getByRole("button", { name: /previous option/i }).click();
+    const previousDy = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+      getComputedStyle(host.shadowRoot.querySelector(".group-count-current")).getPropertyValue("--dy").trim()
+    );
+    assert.equal(previousDy, "-8px");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("toolbar does not outline or ring the active variant title after switching", async () => {
   const browser = await chromium.launch();
   try {

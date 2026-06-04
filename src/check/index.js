@@ -60,8 +60,8 @@ export function scanText(file, text) {
   const lines = text.split(/\r?\n/);
   lines.forEach((lineText, index) => {
     for (const pattern of PATTERNS) {
-      const column = lineText.indexOf(pattern);
-      if (column !== -1) {
+      let column = lineText.indexOf(pattern);
+      while (column !== -1) {
         diagnostics.push({
           file,
           line: index + 1,
@@ -69,6 +69,7 @@ export function scanText(file, text) {
           pattern,
           message: "Remove temporary Unship picker markup before shipping."
         });
+        column = lineText.indexOf(pattern, column + pattern.length);
       }
     }
   });

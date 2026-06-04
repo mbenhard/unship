@@ -25,7 +25,7 @@
   let menuJustOpened = false;
 
   const api = {
-    version: "0.1.1",
+    version: "0.1.2",
     rescan,
     destroy,
     getState
@@ -246,7 +246,7 @@
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" data-action="toggle-placement" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position">
           <span class="label-main${swapClass}">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
-          ${groups.length === 1 ? `<span class="option-count${swapClass}">${group.activeOptionIndex + 1}/${group.options.length}</span>` : ""}
+          ${groups.length === 1 ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
@@ -274,8 +274,12 @@
 
   function groupButton(group, swapClass = "") {
     return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
-      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count${swapClass}">${group.activeOptionIndex + 1}/${group.options.length}</span>
+      <span class="group-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group, swapClass)}
     </button>`;
+  }
+
+  function counterMarkup(className, group, swapClass = "") {
+    return `<span class="${className}"><span class="${className}-current${swapClass}">${group.activeOptionIndex + 1}</span><span class="${className}-slash">/</span><span class="${className}-total">${group.options.length}</span></span>`;
   }
 
   function menu() {
@@ -497,6 +501,8 @@
       .open .group .group-count{opacity:.55}
       .group-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
+      .group-count,.option-count{display:inline-flex;align-items:baseline}
+      .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
       .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .16s ease,visibility 0s linear var(--dur)}
       .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
@@ -531,10 +537,10 @@
       .menu-anim .menuitem:nth-child(n+3){animation-delay:.3s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
-      .dock[data-dir="next"] .group{--dx:0px;--dy:8px}
-      .dock[data-dir="prev"] .group{--dx:0px;--dy:-8px}
-      .label-main.swap,.option-count.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
-      .group-count.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
+      .dock[data-dir="next"] .group-count-current,.dock[data-dir="next"] .option-count-current{--dx:0px;--dy:8px}
+      .dock[data-dir="prev"] .group-count-current,.dock[data-dir="prev"] .option-count-current{--dx:0px;--dy:-8px}
+      .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+      .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>`;

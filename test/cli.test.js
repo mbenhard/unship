@@ -267,6 +267,20 @@ test("install project in empty repo defers setup instead of creating a shell", a
   await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
 });
 
+test("install project in dependency-only package repo defers setup", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { prettier: "3.0.0" } }));
+
+  const result = await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.project.included, true);
+  assert.equal(json.project.status, "deferred");
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
+});
+
 test("uninstall project removes current picker file but leaves app source deliberate", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
@@ -722,7 +736,7 @@ test("doctor json reports update availability from npm registry", async () => {
   await withServer((request, response) => {
     assert.equal(request.url, "/%40unship%2Fcli");
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ "dist-tags": { latest: "0.1.2" } }));
+    response.end(JSON.stringify({ "dist-tags": { latest: "0.1.3" } }));
   }, async (port) => {
     const result = await runCli(["doctor", "--json"], cwd, {
       UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}`
@@ -732,8 +746,8 @@ test("doctor json reports update availability from npm registry", async () => {
     const json = JSON.parse(result.stdout);
     assert.equal(json.updates.checked, true);
     assert.equal(json.updates.available, true);
-    assert.equal(json.updates.current, "0.1.1");
-    assert.equal(json.updates.latest, "0.1.2");
+    assert.equal(json.updates.current, "0.1.2");
+    assert.equal(json.updates.latest, "0.1.3");
     assert.match(json.updates.next, /install --repair/);
     assert.equal(json.next[0], json.updates.next);
   });
@@ -778,6 +792,26 @@ test("doctor next actions prioritize stale skill and picker repairs", async () =
   assert.equal(json.next.some((item) => /Hero/.test(item)), true);
 });
 
+test("doctor caps exploration labels in next actions", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
+  await writeFixture(
+    join(cwd, "app", "page.tsx"),
+    Array.from({ length: 5 }, (_, index) =>
+      `<section data-unship-pick="Group ${index + 1}"><div data-unship-option="Current">${index}</div></section>`
+    ).join("\n")
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "doctor", "--json", "--no-update-check"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  const explorationAction = json.next.find((item) => /Existing Unship explorations detected/.test(item));
+  assert.match(explorationAction, /Group 1, Group 2, Group 3, and 2 more/);
+  assert.doesNotMatch(explorationAction, /Group 4/);
+  assert.doesNotMatch(explorationAction, /Group 5/);
+});
+
 test("doctor json preserves compatibility fields and adds unship summary", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
@@ -795,7 +829,7 @@ test("doctor json preserves compatibility fields and adds unship summary", async
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.packageName, "@unship/cli");
-  assert.equal(json.version, "0.1.1");
+  assert.equal(json.version, "0.1.2");
   assert.equal(typeof json.node, "string");
   assert.equal(json.project.framework, "next");
   assert.equal(json.residue.ok, false);
@@ -829,6 +863,6 @@ test("doctor reports a live preview server so agents can reuse it", async () => 
 test("doctor plain output reports doctor details", () => {
   const result = spawnSync(process.execPath, [CLI, "doctor", "--no-update-check"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /@unship\/cli 0\.1\.1/);
+  assert.match(result.stdout, /@unship\/cli 0\.1\.2/);
   assert.match(result.stdout, /local comparison tooling/);
 });

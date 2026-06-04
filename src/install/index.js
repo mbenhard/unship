@@ -265,12 +265,12 @@ async function planInstallProject(context) {
   const include = context.project || (context.interactive && !context.yes && !context.noProject && !context.json);
   if (context.noProject || !include) return { included: false, status: "skipped" };
   const detected = await detectProject(context.root);
-  if (detected.framework === "universal" && detected.signals.length === 0) {
+  if (detected.framework === "universal") {
     return {
       included: true,
       status: "deferred",
       detected,
-      reason: "No app source, framework signal, or preview shell exists yet."
+      reason: "No supported app shell or framework signal exists yet."
     };
   }
   if (context.dryRun) {

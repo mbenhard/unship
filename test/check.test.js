@@ -22,6 +22,26 @@ test("check reports unship preview artifacts in application source", async () =>
   assert.equal(result.diagnostics[0].line, 1);
 });
 
+test("check reports every artifact occurrence on the same line", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "App.jsx"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Proof">B</div></section>\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostics.length, 3);
+  assert.deepEqual(result.diagnostics.map((item) => item.pattern), [
+    "data-unship-pick",
+    "data-unship-option",
+    "data-unship-option"
+  ]);
+});
+
 test("check allows docs and installed instruction files to document the contract", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
   await mkdir(join(root, "docs"), { recursive: true });

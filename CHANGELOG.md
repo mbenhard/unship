@@ -2,6 +2,14 @@
 
 All notable changes to Unship are documented here.
 
+## Unreleased
+
+## 0.1.2 - 2026-06-04
+
+- Harden install, doctor, and check output for the first beta package.
+- Add update awareness and grouped cleanup summaries.
+- Keep repo-local docs and explorations out of the public GitHub surface.
+
 ## 0.1.0 - 2026-06-04
 
 Initial beta release.

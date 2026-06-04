@@ -5,7 +5,8 @@ Unship is experimental local UI variant tooling. The current direction is tempor
 Before implementation work, verify current behavior in the live repo:
 
 - `package.json` for package shape, scripts, and runtime constraints.
-- `README.md` and `docs/README.md` for the current product direction.
+- `README.md` for public product direction.
+- `docs/README.md` only when the local private docs folder exists.
 - `src/` for implementation truth.
 - `test/` for expected behavior and edge cases.
 - `agent/` for bundled instructions installed into consuming projects.
@@ -14,10 +15,29 @@ Before implementation work, verify current behavior in the live repo:
 
 - Keep preview tooling local and temporary unless the current specs say otherwise.
 - Prefer small, direct code and avoid runtime dependencies without a clear reason.
-- Do not assume historical patch-session ideas are active; check `docs/README.md` before carrying old concepts forward.
+- Do not assume historical patch-session ideas are active; if local `docs/README.md` exists, check it before carrying old concepts forward.
 - Treat agent instructions as product surface. Changes to installed skills, memory files, or command shims should be covered by tests.
 - Keep slash commands and root instruction files as thin pointers to the bundled skill. Do not duplicate workflow, command sequences, or historical assumptions outside `agent/skills/unship/SKILL.md` unless tests cover the generated output.
 - Keep root `AGENTS.md` and `CLAUDE.md` lightweight. Put detailed behavior in source, tests, README, or docs where it can evolve deliberately.
+
+## Public Repo Boundary
+
+`docs/` and `explorations/` are local working material, not public GitHub surface. Keep them ignored and local unless the project direction explicitly changes. User-facing and contributor-facing truth should live in `README.md`, `RELEASE.md`, `CHANGELOG.md`, source, tests, or bundled agent instructions.
+
+Do not rely on local-only docs for behavior that users or external contributors need. If a local plan affects product behavior, either encode it in source/tests or summarize the durable decision in a tracked public file.
+
+## Release Truth Rules
+
+The package may be ahead of npm before first publish. In that state, use `CHANGELOG.md` `Unreleased` entries instead of pretending a version has shipped.
+
+When changing package contents, commands, package name, binary name, or version, update the full release truth set in one coherent change:
+
+- `package.json` and `package-lock.json` when package metadata changes.
+- `README.md`, `RELEASE.md`, `CHANGELOG.md`, and `CONTRIBUTING.md` when commands, versions, or release workflow examples change.
+- `agent/skills/unship/SKILL.md` and `src/agent/index.js` when installed agent behavior or generated shims change.
+- `test/package-smoke.test.js` when the intended published file list changes.
+
+Before claiming a release or publish is complete, verify with `npm run verify`, `npm publish --dry-run`, and registry smoke tests after publish.
 
 ## Internal Local Testing
 

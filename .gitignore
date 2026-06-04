@@ -1,7 +1,11 @@
 .DS_Store
 .unship/
+docs/
 e2e/artifacts/
+explorations/
 node_modules/
+unship-tests/
+unship-tests-v2/
 unship-*.tgz
 npm-debug.log*
 yarn-debug.log*

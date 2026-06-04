@@ -310,10 +310,15 @@ function nextActions({ project, unship, updates }) {
   }
 
   if (unship.activeExplorationCount > 0) {
-    const labels = unship.explorations.map((item) => item.pick).join(", ");
+    const labels = summarizeLabels(unship.explorations.map((item) => item.pick));
     actions.push(`Existing Unship explorations detected: ${labels}. Settle overlapping work before creating another overlapping exploration.`);
   }
   return actions;
+}
+
+function summarizeLabels(labels, limit = 3) {
+  if (labels.length <= limit) return labels.join(", ");
+  return `${labels.slice(0, limit).join(", ")}, and ${labels.length - limit} more`;
 }
 
 function print(value, json) {

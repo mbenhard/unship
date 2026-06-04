@@ -35,6 +35,7 @@ The package should publish only these files:
 - `src/install/index.js`
 - `src/picker/unship-picker.js`
 - `src/setup/index.js`
+- `src/update/index.js`
 
 The `files` array in `package.json` and `test/package-smoke.test.js` enforce this.
 
@@ -85,5 +86,5 @@ npm exec @unship/cli@next -- snippet
 Promote when satisfied:
 
 ```bash
-npm dist-tag add @unship/cli@0.1.1 latest
+npm dist-tag add @unship/cli@0.1.2 latest
 ```

@@ -1,9 +1,24 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+
+const EXPECTED_PACKED_FILES = [
+  "LICENSE",
+  "README.md",
+  "agent/AGENTS.md",
+  "agent/skills/unship/SKILL.md",
+  "package.json",
+  "src/agent/index.js",
+  "src/check/index.js",
+  "src/cli/index.js",
+  "src/install/index.js",
+  "src/picker/unship-picker.js",
+  "src/setup/index.js",
+  "src/update/index.js"
+];
 
 test("packed package is small and excludes legacy implementation paths", () => {
   const result = spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
@@ -11,25 +26,20 @@ test("packed package is small and excludes legacy implementation paths", () => {
   const pack = JSON.parse(result.stdout)[0];
   const files = pack.files.map((file) => file.path);
   assert.equal(pack.size < 30_000, true, `package size ${pack.size} should stay under 30 KB`);
-  assert.deepEqual(files.sort(), [
-    "LICENSE",
-    "README.md",
-    "agent/AGENTS.md",
-    "agent/skills/unship/SKILL.md",
-    "package.json",
-    "src/agent/index.js",
-    "src/check/index.js",
-    "src/cli/index.js",
-    "src/install/index.js",
-    "src/picker/unship-picker.js",
-    "src/setup/index.js",
-    "src/update/index.js"
-  ]);
+  assert.deepEqual(files.sort(), EXPECTED_PACKED_FILES);
   assert.equal(files.some((file) => file.startsWith("src/bridge/")), false);
   assert.equal(files.some((file) => file.startsWith("src/core/")), false);
   assert.equal(files.some((file) => file.startsWith("src/runtime/")), false);
   assert.equal(files.some((file) => file.startsWith("src/toolbar/")), false);
   assert.equal(files.includes("src/picker/unship-picker.js"), true);
+});
+
+test("release docs list every packed package file", async () => {
+  const release = await readFile(new URL("../RELEASE.md", import.meta.url), "utf8");
+
+  for (const file of EXPECTED_PACKED_FILES) {
+    assert.match(release, new RegExp(`- \`${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\``));
+  }
 });
 
 test("packed package smoke runs seamless install commands", async () => {
