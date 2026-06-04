@@ -1,0 +1,44 @@
+# Toolbar Motion Exploration — Design
+
+Date: 2026-06-04
+Status: Approved
+
+## Goal
+
+Explore subtle, lightweight animations for the Unship picker dock (now shipped in the Godly Ink style) on an interactive comparison page, so one motion system can be chosen and ported into `src/picker/unship-picker.js`.
+
+This is a design artifact. The picker only changes after a winner is picked, in a separate step.
+
+## Decisions
+
+- Venue: `explorations/toolbar-animations.html`, committed to this repo. Same chassis as `explorations/toolbar-styles.html` (cards, stage, host-tone toggle), with the Godly Ink skin throughout.
+- Moments covered: dock entrance, menu open/close, option switch. Press feedback is out of scope for this round.
+- Structure: coherent motion systems, not per-moment treatments. Each card is one complete motion personality applied to all three moments.
+- Interaction: each card hosts one interactive dock replica — clicking the group row toggles the menu, the prev/next chevrons cycle real option labels, and a "Replay entrance" button re-runs the load-in animation.
+- Constraints: CSS-only motion (transitions/keyframes), portable 1:1 into the picker's `style()`. No libraries. `prefers-reduced-motion: reduce` disables all of it. Nothing slower than 300ms.
+
+## The Four Motion Systems
+
+1. **M1 Godly Strict** — the DESIGN.md language verbatim. 150ms `cubic-bezier(.4,0,.2,1)` everywhere; entrance 300ms fade + 6px rise; menu 150ms fade + 4px drop with fast height; option switch is a pure label crossfade.
+2. **M2 Calm Spring** — transforms with gentle overshoot `cubic-bezier(.34,1.56,.64,1)` around 240ms; entrance rises and settles with ~2px overshoot; menu unfurls with springy translate and ~25ms item stagger; label slides 8px with a spring settle.
+3. **M3 Ink Quiet** — the barely-there pole. 120ms opacity-only, zero movement; entrance is a 200ms fade; menu fades fast; old label snaps out, new label fades in.
+4. **M4 Directional** — motion communicates direction. 180–260ms decelerating curves; entrance slides up from the bottom edge; menu unfurls downward from the group pill; the incoming label slides from the side of the chevron that was pressed; the count ticks vertically.
+
+## Page Structure
+
+- Header: title, one-line context, host-tone toggle (light/dark stage behind the docks).
+- Four cards in the same grid/card chrome as the styling page. Each card: number (M1–M4), system name, caption listing durations/easings, one interactive Godly Ink dock (multi-group: Hero layout 3 options, Pricing card, Testimonials), and a "Replay entrance" control.
+- Shared vanilla JS (~40 lines) wires interactions only — all motion lives in CSS. Option labels cycle through the real picker-domain copy so the switch animation is felt with content.
+- A short hint line on each stage: "click row · ‹ › · replay".
+
+## Verification
+
+- Open in a browser; exercise all three moments per card, on both stage tones.
+- `git diff --check`.
+- `npm run verify` once (explorations/ stays out of the packed package, guarded by `test/package-smoke.test.js`).
+
+## Out of Scope
+
+- Changes to `src/picker/unship-picker.js` (happens after a winner is chosen).
+- Press/hover feedback styling beyond what Godly Ink already ships.
+- JS-driven animation, scroll-linked effects, or any dependency.
