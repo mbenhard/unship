@@ -1,7 +1,7 @@
 # Toolbar Motion Exploration — Design
 
 Date: 2026-06-04
-Status: Approved
+Status: Implemented — final motion system shipped in `src/picker/unship-picker.js` (evolved from concept M5 through review rounds 2–6 below; approved as final for single and multi mode)
 
 ## Goal
 

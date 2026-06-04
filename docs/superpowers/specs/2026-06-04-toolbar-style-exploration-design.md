@@ -1,7 +1,7 @@
 # Toolbar Style Exploration — Design
 
 Date: 2026-06-04
-Status: Approved
+Status: Implemented — concept 13 Godly Ink shipped in `src/picker/unship-picker.js` (see Revisions)
 
 ## Goal
 
