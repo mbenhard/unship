@@ -70,6 +70,69 @@ header p{margin:0;color:#71717a;font-size:13px}
   --shadow:inset 0 1px 0 rgba(255,255,255,.16),0 18px 42px rgba(0,0,0,.28);
   backdrop-filter:blur(18px) saturate(1.2);
 }
+
+/* 02 Matte Ink — flat near-black, hairline, tight shadow */
+.s2 .dock{
+  --surface:#131316; --edge:1px solid #2a2a2e; --r:12px;
+  --shadow:0 2px 10px rgba(0,0,0,.35);
+  --text:#e7e7ea; --hover-bg:#1c1c20; --sel-bg:#232327;
+  --divider:1px solid #232327;
+}
+
+/* 03 Carbon Bevel — stacked shadows, dual inset bevel, raised controls */
+.s3 .dock{
+  --surface:linear-gradient(180deg,#2e2e33,#1b1b1f);
+  --edge:1px solid #0b0b0d; --r:14px;
+  --shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.5),0 10px 22px rgba(0,0,0,.45),0 28px 56px rgba(0,0,0,.3);
+  --hover-bg:rgba(255,255,255,.07);
+}
+.s3 .dock .grp.on,.s3 .dock .mi.sel{
+  background:linear-gradient(180deg,#3b3b41,#2a2a2f);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.45);
+}
+.s3 .dock .nav{background:linear-gradient(180deg,#37373d,#26262b);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.4)}
+
+/* 04 Etched Wells — dark neumorphism, recessed active rows, embossed nav */
+.s4 .dock{
+  --surface:#1e1e22; --edge:1px solid rgba(255,255,255,.04); --r:18px;
+  --shadow:0 12px 32px rgba(0,0,0,.38);
+  --hover-bg:rgba(0,0,0,.25); --divider:1px solid rgba(0,0,0,.4);
+}
+.s4 .dock .grp.on,.s4 .dock .mi.sel{
+  background:#17171a;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.05);
+}
+.s4 .dock .nav{background:#26262b;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.45)}
+
+/* 05 Hairline Instrument — 1px rules, square radii, monospace, tabular */
+.s5 .dock{
+  --surface:rgba(12,12,14,.93); --edge:1px solid rgba(255,255,255,.3);
+  --r:5px; --fs:11px; --font:ui-monospace,"SF Mono",Menlo,monospace;
+  --shadow:0 6px 18px rgba(0,0,0,.25);
+  --text:#f2f2f2; --hover-bg:rgba(255,255,255,.07); --sel-bg:transparent;
+  --divider:1px solid rgba(255,255,255,.18);
+  font-weight:500;
+}
+.s5 .dock .grp.on,.s5 .dock .mi.sel{box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}
+.s5 .dock .nav{border-radius:4px}
+.s5 .dock .label .name{text-transform:uppercase;letter-spacing:.08em;font-size:10px}
+
+/* 06 OLED Contour — pure black, bright contour, no shadow, inverted selection */
+.s6 .dock{
+  --surface:#000; --edge:1px solid rgba(255,255,255,.35); --r:16px;
+  --shadow:none; --text:#fff;
+  --hover-bg:rgba(255,255,255,.1); --sel-bg:rgba(255,255,255,.14);
+  --divider:1px solid rgba(255,255,255,.22);
+}
+.s6 .dock .mi.sel{background:#fff;color:#000}
+
+/* 07 Soft Graphite — lighter surface, generous radius, huge diffuse shadow */
+.s7 .dock{
+  --surface:#3f3f46; --edge:0; --r:22px; --gap:7px;
+  --shadow:0 28px 64px rgba(0,0,0,.45),0 6px 16px rgba(0,0,0,.22);
+  --text:#f4f4f5; --hover-bg:rgba(255,255,255,.08); --sel-bg:rgba(255,255,255,.13);
+  --divider:1px solid rgba(255,255,255,.09);
+}
 </style>
 </head>
 <body>
@@ -84,6 +147,186 @@ header p{margin:0;color:#71717a;font-size:13px}
   <div class="card-head">
     <span class="num">01</span><h2>Glass Dock</h2>
     <p>zinc gradient · 18px backdrop blur · inset top highlight · deep soft shadow</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s2">
+  <div class="card-head">
+    <span class="num">02</span><h2>Matte Ink</h2>
+    <p>flat #131316 · hairline border · tight 10px shadow · nothing else</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s3">
+  <div class="card-head">
+    <span class="num">03</span><h2>Carbon Bevel</h2>
+    <p>stacked outer shadows · dual inset bevel · gradient raised controls</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s4">
+  <div class="card-head">
+    <span class="num">04</span><h2>Etched Wells</h2>
+    <p>inner-shadow wells · embossed nav buttons · recessed active rows</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s5">
+  <div class="card-head">
+    <span class="num">05</span><h2>Hairline Instrument</h2>
+    <p>translucent black · 1px rules · 5px radii · ui-monospace · tabular numerals</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s6">
+  <div class="card-head">
+    <span class="num">06</span><h2>OLED Contour</h2>
+    <p>pure #000 · bright contour line · no shadow · inverted selection</p>
+  </div>
+  <div class="stage">
+    <div class="dock">
+      <div class="row">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+    <div class="dock">
+      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+      <div class="menu">
+        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
+        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
+        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+      </div>
+      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
+      <div class="row split">
+        <button class="nav l" aria-label="Previous variant"></button>
+        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
+        <button class="nav r" aria-label="Next variant"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card s7">
+  <div class="card-head">
+    <span class="num">07</span><h2>Soft Graphite</h2>
+    <p>zinc-700 surface · 22px radius · huge diffuse ambient shadow</p>
   </div>
   <div class="stage">
     <div class="dock">
