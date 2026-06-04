@@ -172,6 +172,22 @@
     announce(groups[activeGroupIndex]);
   }
 
+  function closeMenu() {
+    if (!menuOpen) return;
+    menuOpen = false;
+
+    const dock = root?.querySelector(".dock");
+    if (!dock) {
+      render();
+      return;
+    }
+
+    dock.classList.remove("open", "menu-anim");
+    dock.querySelector(".group")?.setAttribute("aria-expanded", "false");
+    dock.querySelector(".menu")?.setAttribute("aria-hidden", "true");
+    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
+  }
+
   function render() {
     if (!root) return;
 
@@ -257,9 +273,13 @@
     if (action === "previous") switchOption(-1);
     else if (action === "next") switchOption(1);
     else if (action === "toggle-menu") {
-      menuOpen = !menuOpen;
-      if (menuOpen) menuJustOpened = true;
-      render();
+      if (menuOpen) {
+        closeMenu();
+      } else {
+        menuOpen = true;
+        menuJustOpened = true;
+        render();
+      }
     } else if (action === "toggle-placement") {
       placementLocked = true;
       placement = placement === "top" ? "bottom" : "top";
@@ -292,8 +312,7 @@
         return;
       }
       event.preventDefault();
-      menuOpen = false;
-      render();
+      closeMenu();
     }
   }
 
@@ -453,7 +472,7 @@
       .open .group .group-count{opacity:.55}
       .group-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
-      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .14s ease}
+      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
       .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
       .menuitem:hover{background:rgba(255,255,255,.12)}
@@ -461,7 +480,7 @@
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:1px solid rgba(255,255,255,.15)}
-      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:background .12s ease,transform .12s ease}
+      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
       .next::before{transform:rotate(45deg) translate(-1px,1px)}
@@ -475,19 +494,20 @@
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes menuIn{from{max-height:0;opacity:0}to{max-height:min(264px,calc(100vh - 168px));opacity:1}}
-      @keyframes itemIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+      @keyframes itemIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
       @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
-      .menu-anim .menu{animation:menuIn .18s cubic-bezier(0,0,.2,1)}
-      .menu-anim .menuitem{animation:itemIn .18s cubic-bezier(0,0,.2,1) backwards}
-      .menu-anim .menuitem:nth-child(2){animation-delay:.02s}
-      .menu-anim .menuitem:nth-child(n+3){animation-delay:.04s}
+      .menu-anim .menu{animation:menuIn .2s cubic-bezier(.22,.61,.36,1)}
+      .menu-anim .menuitem{animation:itemIn .22s cubic-bezier(.22,.61,.36,1) backwards}
+      .menu-anim .menuitem:nth-child(2){animation-delay:.03s}
+      .menu-anim .menuitem:nth-child(n+3){animation-delay:.06s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
-      .dock[data-dir="next"] .group{--dy:-5px}
-      .dock[data-dir="prev"] .group{--dy:5px}
-      .label-main.swap,.option-count.swap,.group-count.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+      .dock[data-dir="next"] .group,.dock[data-dir="next"] .option-count{--dx:0px;--dy:8px}
+      .dock[data-dir="prev"] .group,.dock[data-dir="prev"] .option-count{--dx:0px;--dy:-8px}
+      .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+      .option-count.swap,.group-count.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>`;
