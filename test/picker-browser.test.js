@@ -40,7 +40,7 @@ test("toolbar uses comfortable circular option controls", async () => {
 
     assert.equal(metrics.width, metrics.height);
     assert.equal(metrics.width >= 32 && metrics.width <= 44, true);
-    assert.equal(metrics.dockRadius >= 21 && metrics.dockRadius <= 23, true);
+    assert.equal(metrics.dockRadius >= 23 && metrics.dockRadius <= 25, true);
     assert.equal(metrics.radius >= metrics.width / 2, true);
   } finally {
     await browser.close();

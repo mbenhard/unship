@@ -55,6 +55,8 @@ Light:
 
 - 2026-06-04 (round 2): After review, dropped concepts 05 Hairline Instrument, 07 Soft Graphite, 08 Paper, 09 Porcelain Inset, and 10 Print Offset. Added three concepts derived from the godly.website design system captured in `~/development/unship.dev/DESIGN.md`: 11 Godly Pills (free-floating frosted pills, neutral-600/30 + 8px blur, no slab), 12 Godly Chrome (fixed-chrome recipe, neutral-400/80 + 12px blur slab, pill rows, superellipse), 13 Godly Ink (solid black, neutral-100 active pill, no shadow at rest). All three use Inter/system 500, −0.02em tracking, full-round rows. Keeper numbering (01–04, 06) retained.
 
+- 2026-06-04 (round 3): Concept 13 Godly Ink selected as the final direction and ported into `src/picker/unship-picker.js`: solid `#000` slab with 24px outer radius, full-round rows, `#f5f5f5` active group pill with black text, uniform `rgba(255,255,255,.12)` hovers, `.15` divider, Inter/system 500 at 12.5px with −0.02em tracking, no border, no resting shadow, backdrop-filter fallbacks removed. The dock-radius guard in `test/picker-browser.test.js` updated to the new 24px geometry. Next exploration: subtle, lightweight interaction animations.
+
 ## Out of Scope
 
 - Any change to `src/picker/unship-picker.js` or other product code.
