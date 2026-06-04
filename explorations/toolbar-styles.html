@@ -23,44 +23,52 @@ header p{margin:0;color:#71717a;font-size:13px}
 .card-head .num{font:600 11px/1 ui-monospace,Menlo,monospace;color:#a1a1aa}
 .card-head h2{font-size:13.5px;font-weight:650;margin:0}
 .card-head p{margin:0;color:#71717a;font-size:12.5px}
-.stage{display:flex;align-items:flex-end;justify-content:center;gap:36px;padding:48px 24px 28px;
+.stage{display:flex;align-items:flex-end;justify-content:center;gap:36px;padding:48px 24px 22px;
   background:radial-gradient(var(--stage-line) 1px,transparent 1px) 0 0/18px 18px,var(--stage-bg);
   transition:background .2s}
+.spec{display:flex;flex-direction:column;align-items:center;gap:12px}
+.tag{font:500 10px/1 ui-monospace,Menlo,monospace;color:#85858e;letter-spacing:.05em;text-transform:uppercase}
 
-/* ============ dock anatomy (shared — skins must not change structure) ============ */
+/* ============ dock anatomy (mirrors src/picker/unship-picker.js style()) ============ */
 .dock{
   /* skin token contract — every skin overrides a subset of these */
-  --h:34px; --r:16px; --gap:6px; --fs:12px;
-  --font:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --h:34px; --nav:34px; --r:16px; --gap:6px; --fs:12px; --navfs:18px;
+  --font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --surface:#232327; --text:#fafafa; --muted:.62;
   --edge:1px solid transparent; --shadow:none;
-  --hover-bg:rgba(255,255,255,.1); --sel-bg:rgba(255,255,255,.14);
+  --hover-bg:rgba(255,255,255,.1);
+  --sel-bg:rgba(255,255,255,.14); --sel-ring:inset 0 0 0 1px rgba(255,255,255,.08);
   --divider:1px solid rgba(255,255,255,.1);
-  width:328px; flex:none; padding:var(--gap);
+  width:328px; flex:none; display:block;
+  padding:var(--gap);
   border:var(--edge); border-radius:calc(var(--r) + var(--gap));
   background:var(--surface); color:var(--text);
   box-shadow:var(--shadow);
   font:600 var(--fs)/1.2 var(--font);
 }
-.dock button{display:flex;align-items:center;border:0;margin:0;background:transparent;color:inherit;font:inherit;cursor:pointer;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease,box-shadow .12s ease}
-.dock .name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dock .cnt{margin-left:auto;opacity:var(--muted);font-variant-numeric:tabular-nums}
-.dock .grp{gap:.65em}
-.dock .grp:hover,.dock .mi:hover{background:var(--hover-bg)}
-.dock .grp.on,.dock .mi.sel{background:var(--sel-bg)}
-.dock .mi{gap:.8em}
-.dock .mi .name{font-weight:500}
-.dock .mi .opt{margin-left:auto;opacity:var(--muted);font-size:.9em;white-space:nowrap}
-.dock .menu{display:flex;flex-direction:column}
-.dock .row{display:flex;align-items:center}
-.dock .row button{width:auto}
-.dock .split{margin-top:var(--gap);padding-top:var(--gap);border-top:var(--divider)}
-.dock .nav{flex:none;width:var(--h);padding:0;display:grid;place-items:center;border-radius:999px}
+.dock button{border:0;margin:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.dock .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .14s ease,box-shadow .14s ease}
+.dock .group:hover{background:var(--hover-bg)}
+.dock.open .group{background:var(--sel-bg);box-shadow:var(--sel-ring)}
+.dock .group-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock .group-count{margin-left:auto;opacity:var(--muted);font-variant-numeric:tabular-nums}
+.dock .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden}
+.dock.open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible}
+.dock .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
+.dock .menuitem:hover{background:var(--hover-bg)}
+.dock .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock .menu-option{margin-left:auto;opacity:var(--muted);font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dock .row{display:flex;align-items:center;gap:.3em}
+.dock.open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:var(--divider)}
+.dock .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:background .12s ease}
 .dock .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
-.dock .nav.l::before{transform:rotate(-135deg)}
-.dock .nav.r::before{transform:rotate(45deg)}
-.dock .label{flex:1;justify-content:center;gap:.55em}
-.dock .label .cnt{margin-left:0}
+.dock .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
+.dock .next::before{transform:rotate(45deg) translate(-1px,1px)}
+.dock .nav:hover{background:var(--nav-hover,var(--hover-bg))}
+.dock .label{flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r)}
+.dock .label:hover{background:transparent;box-shadow:none}
+.dock .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock .option-count{flex:none;opacity:var(--muted);font-variant-numeric:tabular-nums}
 
 /* ============ skins ============ */
 /* 01 Glass Dock — refined current style (control) */
@@ -68,6 +76,7 @@ header p{margin:0;color:#71717a;font-size:13px}
   --surface:linear-gradient(180deg,rgba(39,39,42,.96),rgba(24,24,27,.96));
   --edge:1px solid rgba(255,255,255,.18);
   --shadow:inset 0 1px 0 rgba(255,255,255,.16),0 18px 42px rgba(0,0,0,.28);
+  --nav-hover:rgba(255,255,255,.14);
   backdrop-filter:blur(18px) saturate(1.2);
 }
 
@@ -75,7 +84,8 @@ header p{margin:0;color:#71717a;font-size:13px}
 .s2 .dock{
   --surface:#131316; --edge:1px solid #34343a; --r:12px;
   --shadow:0 2px 10px rgba(0,0,0,.35);
-  --text:#e7e7ea; --hover-bg:#1c1c20; --sel-bg:#232327;
+  --text:#e7e7ea; --hover-bg:#1c1c20;
+  --sel-bg:#232327; --sel-ring:none;
   --divider:1px solid #232327;
 }
 
@@ -86,19 +96,19 @@ header p{margin:0;color:#71717a;font-size:13px}
   --shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.5),0 10px 22px rgba(0,0,0,.45),0 28px 56px rgba(0,0,0,.3);
   --hover-bg:rgba(255,255,255,.07);
 }
-.s3 .dock .grp.on,.s3 .dock .mi.sel{
+.s3 .dock.open .group{
   background:linear-gradient(180deg,#3b3b41,#2a2a2f);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.45);
 }
 .s3 .dock .nav{background:linear-gradient(180deg,#37373d,#26262b);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.4)}
 
-/* 04 Etched Wells — dark neumorphism, recessed active rows, embossed nav */
+/* 04 Etched Wells — dark neumorphism, recessed active group, embossed nav */
 .s4 .dock{
   --surface:#1e1e22; --edge:1px solid rgba(255,255,255,.07); --r:18px;
   --shadow:0 12px 32px rgba(0,0,0,.38);
   --hover-bg:rgba(0,0,0,.25); --divider:1px solid rgba(0,0,0,.4);
 }
-.s4 .dock .grp.on,.s4 .dock .mi.sel{
+.s4 .dock.open .group{
   background:#17171a;
   box-shadow:inset 0 2px 6px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.05);
 }
@@ -109,28 +119,30 @@ header p{margin:0;color:#71717a;font-size:13px}
   --surface:rgba(12,12,14,.93); --edge:1px solid rgba(255,255,255,.3);
   --r:5px; --fs:11px; --font:ui-monospace,"SF Mono",Menlo,monospace;
   --shadow:0 6px 18px rgba(0,0,0,.25);
-  --text:#f2f2f2; --hover-bg:rgba(255,255,255,.07); --sel-bg:transparent;
+  --text:#f2f2f2; --hover-bg:rgba(255,255,255,.07);
+  --sel-bg:transparent; --sel-ring:inset 0 0 0 1px rgba(255,255,255,.45);
   --divider:1px solid rgba(255,255,255,.18);
   font-weight:500;
 }
-.s5 .dock .grp.on,.s5 .dock .mi.sel{box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}
 .s5 .dock .nav{border-radius:4px}
-.s5 .dock .label .name{text-transform:uppercase;letter-spacing:.08em;font-size:10px}
+.s5 .dock .label-main{text-transform:uppercase;letter-spacing:.08em;font-size:10px}
 
-/* 06 OLED Contour — pure black, bright contour, no shadow, inverted selection */
+/* 06 OLED Contour — pure black, bright contour, no shadow, inverted active group */
 .s6 .dock{
   --surface:#000; --edge:1px solid rgba(255,255,255,.35); --r:16px;
   --shadow:none; --text:#fff;
-  --hover-bg:rgba(255,255,255,.1); --sel-bg:rgba(255,255,255,.14);
+  --hover-bg:rgba(255,255,255,.1);
+  --sel-bg:#fff; --sel-ring:none;
   --divider:1px solid rgba(255,255,255,.22);
 }
-.s6 .dock .mi.sel{background:#fff;color:#000}
+.s6 .dock.open .group{color:#000}
 
 /* 07 Soft Graphite — lighter surface, generous radius, huge diffuse shadow */
 .s7 .dock{
   --surface:#3f3f46; --edge:0; --r:22px; --gap:7px;
   --shadow:0 28px 64px rgba(0,0,0,.45),0 6px 16px rgba(0,0,0,.22);
-  --text:#f4f4f5; --hover-bg:rgba(255,255,255,.08); --sel-bg:rgba(255,255,255,.13);
+  --text:#f4f4f5; --hover-bg:rgba(255,255,255,.08);
+  --sel-bg:rgba(255,255,255,.13); --sel-ring:none;
   --divider:1px solid rgba(255,255,255,.09);
 }
 
@@ -139,22 +151,22 @@ header p{margin:0;color:#71717a;font-size:13px}
   --surface:#fff; --edge:1px solid #e4e4e7; --r:14px;
   --shadow:0 1px 2px rgba(0,0,0,.05),0 10px 28px rgba(0,0,0,.1);
   --text:#18181b; --muted:.55;
-  --hover-bg:#f4f4f5; --sel-bg:#ececef;
+  --hover-bg:#f4f4f5;
+  --sel-bg:#ececef; --sel-ring:inset 0 0 0 1px #e0e0e3;
   --divider:1px solid #ececef;
 }
-.s8 .dock .grp.on,.s8 .dock .mi.sel{box-shadow:inset 0 0 0 1px #e0e0e3}
 
-/* 09 Porcelain Inset — light neumorphism, recessed track, embossed selection */
+/* 09 Porcelain Inset — light neumorphism, recessed active group, embossed nav */
 .s9 .dock{
   --surface:linear-gradient(180deg,#f6f6f7,#e9e9ec);
   --edge:1px solid #dcdce0; --r:18px;
   --shadow:inset 0 1px 0 #fff,0 12px 28px rgba(0,0,0,.12);
   --text:#27272a; --muted:.55;
-  --hover-bg:rgba(0,0,0,.04); --sel-bg:#e3e3e7;
+  --hover-bg:rgba(0,0,0,.04);
   --divider:1px solid rgba(0,0,0,.07);
 }
-.s9 .dock .grp.on{background:#e3e3e7;box-shadow:inset 0 2px 5px rgba(0,0,0,.1),inset 0 -1px 0 rgba(255,255,255,.7)}
-.s9 .dock .mi.sel{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14),inset 0 1px 0 #fff}
+.s9 .dock.open .group{background:#e3e3e7;box-shadow:inset 0 2px 5px rgba(0,0,0,.1),inset 0 -1px 0 rgba(255,255,255,.7)}
+.s9 .dock .menuitem:hover{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .s9 .dock .nav{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 1px 0 #fff}
 
 /* 10 Print Offset — off-white, solid black border, hard offset shadow, mono */
@@ -163,16 +175,16 @@ header p{margin:0;color:#71717a;font-size:13px}
   --fs:11.5px; --font:ui-monospace,"SF Mono",Menlo,monospace;
   --shadow:4px 4px 0 #111;
   --text:#111; --muted:.6;
-  --hover-bg:#efede8; --sel-bg:#111;
+  --hover-bg:#efede8;
   --divider:1.5px solid #111;
 }
-.s10 .dock .grp.on,.s10 .dock .mi.sel{background:#111;color:#faf9f6}
+.s10 .dock.open .group{background:#111;color:#faf9f6;box-shadow:none}
 </style>
 </head>
 <body>
 <header>
   <h1>Unship dock — 10 monochrome styling concepts</h1>
-  <p>Same anatomy in every card; only the skin changes. Spec: docs/superpowers/specs/2026-06-04-toolbar-style-exploration-design.md</p>
+  <p>Real picker anatomy in every card; only the skin changes. Spec: docs/superpowers/specs/2026-06-04-toolbar-style-exploration-design.md</p>
   <button id="tone" type="button">Stage: light</button>
 </header>
 <main class="grid">
@@ -183,26 +195,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>zinc gradient · 18px backdrop blur · inset top highlight · deep soft shadow</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -213,26 +229,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>flat #131316 · hairline border · tight 10px shadow · nothing else</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -243,26 +263,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>stacked outer shadows · dual inset bevel · gradient raised controls</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -270,29 +294,33 @@ header p{margin:0;color:#71717a;font-size:13px}
 <section class="card s4">
   <div class="card-head">
     <span class="num">04</span><h2>Etched Wells</h2>
-    <p>inner-shadow wells · embossed nav buttons · recessed active rows</p>
+    <p>inner-shadow wells · embossed nav buttons · recessed active group</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -303,26 +331,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>translucent black · 1px rules · 5px radii · ui-monospace · tabular numerals</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -330,29 +362,33 @@ header p{margin:0;color:#71717a;font-size:13px}
 <section class="card s6">
   <div class="card-head">
     <span class="num">06</span><h2>OLED Contour</h2>
-    <p>pure #000 · bright contour line · no shadow · inverted selection</p>
+    <p>pure #000 · bright contour line · no shadow · inverted active group</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -363,26 +399,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>zinc-700 surface · 22px radius · huge diffuse ambient shadow</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -393,26 +433,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>white · gray hairline · two-layer macOS shadow</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -420,29 +464,33 @@ header p{margin:0;color:#71717a;font-size:13px}
 <section class="card s9">
   <div class="card-head">
     <span class="num">09</span><h2>Porcelain Inset</h2>
-    <p>porcelain gradient · recessed active track · embossed white selection</p>
+    <p>porcelain gradient · recessed active group · embossed white nav</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>
@@ -453,26 +501,30 @@ header p{margin:0;color:#71717a;font-size:13px}
     <p>off-white · 1.5px black border · hard 4px offset shadow · mono type</p>
   </div>
   <div class="stage">
-    <div class="dock">
-      <div class="row">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
+    <div class="spec">
+      <div class="dock single">
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
+      <span class="tag">1 group · collapsed</span>
     </div>
-    <div class="dock">
-      <button class="grp on"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-      <div class="menu">
-        <button class="mi"><span class="name">Minimal hero</span><span class="opt">1</span></button>
-        <button class="mi sel"><span class="name">Split hero</span><span class="opt">2</span></button>
-        <button class="mi"><span class="name">Full-bleed hero</span><span class="opt">3</span></button>
+    <div class="spec">
+      <div class="dock multi open">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
       </div>
-      <button class="grp"><span class="name">Pricing card</span><span class="cnt">1/2</span></button>
-      <div class="row split">
-        <button class="nav l" aria-label="Previous variant"></button>
-        <button class="label"><span class="name">Hero layout</span><span class="cnt">2/3</span></button>
-        <button class="nav r" aria-label="Next variant"></button>
-      </div>
+      <span class="tag">3 groups · menu open</span>
     </div>
   </div>
 </section>

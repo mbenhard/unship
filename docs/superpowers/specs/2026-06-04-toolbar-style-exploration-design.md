@@ -11,9 +11,9 @@ This is a design artifact, not product code. Nothing in the picker changes as pa
 
 ## Decisions
 
-- Subject: the real Unship dock anatomy — nav chevrons, group label, option count (collapsed); group rows, divider, variant menu (open).
+- Subject: the real Unship dock anatomy as rendered by `src/picker/unship-picker.js` — single-group mode: one row (chevrons, "Group: Option" label, option count); multi-group open mode: active group row (highlighted), group-switcher menu listing the other groups with their active options, divider, nav row showing the active option label.
 - Tone: monochrome/grayscale only. 7 dark concepts, 3 light concepts.
-- States: every concept shows collapsed and open states side by side.
+- States: every concept shows the single-group collapsed dock and the multi-group open dock side by side.
 - Location: `explorations/toolbar-styles.html`, committed to this repo.
 - Approach: shared skeleton + per-concept skins. Dock markup and anatomy CSS are identical across all 10 cards; each concept overrides only its skin (surface, border, outer/inner shadows, radius, typography) via CSS custom properties plus minimal per-skin rules where tokens cannot express the effect (e.g. dual inset bevels).
 
