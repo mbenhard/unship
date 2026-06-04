@@ -136,3 +136,43 @@ test("check marks dynamic option labels as uncertain", async () => {
   assert.deepEqual(result.explorations[0].options, ["Literal"]);
   assert.deepEqual(result.explorations[0].uncertainOptions, ["variantLabel"]);
 });
+
+test("check marks nested non-direct option labels as uncertain", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "NestedOption.jsx"),
+    `<section data-unship-pick="Hero">
+  <div data-unship-option="Direct">A</div>
+  <div>
+    <span data-unship-option="Nested">Ignored by picker</span>
+  </div>
+</section>
+`,
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.explorations[0].options, ["Direct"]);
+  assert.deepEqual(result.explorations[0].uncertainOptions, ["Nested"]);
+});
+
+test("check ignores JSX props before the pick attribute when finding group range", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "JsxProps.jsx"),
+    `<section icon={<Icon />} data-unship-pick="Hero">
+  <div data-unship-option="Current">A</div>
+</section>
+`,
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.explorations[0].options, ["Current"]);
+  assert.equal(result.explorations[0].endLine, 3);
+  assert.equal(result.explorations[0].rangeConfidence, "high");
+});

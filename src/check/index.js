@@ -114,8 +114,9 @@ export function scanExplorations(file, text) {
 function tagNameForAttribute(lineText, attr) {
   const index = lineText.indexOf(attr);
   const before = index === -1 ? "" : lineText.slice(0, index);
-  const match = before.match(/<([A-Za-z][\w:.-]*)\b[^<]*$/);
-  return match?.[1] || null;
+  const withoutExpressions = stripJsxExpressions(before);
+  const matches = Array.from(withoutExpressions.matchAll(/<([A-Za-z][\w:.-]*)\b/g));
+  return matches.at(-1)?.[1] || null;
 }
 
 function findElementRange(lines, startIndex, tag) {
@@ -134,7 +135,7 @@ function tagDelta(lineText, tag) {
   let delta = 0;
   const escaped = escapeRegExp(tag);
   const token = new RegExp(`</?${escaped}\\b[^>]*>`, "g");
-  for (const match of lineText.matchAll(token)) {
+  for (const match of stripJsxExpressions(lineText).matchAll(token)) {
     const value = match[0];
     if (value.startsWith("</")) delta -= 1;
     else if (!value.endsWith("/>")) delta += 1;
@@ -146,15 +147,21 @@ function collectOptionLabels(lines, startIndex, endIndex, nestedRanges, rangeCon
   const options = [];
   const uncertainOptions = [];
   let bareCount = 0;
+  let depth = 0;
 
   for (let index = startIndex; index <= endIndex; index += 1) {
-    if (isInsideNestedRange(index, nestedRanges)) continue;
+    if (isInsideNestedRange(index, nestedRanges)) {
+      depth += markupDelta(lines[index]);
+      continue;
+    }
 
     for (const value of attributeValues(lines[index], OPTION_ATTR, bareCount + 1)) {
       if (value.bare) bareCount += 1;
-      if (rangeConfidence !== "high" || value.kind !== "literal") uncertainOptions.push(value.value);
+      const depthAtAttribute = depth + markupDelta(lines[index].slice(0, value.index));
+      if (rangeConfidence !== "high" || value.kind !== "literal" || depthAtAttribute !== 1) uncertainOptions.push(value.value);
       else options.push(value.value);
     }
+    depth += markupDelta(lines[index]);
   }
 
   return { options, uncertainOptions };
@@ -170,14 +177,29 @@ function attributeValues(lineText, attr, bareIndex = 1) {
     const full = match[0];
     if (full.includes("=")) {
       const literal = match[2] ?? match[3] ?? match[4] ?? match[5];
-      if (literal !== undefined) values.push({ kind: "literal", value: literal || `Option ${bareIndex}`, bare: false });
-      else values.push({ kind: "dynamic", value: (match[6] || "dynamic").trim(), bare: false });
+      if (literal !== undefined) values.push({ kind: "literal", value: literal || `Option ${bareIndex}`, bare: false, index: match.index });
+      else values.push({ kind: "dynamic", value: (match[6] || "dynamic").trim(), bare: false, index: match.index });
     } else {
-      values.push({ kind: "literal", value: `Option ${bareIndex}`, bare: true });
+      values.push({ kind: "literal", value: `Option ${bareIndex}`, bare: true, index: match.index });
     }
   }
 
   return values;
+}
+
+function markupDelta(fragment) {
+  let delta = 0;
+  const token = /<\/?[A-Za-z][\w:.-]*\b[^>]*>/g;
+  for (const match of stripJsxExpressions(fragment).matchAll(token)) {
+    const value = match[0];
+    if (value.startsWith("</")) delta -= 1;
+    else if (!value.endsWith("/>")) delta += 1;
+  }
+  return delta;
+}
+
+function stripJsxExpressions(value) {
+  return value.replace(/\{[^{}]*\}/g, "");
 }
 
 function isInsideNestedRange(index, ranges) {
