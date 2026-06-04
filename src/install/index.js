@@ -449,7 +449,7 @@ function manualHarness(target) {
 
 function nextActions({ harnesses, project }) {
   const next = ["Restart the agent so it reloads Unship."];
-  if (harnesses.some((item) => item.id === "agents")) {
+  if (harnesses.some((item) => item.id === "agents" || item.id === "claude")) {
     next.push("Try /unship where supported, or ask: use unship to compare 3 directions for the hero section.");
     next.push("If /unship is unavailable after restart, run npx @unship/cli@latest doctor --json and use the natural-language fallback.");
   }

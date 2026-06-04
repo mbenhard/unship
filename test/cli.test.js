@@ -140,6 +140,20 @@ test("install plain output groups next actions once", async () => {
   assert.equal((result.stdout.match(/^Next:/gm) || []).length, 1);
 });
 
+test("install claude plain output includes slash and fallback guidance", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".claude"), { recursive: true });
+
+  const result = await runCliWithHome(["install", "--harness", "claude", "--yes", "--no-update-check"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Unship install complete/);
+  assert.match(result.stdout, /\/unship/);
+  assert.match(result.stdout, /natural-language fallback/);
+  assert.equal((result.stdout.match(/^Next:/gm) || []).length, 1);
+});
+
 test("install repairs legacy claude command into shim", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
