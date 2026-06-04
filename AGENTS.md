@@ -16,11 +16,12 @@ Before implementation work, verify current behavior in the live repo:
 - Prefer small, direct code and avoid runtime dependencies without a clear reason.
 - Do not assume historical patch-session ideas are active; check `docs/README.md` before carrying old concepts forward.
 - Treat agent instructions as product surface. Changes to installed skills, memory files, or command shims should be covered by tests.
+- Keep slash commands and root instruction files as thin pointers to the bundled skill. Do not duplicate workflow, command sequences, or historical assumptions outside `agent/skills/unship/SKILL.md` unless tests cover the generated output.
 - Keep root `AGENTS.md` and `CLAUDE.md` lightweight. Put detailed behavior in source, tests, README, or docs where it can evolve deliberately.
 
 ## Internal Local Testing
 
-This package is not assumed to be published on npm yet. Do not use the public registry as the source of truth while developing or dogfooding it locally.
+The package is published as `@unship/cli`, but local development may be ahead of npm. Do not use the public registry as the source of truth while developing or dogfooding unpublished changes.
 
 When testing inside this repo, prefer direct source commands:
 
@@ -36,16 +37,17 @@ When testing in another repo, first install this package locally from a packed t
 ```bash
 cd /Users/marcusbenhard/Development/Playground/unship-design
 mkdir -p /tmp/unship-pack
+rm -f /tmp/unship-pack/unship-cli-*.tgz
 npm pack --pack-destination /tmp/unship-pack
 
 cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz
+npm install -D /tmp/unship-pack/unship-cli-*.tgz
 ./node_modules/.bin/unship doctor --json
 ./node_modules/.bin/unship init --force
 ./node_modules/.bin/unship setup --json
 ```
 
-After `npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz`, use `./node_modules/.bin/unship ...` for release proof so the public registry package named `unship` is never involved accidentally.
+After installing the packed tarball, use `./node_modules/.bin/unship ...` for release proof so npm never resolves the unrelated public package named `unship` and local unpublished changes are exercised.
 
 `npm link` is acceptable for fast manual iteration, but do not treat it as release proof. Always validate the packed tarball before calling a local test complete.
 
@@ -59,6 +61,8 @@ git diff --check
 
 `unship check` is for consuming app roots after a variant exploration. Running it from this package repo is expected to report intentional Unship strings in the implementation and tests.
 
+For changes to `install`, `uninstall`, `install-skill`, generated skills, memory files, or command shims, also verify the temp-home and packed-tarball path so harness discovery, stale-file repair, and generated output are exercised outside this checkout.
+
 ## Release And Publishing
 
 Before release or publish work, read `RELEASE.md` first. The current npm package name is `@unship/cli`, with binary `unship`. If the package name changes, update `package.json`, `package-lock.json`, README commands, bundled skill command examples, tests that assert `packageName`, and packed-tarball smoke docs in one coherent change.
@@ -69,7 +73,7 @@ Publishing gates:
 - `npm run verify` must pass.
 - `npm publish --dry-run` must pass without package-manifest warnings.
 - The packed package contents must remain limited to the files asserted in `test/package-smoke.test.js`.
-- Do not publish to npm until `npm whoami` is authenticated and the `@unship` org/scope exists with the current account as an owner/admin.
-- Prefer the `next` dist-tag for the first public beta; promote to `latest` only after registry smoke tests pass.
+- `npm whoami` must be authenticated with permission to publish under the `@unship` scope.
+- Publish with the dist-tag requested in `RELEASE.md` or by the user, then run registry smoke tests before calling the release complete.
 
 For GitHub, use `mbenhard/unship` unless the user explicitly chooses another owner or repository name.

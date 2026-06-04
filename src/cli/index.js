@@ -167,7 +167,7 @@ async function installSkill({ dir, force }) {
       ? ["Run npx @unship/cli@latest install-skill --force to refresh the stale global Unship skill."]
       : [
           "Restart the agent that loads this skills directory.",
-          "Try: use unship to generate 3 variants of the hero section.",
+          "Try: use unship to compare 3 directions for the hero section.",
           "For slash commands, repair, and project setup, use: npx @unship/cli@latest install."
         ]
   };

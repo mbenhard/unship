@@ -1,6 +1,6 @@
 # Unship Docs Index
 
-This folder now tracks the hard-reset Unship direction: a tiny local DOM picker for temporary agent-authored UI variants.
+This folder now tracks the hard-reset Unship direction: a tiny local picker for comparing temporary agent-made alternatives in real source.
 
 ## Active Source Of Truth
 
@@ -22,6 +22,7 @@ Older implementation plans are execution records, not current behavior specs.
 ## Current Product Decisions
 
 - DOM-local switching is the core product. No bridge, token, session store, source swap, or reload loop.
+- Unship is framed as a local decision surface for UI, copy, states, flows, design-system directions, docs, and DX surfaces that can be rendered in source.
 - Framework support is thin setup only: detect common stacks, copy the picker, and add a dev-only mount when safe.
 - The canonical temporary source contract is `[data-unship-pick]` plus direct child `[data-unship-option]`.
 - The picker is one dependency-free browser script.

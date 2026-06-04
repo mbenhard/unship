@@ -1,11 +1,11 @@
 ---
 name: unship
-description: Use when the user wants to compare UI design variants, generate section or element variants, iterate copywriting/layout/visual directions, preview multiple local directions, use a picker, or clean up temporary Unship markup.
+description: Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup.
 ---
 
 # Unship
 
-Use Unship to create temporary local UI variants in real source, let the human compare them instantly in the browser, and then clean every Unship artifact before shipping.
+Use Unship to create temporary alternatives in real source, let the human compare them in the local browser, and then clean every Unship artifact before shipping. Unship is a decision surface for work that designers and developers judge best in the actual app: UI, copy, product states, flows, design-system treatments, docs previews, and developer experience surfaces.
 
 Unship is local comparison tooling. The picker script runs in the user's local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The human chooses by naming a visible option label in chat; you settle source by keeping that option and removing temporary artifacts.
 
@@ -13,16 +13,22 @@ Unship is local comparison tooling. The picker script runs in the user's local p
 
 Treat ordinary prompts as complete enough to begin. Examples:
 
-- `use unship to generate 4 variants for hero section`
-- `generate 3 copywriting variants for section X with unship`
-- `generate 4 variants of element X in section Y with unship`
+- `use unship to compare 4 hero directions`
+- `generate 3 copywriting directions for section X with unship`
+- `use unship to explore empty, loading, and error states for the import flow`
+- `use unship to compare 3 button system treatments`
+- `use unship to render 3 CLI help output directions`
 
 Parse intent this way:
 
 - A number means exactly that many visible choices unless the user says `plus current`.
-- A section or element name defines the smallest source scope that can be varied cleanly.
+- A section, element, state, flow step, design-system sample, docs preview, or DX surface defines the smallest source scope that can be varied cleanly.
 - `copywriting` means preserve structure and vary message, proof, CTA, tone, and hierarchy.
 - `visual`, `layout`, or `design` means vary composition while staying inside the app's design language.
+- `state` means compare realistic product states such as empty, loading, error, success, long-label, reduced-motion, or permission-limited views.
+- `flow` means compare a small source-contained path or step sequence, not a production experiment framework.
+- `system`, `tokens`, or `design system` means compare local component or style treatments that can be rendered in source.
+- `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface.
 - If the target is ambiguous, inspect the page/source first and choose the most likely match.
 
 ## Fast Start
@@ -58,7 +64,7 @@ If no app source, framework signal, or preview shell exists yet, code normally f
 
 ## Target-First Read
 
-Before authoring variants, inspect the named route, component, or source area first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient. Variants must be derived from the app's vocabulary unless the user explicitly asks to depart from it.
+Before authoring alternatives, inspect the named route, component, source area, or local comparison artifact first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient. Alternatives must be derived from the app's vocabulary unless the user explicitly asks to depart from it.
 
 ## Instruction Precedence
 
@@ -75,7 +81,7 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 - Interpret `N variants` as `N` choices shown unless the user says `N alternatives plus current`.
 - Include `Current` only when baseline comparison is useful.
 - Use 1-3 word labels, ideally under 18 characters.
-- Use inline mode for focused section or component work.
+- Use inline mode for focused section, component, state, copy, or local comparison artifact work.
 
 ## Inline Mode Safety
 
@@ -94,7 +100,7 @@ Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, sub
 
 Wrap each temporary group with `data-unship-pick`. Put direct child choices inside with `data-unship-option`.
 
-Do not build a custom switcher, segmented control, tab set, or app-level preference for Unship comparisons. The source variants are the product; the Unship picker toolbar is the comparison control.
+Do not build a custom switcher, segmented control, tab set, or app-level preference for Unship comparisons. The source alternatives are the product; the Unship picker toolbar is the comparison control.
 
 ```html
 <section data-unship-pick="Hero">
@@ -107,7 +113,7 @@ If setup cannot patch the app automatically, inject the picker locally with `$UN
 
 ## Human Comparison Handoff
 
-Do not start, open, or automate a browser by default. The human compares variants in their own running preview.
+Do not start, open, or automate a browser by default. The human compares alternatives in their own running preview.
 
 Before stopping for human choice, report:
 

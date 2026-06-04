@@ -309,7 +309,9 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /name: unship/);
   assert.match(skill, /Target-First Read/);
   assert.match(skill, /Fast Start/);
-  assert.match(skill, /use unship to generate 4 variants/i);
+  assert.match(skill, /use unship to compare 4 hero directions/i);
+  assert.match(skill, /empty, loading, and error states/i);
+  assert.match(skill, /button system treatments/i);
   assert.match(skill, /Do not build a custom switcher/i);
   assert.match(skill, /Do not start, open, or automate a browser by default/i);
   assert.match(skill, /detected preview servers as hints/i);
@@ -355,7 +357,9 @@ test("init all writes shared skill plus claude and opencode shims", async () => 
   assert.equal(json.ok, true);
   assert.equal(json.written.includes(".agents/skills/unship/SKILL.md"), true);
   assert.match(await readFile(join(cwd, ".claude", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
-  assert.match(await readFile(join(cwd, ".opencode", "commands", "unship.md"), "utf8"), /Use the Unship skill/);
+  const command = await readFile(join(cwd, ".opencode", "commands", "unship.md"), "utf8");
+  assert.match(command, /Compare temporary local alternatives with Unship/);
+  assert.match(command, /local surface to compare/);
 });
 
 test("init does not overwrite without force", async () => {

@@ -1,90 +1,47 @@
 # Unship
 
-Tiny local DOM picker for temporary agent-authored UI variants.
+Tiny local picker for comparing agent-made alternatives in real source.
 
-Unship helps an AI agent create a few real source-level UI options, lets you compare them in your normal local preview, and then guides the agent to remove every temporary artifact before shipping.
+Ask your agent for a few directions, compare them in your local preview, then select the one you like. Use Unship for UI sections, copy, product states, flows, design-system treatments, docs, CLI output, or any local surface your agent can render in source.
 
-> Status: early beta. Unship is intentionally small and local-first; treat it as prototyping tooling, not production runtime infrastructure.
+> Status: early beta. Unship is local-first prototyping tooling, not production experiment infrastructure.
 
 Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. You choose by naming the visible option label in chat; the agent settles source by keeping that option and removing temporary Unship artifacts.
 
 ## Install
 
-Run the smart installer:
-
 ```bash
 npx @unship/cli@latest install
 ```
 
-It detects known coding harnesses, installs the Unship skill, adds `/unship` where supported, and can be re-run later to repair or refresh setup.
-
-Restart your agent, then use the slash command where available:
+Restart your agent, then ask naturally:
 
 ```txt
-/unship generate 3 variants of the hero section
+use unship to compare 4 hero directions
+use unship to explore empty, loading, and error states for the import flow
+use unship to compare 3 button system treatments
+use unship to render 3 CLI help output directions
 ```
 
-Or ask naturally:
+Where supported, `/unship` works too:
 
 ```txt
-use unship to generate 3 variants of the hero section
+/unship compare 3 pricing page directions
 ```
 
-The installed skill checks the project, wires the local picker when needed, creates source-level variants, hands off comparison to you, and later cleans every Unship artifact before shipping.
+`install` detects known coding harnesses, installs the Unship skill, adds slash-command shims where supported, and can be re-run later to repair or refresh setup.
 
-For unsupported harnesses, print the portable skill and place it where your agent loads skills:
+For unsupported harnesses:
 
 ```bash
 npx @unship/cli@latest install --print-skill
 ```
 
-Fallback checklist:
+Put the printed `SKILL.md` in the place your agent loads skills from.
 
-1. Find the harness's user-level or repo-level skill directory.
-2. Create `unship/SKILL.md` inside that directory.
-3. Paste the printed skill content into `SKILL.md`.
-4. Restart the harness so it reloads skills.
-5. Ask naturally: `use unship to generate 3 variants of the hero section`.
+## How It Works
 
-If a harness does not support skills, paste this into the agent instead:
-
-```txt
-Use Unship for this request. First run `npx -y @unship/cli@latest doctor --json`.
-If the project needs setup and an app shell exists, run `npx -y @unship/cli@latest setup --json`.
-Create temporary source-level choices with `data-unship-pick` and `data-unship-option`.
-Use the local picker for comparison, then remove every temporary Unship artifact and run `npx -y @unship/cli@latest check --json`.
-```
-
-## Quick Start In A Project
-
-Check what already exists:
-
-```bash
-npx -y @unship/cli@latest doctor --json
-```
-
-Set up the picker when the app shell exists:
-
-```bash
-npx @unship/cli@latest setup
-```
-
-Or choose a framework explicitly:
-
-```bash
-npx @unship/cli@latest setup next
-npx @unship/cli@latest setup vite
-npx @unship/cli@latest setup astro
-npx @unship/cli@latest setup sveltekit
-npx @unship/cli@latest setup nuxt
-npx @unship/cli@latest setup angular
-```
-
-`setup` is intentionally thin. The runtime is still just DOM attributes plus one browser script.
-
-## Temporary Markup Contract
-
-Agents create temporary choices in real source with one group and direct child options:
+The agent creates temporary choices in normal source:
 
 ```html
 <section data-unship-pick="Hero">
@@ -93,56 +50,72 @@ Agents create temporary choices in real source with one group and direct child o
 </section>
 ```
 
-The Unship picker toolbar is the comparison UI. Agents should not build a separate tab control, segmented switcher, app setting, confirm button, or source-swapping system for comparisons.
+The picker switches direct child options in the DOM. There is no bridge, session store, reload loop, source swapper, or production dependency by default.
 
-## Picker Snippet
+The usual loop:
+
+1. Ask for alternatives.
+2. Compare them in your running local preview.
+3. Tell the agent which option to keep.
+4. Before shipping, have the agent clean Unship markup and run `unship check`.
+
+## Project Commands
+
+Check the current project:
+
+```bash
+npx -y @unship/cli@latest doctor --json
+```
+
+Set up the picker when an app shell exists:
+
+```bash
+npx @unship/cli@latest setup
+```
+
+Supported setup targets are `next`, `vite`, `astro`, `sveltekit`, `nuxt`, and `angular`:
+
+```bash
+npx @unship/cli@latest setup <target>
+```
+
+Print the picker snippet:
 
 ```bash
 npx @unship/cli@latest snippet
 ```
 
-Prints:
-
-```html
-<script src="/unship-picker.js" data-unship-dev></script>
-```
-
-## Cleanup Check
-
-Before shipping, the agent removes losing variants, `data-unship-*` attributes, picker scripts, and Unship comments, then runs:
-
-```bash
-npx @unship/cli@latest check
-```
-
-Use structured output when an agent needs exact artifact locations or active exploration summaries:
+Check for leftover preview artifacts:
 
 ```bash
 npx @unship/cli@latest check --json
 ```
 
-`check` is read-only. The agent still edits source to settle a winner or remove temporary Unship work.
+`check` is read-only. The agent still edits source to keep a winner or remove temporary work.
+
+## Limits
+
+Unship works best when the alternatives can coexist in one rendered local surface.
+
+More complex screens and flows are possible, but the agent has to shape them into something DOM-local: a comparison route, a flow mock, a step preview, or a source-contained version of the screen. If the alternatives require separate routes, real navigation state, backend side effects, auth changes, analytics, or long-lived sessions, Unship can still help sketch them, but it is not orchestrating that flow for you.
+
+Avoid inline Unship options around duplicate active IDs, submit controls, global scripts, autoplay media, focus traps, destructive side effects, or stateful providers. In those cases, compare a safer shell or smaller slice.
 
 ## Repo-Local Instructions
 
-Use repo-local instructions only when your team wants the Unship skill committed into a project:
+Commit the Unship skill into a project only when your team wants repo-local agent instructions:
 
 ```bash
 npx @unship/cli@latest init
 ```
 
-By default this installs portable workspace, Claude, and OpenCode instructions. Existing project instruction files are not overwritten unless they are managed Unship skill files and you pass `--force`.
-
-Use harness-specific targets when needed:
+Harness-specific targets are `antigravity`, `claude`, `opencode`, and `all`:
 
 ```bash
-npx @unship/cli@latest init --target antigravity
-npx @unship/cli@latest init --target claude
-npx @unship/cli@latest init --target opencode
-npx @unship/cli@latest init --target all
+npx @unship/cli@latest init --target <target>
 ```
 
-Codex and Antigravity both use the portable workspace skill at `.agents/skills/unship/SKILL.md`.
+Codex and Antigravity both use `.agents/skills/unship/SKILL.md`.
 
 ## Advanced Skill Install
 
@@ -225,17 +198,6 @@ The npm package is `@unship/cli`. The installed executable is still `unship`, so
 ```bash
 npm ci
 npm run verify
-```
-
-For local package dogfooding, install from a packed tarball rather than the public registry:
-
-```bash
-mkdir -p /tmp/unship-pack
-npm pack --pack-destination /tmp/unship-pack
-
-cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-cli-0.1.1.tgz
-./node_modules/.bin/unship doctor --json
 ```
 
 ## License
