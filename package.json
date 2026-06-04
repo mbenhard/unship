@@ -1,5 +1,5 @@
 {
-  "name": "unship",
+  "name": "@unship/cli",
   "version": "0.1.0",
   "description": "Tiny local DOM picker for temporary agent-authored UI variants.",
   "keywords": [

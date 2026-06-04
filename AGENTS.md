@@ -39,13 +39,13 @@ mkdir -p /tmp/unship-pack
 npm pack --pack-destination /tmp/unship-pack
 
 cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-0.1.0.tgz
-npx unship doctor --json
-npx unship init --force
-npx unship setup --json
+npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz
+./node_modules/.bin/unship doctor --json
+./node_modules/.bin/unship init --force
+./node_modules/.bin/unship setup --json
 ```
 
-After `npm install -D /tmp/unship-pack/unship-0.1.0.tgz`, `npx unship ...` should resolve to the consuming repo's local `node_modules/.bin/unship`. If that is unclear, use `./node_modules/.bin/unship ...` to avoid accidentally testing a registry package.
+After `npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz`, use `./node_modules/.bin/unship ...` for release proof so the public registry package named `unship` is never involved accidentally.
 
 `npm link` is acceptable for fast manual iteration, but do not treat it as release proof. Always validate the packed tarball before calling a local test complete.
 
@@ -57,11 +57,11 @@ Run `npm run verify` for implementation changes. For docs-only changes, at least
 git diff --check
 ```
 
-`npx unship check` is for consuming app roots after a variant exploration. Running it from this package repo is expected to report intentional Unship strings in the implementation and tests.
+`unship check` is for consuming app roots after a variant exploration. Running it from this package repo is expected to report intentional Unship strings in the implementation and tests.
 
 ## Release And Publishing
 
-Before release or publish work, read `RELEASE.md` first. Do not assume the npm package name is available: the clean `unship` name may require maintainer access or transfer. If publishing under a scoped or fallback name, update `package.json`, `package-lock.json`, README commands, bundled skill command examples, tests that assert `packageName`, and packed-tarball smoke docs in one coherent change.
+Before release or publish work, read `RELEASE.md` first. The current npm package name is `@unship/cli`, with binary `unship`. If the package name changes, update `package.json`, `package-lock.json`, README commands, bundled skill command examples, tests that assert `packageName`, and packed-tarball smoke docs in one coherent change.
 
 Publishing gates:
 
@@ -69,7 +69,7 @@ Publishing gates:
 - `npm run verify` must pass.
 - `npm publish --dry-run` must pass without package-manifest warnings.
 - The packed package contents must remain limited to the files asserted in `test/package-smoke.test.js`.
-- Do not publish to npm until `npm whoami` is authenticated and `npm owner ls <package>` or scoped package access proves the current account can publish.
+- Do not publish to npm until `npm whoami` is authenticated and the `@unship` org/scope exists with the current account as an owner/admin.
 - Prefer the `next` dist-tag for the first public beta; promote to `latest` only after registry smoke tests pass.
 
 For GitHub, use `mbenhard/unship` unless the user explicitly chooses another owner or repository name.

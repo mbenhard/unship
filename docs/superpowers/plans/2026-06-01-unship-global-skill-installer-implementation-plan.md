@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a first-party `npx unship@latest install-skill` command so users can install the global Unship skill once, then let agents configure each project on demand.
+**Goal:** Add a first-party `npx @unship/cli@latest install-skill` command so users can install the global Unship skill once, then let agents configure each project on demand.
 
-**Architecture:** Reuse the existing bundled skill template from `src/agent/index.js`. Keep global skill installation in the CLI layer because it is a small file-copy workflow, while project setup remains in `src/setup/index.js`. The installed skill must use a noninteractive `npx -y unship@latest` fallback when a project has no local Unship dependency.
+**Architecture:** Reuse the existing bundled skill template from `src/agent/index.js`. Keep global skill installation in the CLI layer because it is a small file-copy workflow, while project setup remains in `src/setup/index.js`. The installed skill must use a noninteractive `npx -y @unship/cli@latest` fallback when a project has no local Unship dependency.
 
 **Tech Stack:** Node 20+, ESM, `node:test`, no runtime dependencies.
 
@@ -13,7 +13,7 @@
 ## File Map
 
 - Modify `src/cli/index.js`: route `install-skill`, write global skill files, stale-check managed destination, update help text.
-- Modify `agent/skills/unship/SKILL.md`: teach the global skill how to choose between local `npx unship` and remote `npx -y unship@latest`.
+- Modify `agent/skills/unship/SKILL.md`: teach the global skill how to choose between local `npx @unship/cli` and remote `npx -y @unship/cli@latest`.
 - Modify `README.md`: make one-time global install the primary onboarding path and repo-local `init` the fallback.
 - Modify `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`: add the new command contract to the technical spec.
 - Modify `test/cli.test.js`: add red-green coverage for the new command and skill wording.
@@ -41,7 +41,7 @@ test("install-skill writes the global agents skill", async () => {
   assert.equal(json.written.includes(join(skillRoot, "unship", "SKILL.md")), true);
   const skill = await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
-  assert.match(skill, /npx -y unship@latest/);
+  assert.match(skill, /npx -y @unship\/cli@latest/);
 });
 
 test("install-skill skips, fails stale, and refreshes with force", async () => {
@@ -79,7 +79,7 @@ Run:
 npm test -- test/cli.test.js
 ```
 
-Expected: FAIL because `install-skill` is not routed and the skill does not yet contain `npx -y unship@latest`.
+Expected: FAIL because `install-skill` is not routed and the skill does not yet contain `npx -y @unship/cli@latest`.
 
 - [x] **Step 3: Implement the command**
 
@@ -142,7 +142,7 @@ async function installSkill({ dir, force }) {
     skipped,
     stale,
     next: stale.length
-      ? ["Run npx unship@latest install-skill --force to refresh the stale global Unship skill."]
+      ? ["Run npx @unship/cli@latest install-skill --force to refresh the stale global Unship skill."]
       : ["Restart your agent, then ask: use unship to generate 3 variants of the hero section."]
   };
 }
@@ -175,7 +175,7 @@ Expected: still FAIL until Task 2 updates the skill wording.
 Confirm `test/cli.test.js` asserts:
 
 ```js
-assert.match(skill, /npx -y unship@latest/);
+assert.match(skill, /npx -y @unship\/cli@latest/);
 ```
 
 - [x] **Step 2: Update the skill Fast Start**
@@ -185,13 +185,13 @@ Replace the Fast Start opening in `agent/skills/unship/SKILL.md` with:
 ```md
 Before reading package internals or searching `node_modules`, choose the CLI prefix:
 
-- If this project already lists `unship` in `package.json`, use `npx unship`.
-- Otherwise use `npx -y unship@latest` so npm does not stop for an install prompt.
+- If this project already lists `@unship/cli` in `package.json`, use `npx @unship/cli`.
+- Otherwise use `npx -y @unship/cli@latest` so npm does not stop for an install prompt.
 
 Ask the CLI what is already true:
 
 ```bash
-npx -y unship@latest doctor --json
+npx -y @unship/cli@latest doctor --json
 ```
 ```
 
@@ -225,7 +225,7 @@ Make the top of `README.md` lead with:
 ## Install The Global Skill
 
 ```bash
-npx unship@latest install-skill
+npx @unship/cli@latest install-skill
 ```
 
 After restarting your agent, ask naturally:
@@ -234,10 +234,10 @@ After restarting your agent, ask naturally:
 use unship to generate 3 variants of the hero section
 ```
 
-The installed skill runs `npx -y unship@latest doctor --json` and `npx -y unship@latest setup --framework auto --json` inside each project as needed.
+The installed skill runs `npx -y @unship/cli@latest doctor --json` and `npx -y @unship/cli@latest setup --framework auto --json` inside each project as needed.
 ```
 
-Move repo-local `npx unship init` under a fallback heading.
+Move repo-local `npx @unship/cli@latest init` under a fallback heading.
 
 - [x] **Step 2: Update the technical spec**
 

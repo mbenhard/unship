@@ -1,23 +1,17 @@
 # Release Process
 
-This repo is intended to publish from GitHub and npm after the package name is resolved.
+This repo publishes from GitHub as `mbenhard/unship` and from npm as `@unship/cli`. The installed binary is `unship`.
 
 ## Package Name
 
-The clean npm name `unship` is currently taken by another maintainer. Release options:
+Current package:
 
-1. Get npm maintainer access or a transfer for `unship`, then publish this package as `unship`.
-2. Publish under a scope, such as `@mbenhard/unship` or `@unship/cli`, while keeping the binary name `unship`.
-3. Publish an unscoped fallback, such as `unship-cli`, while keeping the binary name `unship`.
+- npm package: `@unship/cli`
+- binary: `unship`
+- fresh command: `npx @unship/cli@latest doctor --json`
+- local project command after install: `./node_modules/.bin/unship doctor --json`
 
-If the package name changes, update:
-
-- `package.json` `name`
-- `package-lock.json`
-- README install commands
-- `agent/skills/unship/SKILL.md` npx command examples
-- CLI tests that assert `packageName`
-- packed-tarball smoke commands in docs
+The clean unscoped npm name `unship` is currently taken by another maintainer. If it is transferred later, update package metadata, README commands, bundled skill fallback commands, tests that assert `packageName`, and packed-tarball docs in one coherent change.
 
 ## Preflight
 
@@ -58,20 +52,16 @@ git remote -v
 gh repo view --json nameWithOwner,url,visibility,isPrivate
 ```
 
-## npm Login
+## npm Scope
 
-Use browser login:
+The npm CLI cannot create an org/scope. Before publishing, create or claim the `@unship` npm org in the npm website, then add npm user `benhard` as owner/admin.
+
+Verify:
 
 ```bash
-npm login --auth-type=web
 npm whoami
-```
-
-Verify package access:
-
-```bash
-npm owner ls unship
-npm access ls-packages
+npm org ls unship --json
+npm access list packages @unship --json
 ```
 
 ## Publish
@@ -80,20 +70,18 @@ For the first public beta, prefer `next` before `latest`:
 
 ```bash
 npm publish --tag next --access public
-npm view unship dist-tags version
+npm view @unship/cli dist-tags version
 ```
 
 Smoke test from the registry:
 
 ```bash
-npm exec unship@next -- doctor --json
-npm exec unship@next -- snippet
+npm exec @unship/cli@next -- doctor --json
+npm exec @unship/cli@next -- snippet
 ```
 
 Promote when satisfied:
 
 ```bash
-npm dist-tag add unship@0.1.0 latest
+npm dist-tag add @unship/cli@0.1.0 latest
 ```
-
-If publishing under a scoped fallback, replace `unship` with the chosen package name in the npm commands.

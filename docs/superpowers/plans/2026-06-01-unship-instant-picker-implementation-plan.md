@@ -72,7 +72,7 @@ Create `package.json` with this initial content:
 
 ```json
 {
-  "name": "unship",
+  "name": "@unship/cli",
   "version": "0.1.0",
   "description": "Tiny local DOM picker for temporary agent-authored UI variants.",
   "license": "MIT",
@@ -456,7 +456,7 @@ Create `agent/AGENTS.md`:
 ```md
 # Agent Notes
 
-When comparing temporary UI design variants, use the Unship skill. Keep Unship picker markup local-only and run `npx unship check` before shipping.
+When comparing temporary UI design variants, use the Unship skill. Keep Unship picker markup local-only and run `npx @unship/cli@latest check` before shipping.
 ```
 
 Create `agent/skills/unship/SKILL.md`:
@@ -508,7 +508,7 @@ Wrap each temporary group with `data-unship-pick`. Put direct child choices insi
 </section>
 ```
 
-Inject the picker locally with `npx unship snippet` or an equivalent dev-only script include.
+Inject the picker locally with `npx @unship/cli@latest snippet` or an equivalent dev-only script include.
 
 ## Subagent Mode
 
@@ -519,7 +519,7 @@ Subagents must not mutate the shared workspace in V1. They return briefs, sketch
 Cleanup is mandatory when exploration ends, including selection, cancellation, rejection, timeout, interruption, or ship request. Keep the selected option, remove losing options, remove all `data-unship-*` attributes, remove picker script/comments, then run:
 
 ```bash
-npx unship check
+npx @unship/cli@latest check
 ```
 
 Do not claim completion until the check is clean.
@@ -689,7 +689,7 @@ test("doctor reports package and local-only reminder", () => {
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, true);
-  assert.equal(json.packageName, "unship");
+  assert.equal(json.packageName, "@unship/cli");
   assert.match(json.reminder, /local preview tooling/);
 });
 ```
@@ -1257,15 +1257,15 @@ Tiny local DOM picker for temporary agent-authored UI variants.
 ## Install Agent Instructions
 
 ```bash
-npx unship init
+npx @unship/cli@latest init
 ```
 
 Use harness-specific targets when needed:
 
 ```bash
-npx unship init --target claude
-npx unship init --target opencode
-npx unship init --target all
+npx @unship/cli@latest init --target claude
+npx @unship/cli@latest init --target opencode
+npx @unship/cli@latest init --target all
 ```
 
 ## Temporary Markup Contract
@@ -1280,7 +1280,7 @@ npx unship init --target all
 ## Picker Snippet
 
 ```bash
-npx unship snippet
+npx @unship/cli@latest snippet
 ```
 
 This prints:
@@ -1294,7 +1294,7 @@ This prints:
 Before shipping, the agent removes losing variants, `data-unship-*` attributes, picker scripts, and Unship comments, then runs:
 
 ```bash
-npx unship check
+npx @unship/cli@latest check
 ```
 
 ## What Unship Is Not
@@ -1360,12 +1360,12 @@ If not inside a git repository, append:
 
 - [ ] No active file path references `.codex/skills` as the default target.
 - [ ] No active code path implements bridge/session/source-swap/finalize/abort behavior.
-- [ ] `npx unship check` allows docs and installed instructions but fails app source residue.
+- [ ] `npx @unship/cli@latest check` allows docs and installed instructions but fails app source residue.
 - [ ] Picker switching touches only direct child options in the active group.
 - [ ] Picker makes no network requests and never reloads.
 - [ ] Toolbar has no confirm/checkmark/pending/session language.
 - [ ] Multi-group picker keeps independent selections.
-- [ ] Agent skill requires brand read, cleanup, and `npx unship check`.
+- [ ] Agent skill requires brand read, cleanup, and `npx @unship/cli@latest check`.
 - [ ] Packed package excludes the external legacy archive and old implementation paths.
 
 ## Execution Handoff

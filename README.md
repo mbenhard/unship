@@ -11,7 +11,7 @@ Unship helps an AI agent create a few real source-level UI options, lets you com
 Install the global agent skill once:
 
 ```bash
-npx unship@latest install-skill
+npx @unship/cli@latest install-skill
 ```
 
 Restart your agent, then ask naturally:
@@ -27,24 +27,24 @@ The installed skill checks the project, wires the local picker when needed, crea
 Check what already exists:
 
 ```bash
-npx -y unship@latest doctor --json
+npx -y @unship/cli@latest doctor --json
 ```
 
 Set up the picker when the app shell exists:
 
 ```bash
-npx unship@latest setup
+npx @unship/cli@latest setup
 ```
 
 Or choose a framework explicitly:
 
 ```bash
-npx unship@latest setup next
-npx unship@latest setup vite
-npx unship@latest setup astro
-npx unship@latest setup sveltekit
-npx unship@latest setup nuxt
-npx unship@latest setup angular
+npx @unship/cli@latest setup next
+npx @unship/cli@latest setup vite
+npx @unship/cli@latest setup astro
+npx @unship/cli@latest setup sveltekit
+npx @unship/cli@latest setup nuxt
+npx @unship/cli@latest setup angular
 ```
 
 `setup` is intentionally thin. The runtime is still just DOM attributes plus one browser script.
@@ -65,7 +65,7 @@ The Unship picker toolbar is the comparison UI. Agents should not build a separa
 ## Picker Snippet
 
 ```bash
-npx unship@latest snippet
+npx @unship/cli@latest snippet
 ```
 
 Prints:
@@ -79,13 +79,13 @@ Prints:
 Before shipping, the agent removes losing variants, `data-unship-*` attributes, picker scripts, and Unship comments, then runs:
 
 ```bash
-npx unship@latest check
+npx @unship/cli@latest check
 ```
 
 Use structured output when an agent needs exact artifact locations or active exploration summaries:
 
 ```bash
-npx unship@latest check --json
+npx @unship/cli@latest check --json
 ```
 
 `check` is read-only. The agent still edits source to settle a winner or remove temporary Unship work.
@@ -95,7 +95,7 @@ npx unship@latest check --json
 Use repo-local instructions only when your team wants the Unship skill committed into a project:
 
 ```bash
-npx unship@latest init
+npx @unship/cli@latest init
 ```
 
 By default this installs portable workspace, Claude, and OpenCode instructions. Existing project instruction files are not overwritten unless they are managed Unship skill files and you pass `--force`.
@@ -103,10 +103,10 @@ By default this installs portable workspace, Claude, and OpenCode instructions. 
 Use harness-specific targets when needed:
 
 ```bash
-npx unship@latest init --target antigravity
-npx unship@latest init --target claude
-npx unship@latest init --target opencode
-npx unship@latest init --target all
+npx @unship/cli@latest init --target antigravity
+npx @unship/cli@latest init --target claude
+npx @unship/cli@latest init --target opencode
+npx @unship/cli@latest init --target all
 ```
 
 Codex and Antigravity both use the portable workspace skill at `.agents/skills/unship/SKILL.md`.
@@ -128,6 +128,14 @@ Natural prompts should work:
 use unship to generate 4 variants for hero section
 generate 3 copywriting variants for the pricing section with unship
 generate 4 variants of the CTA row in the onboarding section with unship
+```
+
+## Package And Binary
+
+The npm package is `@unship/cli`. The installed executable is still `unship`, so local project installs can use:
+
+```bash
+./node_modules/.bin/unship doctor --json
 ```
 
 ## What Unship Is Not
@@ -153,7 +161,7 @@ mkdir -p /tmp/unship-pack
 npm pack --pack-destination /tmp/unship-pack
 
 cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-0.1.0.tgz
+npm install -D /tmp/unship-pack/unship-cli-0.1.0.tgz
 ./node_modules/.bin/unship doctor --json
 ```
 

@@ -12,22 +12,22 @@ Build Unship V1 as a tiny local-only design picker:
 2. A standalone browser script discovers those variants.
 3. The user switches variants instantly with DOM-local visibility changes.
 4. The user tells the agent in chat which visible title to keep.
-5. The agent removes every Unship preview artifact and runs `npx unship check`.
+5. The agent removes every Unship preview artifact and runs `npx @unship/cli@latest check`.
 
 There is no bridge, server, session store, token, source patch engine, confirm button, wait loop, or reload-based switching.
 
 ## Package Contract
 
-Published package name: `unship`
+Published package name: `@unship/cli`
 
-Development package may expose aliases, but public docs and tests target:
+The installed binary remains `unship`, but fresh registry commands must target the scoped package:
 
 ```bash
-npx unship init
-npx unship setup
-npx unship snippet
-npx unship check
-npx unship doctor
+npx @unship/cli@latest init
+npx @unship/cli@latest setup
+npx @unship/cli@latest snippet
+npx @unship/cli@latest check
+npx @unship/cli@latest doctor
 ```
 
 Package rules:
@@ -276,7 +276,7 @@ Write rules:
 - Create directories as needed.
 - Do not depend on the current project root.
 - Do not overwrite an existing global Unship skill unless `--force` is present.
-- If the global skill exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx unship@latest install-skill --force`.
+- If the global skill exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx @unship/cli@latest install-skill --force`.
 - JSON output includes `{ ok, written, skipped, stale, next }`.
 - Plain output is concise and agent-readable.
 
@@ -309,7 +309,7 @@ Write rules:
 - Create directories as needed.
 - Do not overwrite existing project pointer files (`AGENTS.md`, `CLAUDE.md`) unless the user edits them manually.
 - Do not overwrite existing managed Unship skill/command files unless `--force` is present.
-- If a managed Unship skill/command file exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx unship init --force --json`.
+- If a managed Unship skill/command file exists but differs from the bundled version, return `ok: false`, exit nonzero, and include a `next` action pointing to `npx @unship/cli@latest init --force --json`.
 - JSON output includes `{ ok, written, skipped, stale, next }`.
 - Plain output is concise and agent-readable.
 
@@ -463,19 +463,19 @@ The portable skill is the primary workflow artifact.
 - subagent mode proposal-only rules;
 - subagent-unavailable fallback;
 - local-only cleanup rules;
-- fast start through `npx unship doctor --json` and `npx unship setup --framework auto --json`;
-- explicit use of `npx unship`, not a bare `unship` command that may be absent from PATH;
+- fast start through `npx @unship/cli@latest doctor --json` and `npx @unship/cli@latest setup --framework auto --json`;
+- explicit use of either the chosen local `unship` binary or `npx @unship/cli@latest`, not a bare `unship` command that may be absent from PATH;
 - stale install recovery through `skillCurrent` and `pickerFileCurrent`;
 - detect-only preview handling: mention `doctor`-reported preview servers as hints, but do not start, open, or automate a browser by default;
 - natural prompt parsing for requests like `use unship to generate 4 variants for hero section`;
-- `npx unship check` verification before final response.
+- `npx @unship/cli@latest check` verification before final response.
 
 `AGENTS.md` pointer must stay short:
 
 ```md
 # Agent Notes
 
-When comparing temporary UI design variants, use the Unship skill. Keep Unship picker markup local-only and run `npx unship check` before shipping.
+When comparing temporary UI design variants, use the Unship skill. Keep Unship picker markup local-only and run the skill's chosen `unship check` command before shipping.
 ```
 
 OpenCode command shim:

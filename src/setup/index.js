@@ -191,7 +191,7 @@ async function mountPicker({ root, framework, force, dryRun }) {
     status: "manual",
     framework,
     instructions: [
-      "Serve public/unship-picker.js from your app and add the snippet from npx unship snippet to a local-only preview shell.",
+      "Serve public/unship-picker.js from your app and add the snippet from npx @unship/cli@latest snippet to a local-only preview shell.",
       "Remove the snippet and picker file before shipping."
     ]
   };
@@ -212,7 +212,7 @@ async function patchNext(root, { dryRun }) {
     return {
       status: "manual",
       framework: "next",
-      instructions: ["Add the dev-only Script snippet from npx unship snippet to your root app layout body."]
+      instructions: ["Add the dev-only Script snippet from npx @unship/cli@latest snippet to your root app layout body."]
     };
   }
 
@@ -230,7 +230,7 @@ async function patchNext(root, { dryRun }) {
       status: "manual",
       framework: "next",
       file,
-      instructions: ["Add the dev-only Script snippet from npx unship snippet inside the root layout body."]
+      instructions: ["Add the dev-only Script snippet from npx @unship/cli@latest snippet inside the root layout body."]
     };
   }
   if (!dryRun) await writeFile(absolute, next, "utf8");
