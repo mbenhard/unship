@@ -24,6 +24,10 @@ This is a design artifact. The picker only changes after a winner is picked, in 
 3. **M3 Ink Quiet** — the barely-there pole. 120ms opacity-only, zero movement; entrance is a 200ms fade; menu fades fast; old label snaps out, new label fades in.
 4. **M4 Directional** — motion communicates direction. 180–260ms decelerating curves; entrance slides up from the bottom edge; menu unfurls downward from the group pill; the incoming label slides from the side of the chevron that was pressed; the count ticks vertically.
 
+## Revisions
+
+- 2026-06-04 (round 2): Added **M5 Directional Fade** per review feedback ("Directional + quick fade in/out"): M4's directional language with quick two-phase label swaps — 70ms fade-out exiting away from the incoming side, then a 110ms fade/slide-in from the pressed chevron; faster menu fade (180ms unfurl, 100ms opacity); 5px count tick; 150/200ms entrance. The demo page's swap handler gained a two-phase path (out class → 70ms timer → text swap + in class) used only by M5.
+
 ## Page Structure
 
 - Header: title, one-line context, host-tone toggle (light/dark stage behind the docks).

@@ -64,6 +64,7 @@ header p{margin:0;color:#71717a;font-size:13px}
 
 /* ============ shared motion plumbing ============ */
 @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
+@keyframes swapOut{to{opacity:0;transform:translate(calc(var(--dx,0px) * -1),0)}}
 .dock[data-dir="next"] .row{--dx:var(--amp,0px)}
 .dock[data-dir="prev"] .row{--dx:calc(var(--amp,0px) * -1)}
 
@@ -105,6 +106,21 @@ header p{margin:0;color:#71717a;font-size:13px}
 .m4 .dock .group-count.swap{animation:swapIn .18s cubic-bezier(0,0,.2,1)}
 .m4 .dock[data-dir="next"] .group{--dy:-6px}
 .m4 .dock[data-dir="prev"] .group{--dy:6px}
+
+/* ============ M5 Directional Fade — M4 direction + quick fade out/in ============ */
+.m5 .dock{--dur:.18s;--ease:cubic-bezier(0,0,.2,1);--amp:8px;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .15s ease,transform .2s cubic-bezier(0,0,.2,1)}
+.m5 .dock.in{opacity:1;transform:none}
+.m5 .dock .menu{transition:max-height .18s cubic-bezier(0,0,.2,1),opacity .1s ease}
+.m5 .dock .menuitem{opacity:0;transform:translateY(-8px);transition:background .12s ease,opacity .12s ease,transform .18s cubic-bezier(0,0,.2,1)}
+.m5 .dock.open .menuitem{opacity:1;transform:none}
+.m5 .dock.open .menuitem:nth-child(2){transition-delay:.02s}
+.m5 .dock .label-main.out{animation:swapOut .07s ease forwards}
+.m5 .dock .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+.m5 .dock .group-count.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+.m5 .dock[data-dir="next"] .group{--dy:-5px}
+.m5 .dock[data-dir="prev"] .group{--dy:5px}
 
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -216,6 +232,30 @@ header p{margin:0;color:#71717a;font-size:13px}
   </div>
 </section>
 
+<section class="card m5">
+  <div class="card-head">
+    <span class="num">M5</span><h2>Directional Fade</h2>
+    <p>M4 direction + quick fades · 70ms out / 110ms in from pressed side · fast menu fade · count tick</p>
+  </div>
+  <div class="stage">
+    <div class="spec">
+      <div class="dock multi">
+        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
+        <div class="menu">
+          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
+          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
+        </div>
+        <div class="row">
+          <button class="prev nav" type="button" aria-label="Previous option"></button>
+          <button class="label" type="button"><span class="label-main">Split hero</span></button>
+          <button class="next nav" type="button" aria-label="Next option"></button>
+        </div>
+      </div>
+      <span class="tag">click row · ‹ › · <button class="replay" type="button" data-replay>replay entrance</button></span>
+    </div>
+  </div>
+</section>
+
 </main>
 <script>
 const OPTS = ["Minimal hero", "Split hero", "Full-bleed hero"];
@@ -224,12 +264,20 @@ document.querySelectorAll(".dock").forEach((dock) => {
   const label = dock.querySelector(".label-main");
   const count = dock.querySelector(".group-count");
   dock.querySelector(".group").addEventListener("click", () => dock.classList.toggle("open"));
-  const swap = (dir) => {
-    index = (index + dir + OPTS.length) % OPTS.length;
-    dock.dataset.dir = dir > 0 ? "next" : "prev";
+  const twoPhase = dock.closest(".card").matches(".m5");
+  const apply = () => {
     label.textContent = OPTS[index];
     count.textContent = `${index + 1}/${OPTS.length}`;
     for (const el of [label, count]) { el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap"); }
+  };
+  const swap = (dir) => {
+    index = (index + dir + OPTS.length) % OPTS.length;
+    dock.dataset.dir = dir > 0 ? "next" : "prev";
+    if (!twoPhase) { apply(); return; }
+    label.classList.remove("out", "swap"); void label.offsetWidth;
+    label.classList.add("out");
+    clearTimeout(dock._outTimer);
+    dock._outTimer = setTimeout(() => { label.classList.remove("out"); apply(); }, 70);
   };
   dock.querySelector(".prev").addEventListener("click", () => swap(-1));
   dock.querySelector(".next").addEventListener("click", () => swap(1));
