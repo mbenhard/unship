@@ -65,7 +65,7 @@ npx -y unship@latest doctor --json
 ```
 
 `doctor` also reports likely live preview servers so agents can reuse an existing dev server instead of starting another one.
-It reports stale installed skills or picker files too; use `npx unship@latest init --force` to refresh managed repo instructions and rerun `npx unship@latest setup` to refresh the picker. A plain `npx unship init` fails loudly when an installed Unship skill is stale, instead of pretending initialization succeeded.
+It reports stale installed skills or picker files too; use `npx unship@latest init --force` to refresh managed repo instructions and rerun `npx unship@latest setup` to refresh the picker. It also summarizes active Unship exploration groups and next actions so agents can continue, settle, or clean temporary work without spelunking first. A plain `npx unship init` fails loudly when an installed Unship skill is stale, instead of pretending initialization succeeded.
 
 ## Temporary Markup Contract
 
@@ -95,6 +95,8 @@ Before shipping, the agent removes losing variants, `data-unship-*` attributes, 
 ```bash
 npx unship@latest check
 ```
+
+Use `npx unship@latest check --json` when an agent needs structured exploration summaries or exact artifact locations for cleanup. `check` is read-only; the agent still edits source to settle a winner or remove temporary Unship work.
 
 ## Natural Agent Prompts
 
