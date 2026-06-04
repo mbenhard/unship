@@ -47,6 +47,36 @@ test("toolbar uses comfortable circular option controls", async () => {
   }
 });
 
+test("toolbar uses CSS chevrons instead of font arrow glyphs", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><section data-unship-pick="Pricing"><div data-unship-option="Simple">C</div><div data-unship-option="Detailed" hidden>D</div></section><script>${picker}</script>`);
+    const controls = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const root = host.shadowRoot;
+      return {
+        previousChevronWidth: Number.parseFloat(getComputedStyle(root.querySelector(".prev"), "::before").width),
+        previousChevronHeight: Number.parseFloat(getComputedStyle(root.querySelector(".prev"), "::before").height),
+        nextChevronWidth: Number.parseFloat(getComputedStyle(root.querySelector(".next"), "::before").width),
+        nextChevronHeight: Number.parseFloat(getComputedStyle(root.querySelector(".next"), "::before").height),
+        previousText: root.querySelector(".prev").textContent.trim(),
+        nextText: root.querySelector(".next").textContent.trim(),
+        hasTopCaret: Boolean(root.querySelector(".caret"))
+      };
+    });
+
+    assert.equal(controls.previousText, "");
+    assert.equal(controls.nextText, "");
+    assert.equal(controls.hasTopCaret, false);
+    assert.equal(controls.previousChevronWidth >= 5 && controls.previousChevronWidth <= 6.5, true);
+    assert.equal(controls.previousChevronHeight >= 5 && controls.previousChevronHeight <= 6.5, true);
+    assert.equal(controls.nextChevronWidth >= 5 && controls.nextChevronWidth <= 6.5, true);
+    assert.equal(controls.nextChevronHeight >= 5 && controls.nextChevronHeight <= 6.5, true);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("toolbar does not outline or ring the active variant title after switching", async () => {
   const browser = await chromium.launch();
   try {

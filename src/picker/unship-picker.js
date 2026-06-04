@@ -192,12 +192,12 @@
       ${groups.length > 1 ? groupButton(group) : ""}
       ${groups.length > 1 ? menu() : ""}
       <div class="row">
-        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option">&#8249;</button>
+        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" data-action="toggle-placement" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position">
           <span class="label-main">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
           ${groups.length === 1 ? `<span class="option-count">${group.activeOptionIndex + 1}/${group.options.length}</span>` : ""}
         </button>
-        <button class="next nav" type="button" data-action="next" aria-label="Next option">&#8250;</button>
+        <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
     </div>`;
     root.append(liveRegion);
@@ -223,7 +223,7 @@
 
   function groupButton(group) {
     return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
-      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span><span class="caret">&#9662;</span>
+      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span>
     </button>`;
   }
 
@@ -441,8 +441,6 @@
       .open .group{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
       .group-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .group-count{margin-left:auto;opacity:.62;font-variant-numeric:tabular-nums}
-      .caret{opacity:.65;font-size:.8em;transition:transform var(--dur) var(--ease)}
-      .open .caret{transform:rotate(180deg)}
       .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .14s ease}
       .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
@@ -452,6 +450,9 @@
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:1px solid rgba(255,255,255,.1)}
       .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:background .12s ease,transform .12s ease}
+      .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
+      .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
+      .next::before{transform:rotate(45deg) translate(-1px,1px)}
       .nav:hover{background:rgba(255,255,255,.14)}
       .nav:active{transform:scale(.9)}
       .label{flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease}
