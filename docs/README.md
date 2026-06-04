@@ -7,11 +7,13 @@ This folder now tracks the hard-reset Unship direction: a tiny local DOM picker 
 Read in this order:
 
 1. `docs/plans/current-run.md`
-2. `docs/superpowers/specs/2026-06-04-unship-agent-fast-prototyping-design.md`
-3. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
-4. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
-5. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
-6. `RELEASE.md`
+2. `docs/superpowers/specs/2026-06-04-unship-seamless-install-design.md`
+3. `docs/superpowers/specs/2026-06-04-unship-agent-fast-prototyping-design.md`
+4. `docs/superpowers/plans/2026-06-04-unship-seamless-install-implementation-plan.md`
+5. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
+6. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
+7. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
+8. `RELEASE.md`
 
 Older implementation plans are execution records, not current behavior specs.
 
@@ -26,6 +28,7 @@ Older implementation plans are execution records, not current behavior specs.
 - Keyboard shortcuts are scoped to picker focus by default so host apps keep their own shortcuts.
 - No confirm button. The human tells the agent in chat which visible title to keep.
 - Agent instructions live primarily in `SKILL.md`; standing `AGENTS.md`/`CLAUDE.md` files stay short.
+- `npx @unship/cli@latest install` is the primary re-runnable harness setup and repair path. `install-skill` remains a lower-level compatibility command.
 - Subagent mode is proposal-only in V1. Unship does not orchestrate subagents.
 - `unship check` must distinguish allowed installed instructions from forbidden preview artifacts.
 - `npx -y @unship/cli@latest doctor --json` and `npx -y @unship/cli@latest setup --framework auto --json` are the fresh-project fast path for capable agents.

@@ -76,6 +76,7 @@ npm view @unship/cli dist-tags version
 Smoke test from the registry:
 
 ```bash
+npm exec @unship/cli@next -- install --dry-run --json
 npm exec @unship/cli@next -- doctor --json
 npm exec @unship/cli@next -- snippet
 ```

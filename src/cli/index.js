@@ -3,8 +3,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipResidue } from "../check/index.js";
+import { applyInstallPlan, applyUninstallPlan, planInstall, planUninstall } from "../install/index.js";
 import { inspectProject, setupProject } from "../setup/index.js";
 
 const args = process.argv.slice(2);
@@ -12,7 +14,37 @@ const command = args[0] || "help";
 const flags = parseFlags(args.slice(1));
 
 try {
-  if (command === "init") {
+  if (command === "install") {
+    const plan = await planInstall(installOptions(flags));
+    if (plan.printSkill) {
+      console.log(plan.skill);
+    } else {
+      if (plan.ok && !flags["dry-run"] && !flags.yes && !flags.json) {
+        printInstallResult({ ...plan, dryRun: true }, false);
+      }
+      const approved = !plan.ok || flags["dry-run"] || flags.yes || await confirmPlan("Proceed with Unship install?");
+      const result = !plan.ok
+        ? plan
+        : approved
+          ? (flags["dry-run"] ? plan : await applyInstallPlan(plan))
+          : { ok: false, command: "install", error: "Install cancelled.", next: [] };
+      printInstallResult(result, flags.json);
+      if (!result.ok) process.exitCode = 1;
+    }
+  } else if (command === "uninstall") {
+    const plan = await planUninstall(installOptions(flags));
+    if (plan.ok && !flags["dry-run"] && !flags.yes && !flags.json) {
+      printInstallResult({ ...plan, dryRun: true }, false);
+    }
+    const approved = !plan.ok || flags["dry-run"] || flags.yes || await confirmPlan("Proceed with Unship uninstall?");
+    const result = !plan.ok
+      ? plan
+      : approved
+        ? (flags["dry-run"] ? plan : await applyUninstallPlan(plan))
+        : { ok: false, command: "uninstall", error: "Uninstall cancelled.", next: [] };
+    printInstallResult(result, flags.json);
+    if (!result.ok) process.exitCode = 1;
+  } else if (command === "init") {
     const result = await init({ target: flags.target || "all", force: Boolean(flags.force) });
     print(result, flags.json);
     if (!result.ok) process.exitCode = 1;
@@ -42,7 +74,7 @@ try {
   } else if (command === "help" || command === "--help" || command === "-h") {
     printHelp();
   } else {
-    throw new Error(`Unknown command: ${command}. Use one of: init, install-skill, setup, snippet, check, doctor.`);
+    throw new Error(`Unknown command: ${command}. Use one of: install, uninstall, init, install-skill, setup, snippet, check, doctor.`);
   }
 } catch (error) {
   if (flags.json) {
@@ -153,6 +185,13 @@ function parseFlags(items) {
     const item = items[index];
     if (item === "--json") parsed.json = true;
     else if (item === "--force") parsed.force = true;
+    else if (item === "--all") parsed.all = true;
+    else if (item === "--yes") parsed.yes = true;
+    else if (item === "--repair") parsed.repair = true;
+    else if (item === "--no-project") parsed["no-project"] = true;
+    else if (item === "--print-skill") parsed["print-skill"] = true;
+    else if (item === "--project") parsed.project = true;
+    else if (item === "--harness") parsed.harness = items[++index];
     else if (item === "--target") parsed.target = items[++index];
     else if (item === "--framework") parsed.framework = items[++index];
     else if (item === "--src") parsed.src = items[++index];
@@ -255,6 +294,55 @@ function parsePorts(value) {
   return String(value).split(",").map((item) => Number(item.trim())).filter(Boolean);
 }
 
+function installOptions(flags) {
+  return {
+    all: Boolean(flags.all),
+    dryRun: Boolean(flags["dry-run"]),
+    force: Boolean(flags.force),
+    harnesses: flags.harness ? String(flags.harness).split(",") : [],
+    json: Boolean(flags.json),
+    noProject: Boolean(flags["no-project"]),
+    printSkill: Boolean(flags["print-skill"]),
+    project: Boolean(flags.project),
+    repair: Boolean(flags.repair),
+    root: flags.root || process.cwd(),
+    yes: Boolean(flags.yes)
+  };
+}
+
+function printInstallResult(result, json) {
+  if (json) {
+    console.log(JSON.stringify(result));
+    return;
+  }
+  if (!result.ok) {
+    console.log(result.error || `Unship ${result.command === "uninstall" ? "uninstall" : "install"} failed.`);
+    if (result.next?.length) console.log(result.next.map((item) => `Next: ${item}`).join("\n"));
+    return;
+  }
+  const label = result.command === "uninstall" ? "uninstall" : "install";
+  const lines = [result.dryRun ? `Unship ${label} dry run.` : `Unship ${label} complete.`];
+  for (const harness of result.harnesses || []) {
+    lines.push(`${harness.name}: ${harness.status}`);
+  }
+  for (const item of result.legacy || []) {
+    lines.push(`Legacy ${item.status}: ${item.path}`);
+  }
+  if (result.project) lines.push(`Project: ${result.project.status}`);
+  if (result.next?.length) lines.push(...result.next.map((item) => `Next: ${item}`));
+  console.log(lines.join("\n"));
+}
+
+async function confirmPlan(question) {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await prompt.question(`${question} [y/N] `);
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    prompt.close();
+  }
+}
+
 function printSetup(result) {
   const lines = [
     `Framework ${result.framework}`,
@@ -274,5 +362,5 @@ function printCheck(result) {
 }
 
 function printHelp() {
-  console.log("Usage: unship init|install-skill|setup|snippet|check|doctor");
+  console.log("Usage: unship install|uninstall|init|install-skill|setup|snippet|check|doctor");
 }

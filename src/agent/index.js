@@ -9,6 +9,7 @@ export async function getAgentTemplates() {
     skill,
     agents,
     claude: '@AGENTS.md\n\nUse `/unship` or the `unship` skill for temporary local UI variant comparison.\n',
+    claudeCommand: "Use the Unship skill for this request. Interpret arguments as target, count, style, or scope: $ARGUMENTS\n",
     opencodeCommand: "---\ndescription: Create temporary local UI variants with Unship\n---\n\nUse the Unship skill for this request. Interpret arguments as the target, count, style, or scope: $ARGUMENTS\n"
   };
 }

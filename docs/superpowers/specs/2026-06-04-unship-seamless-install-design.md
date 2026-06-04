@@ -89,7 +89,7 @@ Planned:
 Proceed? yes
 ```
 
-If stdin is not interactive, fail with a clear message unless `--yes`, `--json`, or `--dry-run` is provided.
+If stdin is not interactive, fail with a clear message unless `--yes` or `--dry-run` is provided. `--json` may be combined with either mode, but it never counts as consent to write.
 
 ### Noninteractive
 
@@ -99,12 +99,13 @@ npx @unship/cli@latest install --harness claude,codex --yes
 npx @unship/cli@latest install --project --yes
 npx @unship/cli@latest install --repair --yes
 npx @unship/cli@latest install --dry-run --json
+npx @unship/cli@latest install --print-skill
 ```
 
 Flags:
 
 - `--all`: install every known harness target that can be safely written.
-- `--harness <list>`: install only selected harnesses. Supported initial values: `claude`, `codex`, `antigravity`, `opencode`, `agents`.
+- `--harness <list>`: install only selected harnesses. Supported initial values: `agents`, `claude`, and `opencode`. `codex` and `antigravity` are accepted aliases for `agents`.
 - `--project`: include current project picker setup.
 - `--no-project`: skip current project setup even when an app is detected.
 - `--repair`: refresh stale managed files and remove known legacy Unship command files.
@@ -112,8 +113,11 @@ Flags:
 - `--dry-run`: report planned actions without writing.
 - `--json`: emit machine-readable detection, plan, and result.
 - `--force`: overwrite stale managed files and known legacy Unship files without requiring `--repair`.
+- `--print-skill`: print the bundled `SKILL.md` content for unsupported harnesses and exit without writing.
 
 `--all` should imply harness setup, not project setup. Project mutation should require either interactive confirmation or explicit `--project`.
+
+`--json` changes only output format. It is not consent to write. A mutating noninteractive install still requires `--yes`; `install --json` without `--yes` or `--dry-run` exits nonzero with a JSON error that suggests adding `--yes` to write or `--dry-run` to inspect.
 
 ## Harness Targets
 
@@ -126,6 +130,16 @@ Writes:
 ```
 
 This target supports Codex-style and Antigravity-style agents that load the shared `.agents` skills root.
+
+`agents` is the canonical target. `codex` and `antigravity` are aliases because they write the same file. `--harness codex,antigravity` should dedupe to one shared `.agents` write and report one "Shared .agents skill" result with Codex and Antigravity invocation hints.
+
+The shared target can be writable even when a specific harness is not confirmed to load it. Detection should distinguish:
+
+- `detected-loaded`: a known harness/config points at the shared skills root;
+- `writable`: the home directory can accept the file, but loading is not proven;
+- `unknown`: the home directory cannot be inspected.
+
+When loading is not proven, output should still be honest: "installed shared skill; restart your agent. If your harness does not load it, use repo-local `init` or the fallback prompt."
 
 ### Claude Code Target
 
@@ -156,6 +170,17 @@ Known stale legacy files should be detected:
 
 If they contain old Unship task-board or patch-session wording, `install` should offer to remove or replace them.
 
+For `~/.claude/commands/unship.md`, legacy replacement is a single transition:
+
+- exact current shim: `current`;
+- legacy marker content: `legacy-replaced-with-shim` when repair/write is allowed;
+- older managed shim: `stale-managed`;
+- unknown content: `user-modified`.
+
+Do not report this same path as both "removed" and "installed" in JSON.
+
+Install the Claude slash command only when the matching Claude skill is `current`, `written`, or `would-write`. If the skill is `user-modified` or blocked, do not install the shim; report `blocked-missing-skill` so `/unship` does not point at a skill the harness cannot resolve.
+
 ### OpenCode Target
 
 Writes:
@@ -165,7 +190,7 @@ Writes:
 ~/.opencode/commands/unship.md
 ```
 
-Enable writes only when the CLI can verify these global paths from documented OpenCode conventions or an existing local OpenCode config directory. If verification fails, report manual instructions instead of guessing.
+OpenCode is manual in the first seamless installer unless the CLI can verify global paths from documented OpenCode conventions or an existing local OpenCode config directory. `--all` should not write OpenCode files until that verification exists. If verification fails, report manual instructions instead of guessing.
 
 ### Future Harnesses
 
@@ -206,6 +231,24 @@ Every managed file should have one of these states:
 
 Rerunning `install` should never duplicate content. It should skip current files, refresh stale managed files only when confirmed or forced, and avoid overwriting user-modified files without explicit `--force`.
 
+State transitions:
+
+| State | `install` interactive/confirmed | `install --repair` | `install --force` | `install --repair --force` |
+| --- | --- | --- | --- | --- |
+| `missing` | write | write | write | write |
+| `current` | skip | skip | skip | skip |
+| `stale-managed` | ask before refresh | refresh | refresh | refresh |
+| `legacy` | ask before remove/replace | remove/replace | remove/replace | remove/replace |
+| `user-modified` | skip and report | skip and report | overwrite only if target explicitly selected | overwrite only if target explicitly selected |
+| `unsupported` | manual instructions | manual instructions | manual instructions | manual instructions |
+
+Classification precedence for paths that are both legacy candidates and managed targets:
+
+1. Exact current template match: `current`.
+2. Known legacy markers such as `unship next` or `patch-session`: `legacy`.
+3. Strong Unship managed markers but different content: `stale-managed`.
+4. Anything else at that path: `user-modified`.
+
 ## Detection Rules
 
 Harness detection should be conservative:
@@ -225,6 +268,8 @@ Legacy detection should match specific files and content markers such as:
 - old source-swapping workflow language.
 
 Do not delete arbitrary files merely because their path or text contains `unship`.
+
+False positives are especially important for legacy cleanup: a user note, custom command, or unrelated file that merely mentions Unship must remain `user-modified` or ignored unless it matches a known legacy path and known legacy marker.
 
 ## Output
 
@@ -292,7 +337,16 @@ npx @unship/cli@latest uninstall --project --yes
 
 Default interactive uninstall should remove user-level managed Unship harness files, including known legacy files, after confirmation.
 
-Project uninstall should remove picker files and dev-only mounts only when they match managed setup patterns. It should not remove `data-unship-pick` source variants; users must settle or clean variants through the agent workflow and verify with `unship check`.
+Project uninstall should remove byte-matching managed picker files only in the first seamless installer. It should not remove dev-only source mounts, `data-unship-pick` source variants, or app shell edits; users must settle or clean variants and mounts through the agent workflow and verify with `unship check`.
+
+`--all` on uninstall means all harnesses only. It does not imply project uninstall. Project mutation requires `--project`.
+
+Project uninstall must be conservative:
+
+- remove picker files only when they byte-match the bundled picker;
+- leave generated SvelteKit/Nuxt hook/plugin files and patched Next/Vite/Astro mount snippets for the agent cleanup workflow in V1;
+- refuse `uninstall --project` when active `data-unship-*` variants remain, unless `--force` is supplied;
+- never remove source variants, app shell edits, or choose a winning option.
 
 ## Copy-Paste Agent Bootstrap
 
@@ -303,6 +357,14 @@ Set up Unship for this coding agent. Run `npx -y @unship/cli@latest install --dr
 ```
 
 This prompt is a fallback, not the primary path.
+
+For harnesses with unknown skill paths, users can run:
+
+```bash
+npx @unship/cli@latest install --print-skill
+```
+
+Then place the printed `SKILL.md` content wherever that harness stores skills. The docs should include a short checklist: find the harness skill directory, create `unship/SKILL.md`, paste the content, restart the harness, and ask naturally.
 
 ## Error Handling
 
@@ -317,18 +379,34 @@ This prompt is a fallback, not the primary path.
 
 Add tests for:
 
+- all install/uninstall tests run with a temporary `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME`, and `CLAUDE_CONFIG_DIR` when relevant, and assert no JSON paths or writes escape that temp root;
 - `install --dry-run --json` reports shared agents, Claude, legacy files, and project setup state without writing.
 - `install --all --yes --json` writes shared and Claude targets in a temp home.
 - rerunning install reports files as current and does not duplicate content.
 - stale managed files refresh with `--repair --yes`.
 - user-modified files are skipped without `--force`.
 - legacy Claude `unship next` command is detected and removed when repair is confirmed.
+- legacy `unship-batch.md`, `unship-docs.md`, and `unship-design/SKILL.md` are detected only when their content has known legacy markers.
+- files that mention Unship but do not match known legacy path/marker combinations are not removed.
 - Claude slash command is a shim and does not contain full workflow or CLI lifecycle commands.
+- Claude slash command is blocked when the Claude skill is user-modified or otherwise unavailable.
 - project setup can be included or skipped independently.
-- noninteractive install without `--yes`, `--json`, or `--dry-run` exits with a clear error.
+- project uninstall preserves active `data-unship-pick` source and removes only byte-matching managed picker files and exact managed snippets/files.
+- noninteractive install without `--yes` or `--dry-run` exits with a clear error, even when `--json` is present.
 - `uninstall --all --yes --json` removes only managed and known legacy files.
+- `install-skill` remains skill-only: no slash command, no project setup, no legacy cleanup, and unchanged stale semantics.
+- `help` lists `install`, `uninstall`, and `install-skill`.
+- packed tarball smoke installs the tarball in a temp consumer and runs `./node_modules/.bin/unship install --dry-run --json`, `./node_modules/.bin/unship install-skill --dir <tmp> --json`, and `./node_modules/.bin/unship uninstall --dry-run --json`.
 
 Existing package smoke tests should be updated if new template files are added to the published package.
+
+## Documentation And Release Acceptance
+
+- README promotes `npx @unship/cli@latest install` as the primary path.
+- README moves `install-skill` to an advanced compatibility section.
+- `docs/README.md` links this seamless install design as the active install direction.
+- `RELEASE.md` registry smoke includes `npm exec @unship/cli@next -- install --dry-run --json`.
+- Release gates remain `npm run verify`, `npm publish --dry-run`, and packed contents smoke.
 
 ## Migration
 

@@ -28,7 +28,6 @@ Parse intent this way:
 Before reading package internals or searching `node_modules`, choose the CLI prefix once:
 
 - If `./node_modules/.bin/unship` exists, use `./node_modules/.bin/unship`.
-- Otherwise, if this project lists `@unship/cli` in `package.json`, use `npx unship`.
 - Otherwise use `npx -y @unship/cli@latest` so npm does not stop for an install prompt.
 
 Ask the CLI what is already true:

@@ -6,21 +6,52 @@ Unship helps an AI agent create a few real source-level UI options, lets you com
 
 > Status: early beta. Unship is intentionally small and local-first; treat it as prototyping tooling, not production runtime infrastructure.
 
-## Install The Skill
+## Install
 
-Install the global agent skill once:
+Run the smart installer:
 
 ```bash
-npx @unship/cli@latest install-skill
+npx @unship/cli@latest install
 ```
 
-Restart your agent, then ask naturally:
+It detects known coding harnesses, installs the Unship skill, adds `/unship` where supported, and can be re-run later to repair or refresh setup.
+
+Restart your agent, then use the slash command where available:
+
+```txt
+/unship generate 3 variants of the hero section
+```
+
+Or ask naturally:
 
 ```txt
 use unship to generate 3 variants of the hero section
 ```
 
 The installed skill checks the project, wires the local picker when needed, creates source-level variants, hands off comparison to you, and later cleans every Unship artifact before shipping.
+
+For unsupported harnesses, print the portable skill and place it where your agent loads skills:
+
+```bash
+npx @unship/cli@latest install --print-skill
+```
+
+Fallback checklist:
+
+1. Find the harness's user-level or repo-level skill directory.
+2. Create `unship/SKILL.md` inside that directory.
+3. Paste the printed skill content into `SKILL.md`.
+4. Restart the harness so it reloads skills.
+5. Ask naturally: `use unship to generate 3 variants of the hero section`.
+
+If a harness does not support skills, paste this into the agent instead:
+
+```txt
+Use Unship for this request. First run `npx -y @unship/cli@latest doctor --json`.
+If the project needs setup and an app shell exists, run `npx -y @unship/cli@latest setup --json`.
+Create temporary source-level choices with `data-unship-pick` and `data-unship-option`.
+Use the local picker for comparison, then remove every temporary Unship artifact and run `npx -y @unship/cli@latest check --json`.
+```
 
 ## Quick Start In A Project
 
@@ -110,6 +141,16 @@ npx @unship/cli@latest init --target all
 ```
 
 Codex and Antigravity both use the portable workspace skill at `.agents/skills/unship/SKILL.md`.
+
+## Advanced Skill Install
+
+Use the older skill-only installer only when you need to target a specific skills directory yourself:
+
+```bash
+npx @unship/cli@latest install-skill --dir ~/.claude/skills
+```
+
+This does not install slash commands, repair legacy files, or set up a project.
 
 ## Agent Behavior
 

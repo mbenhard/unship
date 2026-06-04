@@ -24,8 +24,12 @@ async function withServer(handler, callback) {
   }
 }
 
-async function runCli(args, cwd) {
-  const child = spawn(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" });
+async function runCli(args, cwd, env = {}) {
+  const child = spawn(process.execPath, [CLI, ...args], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, ...env }
+  });
   let stdout = "";
   let stderr = "";
   child.stdout.on("data", (chunk) => {
@@ -37,6 +41,216 @@ async function runCli(args, cwd) {
   const status = await new Promise((resolve) => child.on("close", resolve));
   return { status, stdout, stderr };
 }
+
+async function runCliWithHome(args, cwd, home) {
+  return runCli(args, cwd, {
+    HOME: home,
+    USERPROFILE: home,
+    XDG_CONFIG_HOME: join(home, ".config"),
+    CLAUDE_CONFIG_DIR: join(home, ".claude")
+  });
+}
+
+test("help lists seamless install commands", () => {
+  const result = spawnSync(process.execPath, [CLI, "help"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /install/);
+  assert.match(result.stdout, /uninstall/);
+  assert.match(result.stdout, /install-skill/);
+});
+
+test("install print-skill outputs the bundled skill without writing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--print-skill"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /name: unship/);
+  assert.match(result.stdout, /Fast Start/);
+  await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
+});
+
+test("install dry-run json plans shared and claude targets inside temp home", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".claude"), { recursive: true });
+
+  const result = await runCliWithHome(["install", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.equal(json.dryRun, true);
+  assert.equal(json.harnesses.some((item) => item.id === "agents"), true);
+  assert.equal(json.harnesses.some((item) => item.id === "claude"), true);
+  assert.equal(json.harnesses.find((item) => item.id === "agents").status, "planned");
+  assert.equal(JSON.stringify(json).includes(home), true);
+  assert.equal(JSON.stringify(json).includes(process.env.HOME), false);
+  await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
+});
+
+test("install all yes writes shared and claude targets then reruns current", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".claude"), { recursive: true });
+
+  const first = await runCliWithHome(["install", "--all", "--yes", "--json"], cwd, home);
+
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(JSON.parse(first.stdout).ok, true);
+  assert.match(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  assert.match(await readFile(join(home, ".claude", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  const command = await readFile(join(home, ".claude", "commands", "unship.md"), "utf8");
+  assert.match(command, /Use the Unship skill/);
+  assert.doesNotMatch(command, /unship next/);
+
+  const second = await runCliWithHome(["install", "--all", "--yes", "--json"], cwd, home);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(JSON.stringify(JSON.parse(second.stdout)).includes('"status":"current"'), true);
+});
+
+test("install repairs legacy claude command into shim", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await writeFixture(join(home, ".claude", "commands", "unship.md"), "Run `unship next --json` at session start.\n");
+
+  const result = await runCliWithHome(["install", "--harness", "claude", "--repair", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.legacy.some((item) => item.status === "legacy-replaced-with-shim"), true);
+  const command = await readFile(join(home, ".claude", "commands", "unship.md"), "utf8");
+  assert.match(command, /Use the Unship skill/);
+  assert.doesNotMatch(command, /unship next/);
+});
+
+test("install skips user modified skill and blocks claude command", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await writeFixture(join(home, ".claude", "skills", "unship", "SKILL.md"), "# My custom skill\n");
+
+  const result = await runCliWithHome(["install", "--harness", "claude", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(JSON.stringify(json).includes("user-modified"), true);
+  assert.equal(JSON.stringify(json).includes("blocked-missing-skill"), true);
+  await assert.rejects(readFile(join(home, ".claude", "commands", "unship.md"), "utf8"));
+});
+
+test("install repair does not overwrite custom command text that only mentions Unship", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  const commandPath = join(home, ".claude", "commands", "unship.md");
+  await runCliWithHome(["install", "--harness", "claude", "--yes", "--json"], cwd, home);
+  await writeFixture(commandPath, "Use Unship in my own custom workflow.\n");
+
+  const result = await runCliWithHome(["install", "--harness", "claude", "--repair", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  const command = json.harnesses.find((item) => item.id === "claude").files.find((file) => file.role === "command");
+  assert.equal(command.state, "user-modified");
+  assert.equal(command.operation, "skip");
+  assert.equal(await readFile(commandPath, "utf8"), "Use Unship in my own custom workflow.\n");
+});
+
+test("install json without yes is not consent to write", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--json"], cwd, home);
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /--yes/);
+});
+
+test("uninstall all yes removes managed harness files and legacy files only", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await runCliWithHome(["install", "--all", "--yes", "--json"], cwd, home);
+  await writeFixture(join(home, ".claude", "commands", "unship-batch.md"), "# unship-batch\nparallel task processing\n");
+  await writeFixture(join(home, ".claude", "commands", "custom-unship.md"), "I mention Unship but am custom.\n");
+
+  const result = await runCliWithHome(["uninstall", "--all", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
+  await assert.rejects(readFile(join(home, ".claude", "commands", "unship-batch.md"), "utf8"));
+  assert.match(await readFile(join(home, ".claude", "commands", "custom-unship.md"), "utf8"), /custom/);
+});
+
+test("uninstall dry-run plain output names uninstall", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await runCliWithHome(["install", "--all", "--yes", "--json"], cwd, home);
+
+  const result = await runCliWithHome(["uninstall", "--dry-run"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Unship uninstall dry run/);
+  assert.doesNotMatch(result.stdout, /Unship install dry run/);
+});
+
+test("install can include project setup while no-project skips it", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
+  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
+
+  const skipped = await runCliWithHome(["install", "--all", "--no-project", "--yes", "--json"], cwd, home);
+  assert.equal(skipped.status, 0, skipped.stderr);
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
+
+  const included = await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
+  assert.equal(included.status, 0, included.stderr);
+  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
+});
+
+test("install project in empty repo defers setup instead of creating a shell", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.project.included, true);
+  assert.equal(json.project.status, "deferred");
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
+});
+
+test("uninstall project removes current picker file but leaves app source deliberate", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
+  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
+  await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
+
+  const result = await runCliWithHome(["uninstall", "--project", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.project.status, "complete");
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
+  assert.match(await readFile(join(cwd, "index.html"), "utf8"), /unship-picker\.js/);
+});
+
+test("install-skill remains skill only", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  const skillRoot = join(home, "skills");
+  await writeFixture(join(home, ".claude", "commands", "unship.md"), "Run unship next --json\n");
+
+  const result = await runCliWithHome(["install-skill", "--dir", skillRoot, "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8"), /name: unship/);
+  assert.match(await readFile(join(home, ".claude", "commands", "unship.md"), "utf8"), /unship next/);
+});
 
 test("init writes portable skill by default", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
@@ -123,6 +337,7 @@ test("install-skill writes the global agents skill", async () => {
   assert.match(skill, /name: unship/);
   assert.match(skill, /npx -y @unship\/cli@latest/);
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
+  assert.doesNotMatch(skill, /npx unship\b/);
   assert.doesNotMatch(skill, /lists `@unship\/cli` or `unship`/);
   assert.match(skill, /Settle a selected group/i);
   assert.match(skill, /Final cleanup/i);
