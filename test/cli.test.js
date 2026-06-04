@@ -318,6 +318,15 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /Picker selection does not save source/i);
   assert.match(skill, /whether the installed skill or picker appears stale/i);
   assert.match(skill, /multiple groups with the same label/i);
+  assert.match(skill, /the variant group label/i);
+  assert.match(skill, /the visible option labels/i);
+  assert.match(skill, /whether picker setup is installed and current/i);
+  assert.match(skill, /any detected preview servers as hints only/i);
+  assert.match(skill, /cleanup status if existing Unship artifacts already exist/i);
+  assert.match(skill, /repeated option labels/i);
+  assert.match(skill, /"the second one"/i);
+  assert.match(skill, /overlapping active explorations/i);
+  assert.match(skill, /If `\/unship` is unavailable after installation, continue from the natural-language request/i);
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
   assert.match(skill, /If no app source, framework signal, or preview shell exists yet/i);
   assert.match(skill, /Settle a selected group/i);
@@ -389,6 +398,15 @@ test("install-skill writes the global agents skill", async () => {
   assert.doesNotMatch(skill, /npx unship\b/);
   assert.doesNotMatch(skill, /lists `@unship\/cli` or `unship`/);
   assert.match(skill, /does not send telemetry/i);
+  assert.match(skill, /the variant group label/i);
+  assert.match(skill, /the visible option labels/i);
+  assert.match(skill, /whether picker setup is installed and current/i);
+  assert.match(skill, /any detected preview servers as hints only/i);
+  assert.match(skill, /cleanup status if existing Unship artifacts already exist/i);
+  assert.match(skill, /repeated option labels/i);
+  assert.match(skill, /"the second one"/i);
+  assert.match(skill, /overlapping active explorations/i);
+  assert.match(skill, /If `\/unship` is unavailable after installation, continue from the natural-language request/i);
   assert.match(skill, /Settle a selected group/i);
   assert.match(skill, /Final cleanup/i);
 });
@@ -398,8 +416,12 @@ test("README documents local trust and unship troubleshooting", async () => {
 
   assert.match(readme, /Unship is local comparison tooling/i);
   assert.match(readme, /does not send telemetry/i);
+  assert.match(readme, /picker selection does not save source/i);
   assert.match(readme, /\/unship does not appear/i);
+  assert.match(readme, /Restart the agent after running `install`/);
+  assert.match(readme, /doctor --json/);
   assert.match(readme, /install --repair/);
+  assert.match(readme, /natural-language fallback/);
   assert.match(readme, /install --print-skill/);
 });
 
