@@ -35,7 +35,7 @@
     "access": "public"
   },
   "scripts": {
-    "check": "node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/install/index.js && node --check src/setup/index.js && node --check src/picker/unship-picker.js",
+    "check": "node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/install/index.js && node --check src/setup/index.js && node --check src/update/index.js && node --check src/picker/unship-picker.js",
     "e2e": "node e2e/toolbar-readiness.mjs",
     "test": "node --test",
     "verify": "npm run check && npm test && npm run e2e && npm pack --dry-run"
