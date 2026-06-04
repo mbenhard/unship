@@ -167,9 +167,34 @@
     if (!Number.isInteger(index) || !groups[index]) return;
 
     activeGroupIndex = index;
-    menuOpen = false;
-    render();
-    announce(groups[activeGroupIndex]);
+    const group = groups[activeGroupIndex];
+    const dock = root?.querySelector(".dock");
+
+    if (menuOpen && dock) {
+      // Update the visible texts in place, then contract the menu like a
+      // regular close. The hidden menu list goes stale but the next render
+      // (required before the menu can reopen) rebuilds it.
+      const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
+      const groupBtn = dock.querySelector(".group");
+      groupBtn?.setAttribute("aria-label", `Active group ${group.displayLabel}`);
+      const nameEl = dock.querySelector(".group-name");
+      if (nameEl) nameEl.textContent = group.displayLabel;
+      const countEl = dock.querySelector(".group-count");
+      if (countEl) countEl.textContent = `${group.activeOptionIndex + 1}/${group.options.length}`;
+      const labelMain = dock.querySelector(".label-main");
+      if (labelMain) labelMain.textContent = option.label;
+      dock
+        .querySelector(".label")
+        ?.setAttribute(
+          "aria-label",
+          `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position`
+        );
+      closeMenu();
+    } else {
+      menuOpen = false;
+      render();
+    }
+    announce(group);
   }
 
   function closeMenu() {

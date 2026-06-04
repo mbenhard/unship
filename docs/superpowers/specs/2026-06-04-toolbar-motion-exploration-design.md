@@ -32,6 +32,8 @@ This is a design artifact. The picker only changes after a winner is picked, in 
 
 - 2026-06-04 (round 4, review feedback): (a) group/option counts now tick vertically odometer-style — next enters from below, prev from above, ±8px at 130ms; (b) menu close is now animated — `closeMenu()` removes the `open` class on the live dock instead of re-rendering, letting the existing max-height/opacity transitions play (with a visibility delay so the collapse stays visible), then re-syncs `renderedSignature`; used by the group toggle and Escape; (c) smoother item reveal — 220ms `cubic-bezier(.22,.61,.36,1)`, 6px drop, 30ms stagger; (d) removed the background transition from nav buttons — the hover fade re-played on every press because re-renders rebuild the hovered node, reading as a color flash.
 
+- 2026-06-04 (round 5, review feedback): (a) menu item reveal simplified to the godly overlay rule — container unmasks via max-height only, items are a pure staggered opacity fade (240ms ease, 30ms cascade, 300ms total), removing the compound slide+expand+double-fade; (b) picking a group from the menu now plays the same contract animation as closing — `pickGroup` updates the visible group/label texts on the live dock and routes through `closeMenu()` instead of re-rendering; the hidden menu list goes stale but is rebuilt by the render required before it can reopen.
+
 ## Page Structure
 
 - Header: title, one-line context, host-tone toggle (light/dark stage behind the docks).
