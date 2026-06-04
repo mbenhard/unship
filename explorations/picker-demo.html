@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unship picker — live demo</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:#fff;color:#000;font:400 14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.02em;-webkit-font-smoothing:antialiased}
+  main{max-width:760px;margin:0 auto;padding:56px 24px 160px;display:grid;gap:48px}
+  .hint{font-size:12px;color:#737373}
+  section[data-unship-option]{border:1px solid rgba(0,0,0,.05);border-radius:6px;padding:32px;display:grid;gap:12px}
+  h1,h2{font-weight:500;margin:0;line-height:1.25}
+  h1{font-size:20px}
+  h2{font-size:16px}
+  p{margin:0;color:#737373}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{height:40px;padding:0 16px;border:0;border-radius:999px;background:#000;color:#fff;font:500 14px/1 inherit;display:inline-flex;align-items:center;cursor:pointer}
+  .btn.alt{background:#f5f5f5;color:#737373}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cardlet{border:1px solid rgba(0,0,0,.05);border-radius:6px;padding:18px;display:grid;gap:6px}
+  .price{font-size:20px;font-weight:500}
+  blockquote{margin:0;padding:14px 18px;background:#f5f5f5;border-radius:6px;font-size:13px}
+  /* dark host toggle to judge the dock over dark apps */
+  body.dark{background:#101012;color:#fff}
+  body.dark p,body.dark .hint{color:#a1a1aa}
+  body.dark section[data-unship-option],body.dark .cardlet{border-color:rgba(255,255,255,.1)}
+  body.dark blockquote{background:#1b1b1f}
+  body.dark .btn{background:#fff;color:#000}
+  body.dark .btn.alt{background:#1b1b1f;color:#a1a1aa}
+  #host{position:fixed;top:16px;right:16px;height:32px;padding:0 14px;border:1px solid rgba(127,127,127,.35);border-radius:999px;background:transparent;color:inherit;font:500 12px/1 inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<button id="host" type="button">Host: light</button>
+<main>
+  <div class="hint">Unship picker live demo — the dock below is the real <code>src/picker/unship-picker.js</code>. Click the group row to open the switcher, use ‹ › or arrow keys (←/→ option, ↑/↓ group, Esc closes).</div>
+
+  <div data-unship-pick="Hero layout">
+    <section data-unship-option="Minimal hero">
+      <h1>Ship the version you actually like</h1>
+      <p>Unship lets agents draft a few real options in your app, so you can compare calmly and keep one.</p>
+      <div class="row"><button class="btn" type="button">Get started</button></div>
+    </section>
+    <section data-unship-option="Split hero">
+      <div class="grid2">
+        <div style="display:grid;gap:12px">
+          <h1>Make a few real options</h1>
+          <p>Compare variants live in your own app — not in screenshots.</p>
+          <div class="row"><button class="btn" type="button">Get started</button><button class="btn alt" type="button">How it works</button></div>
+        </div>
+        <div class="cardlet" style="place-content:center;text-align:center"><p>preview</p></div>
+      </div>
+    </section>
+    <section data-unship-option="Full-bleed hero" style="text-align:center;padding:56px 32px">
+      <h1>Astronomically calm shipping</h1>
+      <p>One page, three heroes, zero regret.</p>
+      <div class="row" style="justify-content:center"><button class="btn" type="button">Get started</button></div>
+    </section>
+  </div>
+
+  <div data-unship-pick="Pricing card">
+    <section data-unship-option="Two column">
+      <h2>Pricing</h2>
+      <div class="grid2">
+        <div class="cardlet"><div class="price">$0</div><p>Local, forever</p></div>
+        <div class="cardlet"><div class="price">$12</div><p>For teams</p></div>
+      </div>
+    </section>
+    <section data-unship-option="Stacked">
+      <h2>Pricing</h2>
+      <div class="cardlet"><div class="price">$0</div><p>Local, forever</p></div>
+      <div class="cardlet"><div class="price">$12</div><p>For teams</p></div>
+    </section>
+  </div>
+
+  <div data-unship-pick="Testimonials">
+    <section data-unship-option="Carousel">
+      <h2>What people say</h2>
+      <blockquote>“The picker stays out of the way until I need it.”</blockquote>
+    </section>
+    <section data-unship-option="Grid">
+      <h2>What people say</h2>
+      <div class="grid2">
+        <blockquote>“The picker stays out of the way.”</blockquote>
+        <blockquote>“Compare calmly, ship clean.”</blockquote>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+  const host = document.getElementById("host");
+  host.addEventListener("click", () => {
+    const dark = document.body.classList.toggle("dark");
+    host.textContent = dark ? "Host: dark" : "Host: light";
+  });
+</script>
+<script src="../src/picker/unship-picker.js" data-unship-global-shortcuts></script>
+</body>
+</html>
