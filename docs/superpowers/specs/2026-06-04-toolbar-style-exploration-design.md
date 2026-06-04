@@ -51,6 +51,10 @@ Light:
 - `git diff --check` (docs/artifact-level change).
 - `npm run verify` once, to confirm `explorations/` does not leak into the packed package (guarded by `test/package-smoke.test.js`).
 
+## Revisions
+
+- 2026-06-04 (round 2): After review, dropped concepts 05 Hairline Instrument, 07 Soft Graphite, 08 Paper, 09 Porcelain Inset, and 10 Print Offset. Added three concepts derived from the godly.website design system captured in `~/development/unship.dev/DESIGN.md`: 11 Godly Pills (free-floating frosted pills, neutral-600/30 + 8px blur, no slab), 12 Godly Chrome (fixed-chrome recipe, neutral-400/80 + 12px blur slab, pill rows, superellipse), 13 Godly Ink (solid black, neutral-100 active pill, no shadow at rest). All three use Inter/system 500, −0.02em tracking, full-round rows. Keeper numbering (01–04, 06) retained.
+
 ## Out of Scope
 
 - Any change to `src/picker/unship-picker.js` or other product code.

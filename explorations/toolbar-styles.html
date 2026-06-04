@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Unship dock — 10 monochrome styling concepts</title>
+<title>Unship dock — monochrome styling concepts</title>
 <style>
 /* ============ page chrome ============ */
 :root{
@@ -114,19 +114,6 @@ header p{margin:0;color:#71717a;font-size:13px}
 }
 .s4 .dock .nav{background:#26262b;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.45)}
 
-/* 05 Hairline Instrument — 1px rules, square radii, monospace, tabular */
-.s5 .dock{
-  --surface:rgba(12,12,14,.93); --edge:1px solid rgba(255,255,255,.3);
-  --r:5px; --fs:11px; --font:ui-monospace,"SF Mono",Menlo,monospace;
-  --shadow:0 6px 18px rgba(0,0,0,.25);
-  --text:#f2f2f2; --hover-bg:rgba(255,255,255,.07);
-  --sel-bg:transparent; --sel-ring:inset 0 0 0 1px rgba(255,255,255,.45);
-  --divider:1px solid rgba(255,255,255,.18);
-  font-weight:500;
-}
-.s5 .dock .nav{border-radius:4px}
-.s5 .dock .label-main{text-transform:uppercase;letter-spacing:.08em;font-size:10px}
-
 /* 06 OLED Contour — pure black, bright contour, no shadow, inverted active group */
 .s6 .dock{
   --surface:#000; --edge:1px solid rgba(255,255,255,.35); --r:16px;
@@ -137,54 +124,56 @@ header p{margin:0;color:#71717a;font-size:13px}
 }
 .s6 .dock.open .group{color:#000}
 
-/* 07 Soft Graphite — lighter surface, generous radius, huge diffuse shadow */
-.s7 .dock{
-  --surface:#3f3f46; --edge:0; --r:22px; --gap:7px;
-  --shadow:0 28px 64px rgba(0,0,0,.45),0 6px 16px rgba(0,0,0,.22);
-  --text:#f4f4f5; --hover-bg:rgba(255,255,255,.08);
-  --sel-bg:rgba(255,255,255,.13); --sel-ring:none;
-  --divider:1px solid rgba(255,255,255,.09);
+/* 11 Godly Pills — godly.website over-imagery chrome: free-floating frosted pills, no slab */
+.s11 .dock{
+  --surface:transparent; --edge:0; --r:999px;
+  --shadow:none; --text:#fff; --muted:.75;
+  --hover-bg:rgba(82,82,82,.45);
+  --sel-bg:rgba(82,82,82,.6); --sel-ring:none;
+  --divider:0; --fs:12.5px;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:-.02em; font-weight:500;
 }
+.s11 .dock .group-name{font-weight:500}
+.s11 .dock .group,.s11 .dock .menuitem,.s11 .dock .label,.s11 .dock .nav{background:rgba(82,82,82,.3);backdrop-filter:blur(8px)}
+.s11 .dock .group:hover,.s11 .dock .menuitem:hover,.s11 .dock .nav:hover{background:rgba(82,82,82,.45)}
+.s11 .dock.open .row{padding-top:0}
 
-/* 08 Paper — white, gray hairline, two-layer macOS shadow */
-.s8 .dock{
-  --surface:#fff; --edge:1px solid #e4e4e7; --r:14px;
-  --shadow:0 1px 2px rgba(0,0,0,.05),0 10px 28px rgba(0,0,0,.1);
-  --text:#18181b; --muted:.55;
-  --hover-bg:#f4f4f5;
-  --sel-bg:#ececef; --sel-ring:inset 0 0 0 1px #e0e0e3;
-  --divider:1px solid #ececef;
+/* 12 Godly Chrome — godly.website fixed-chrome recipe: light frosted slab, pill rows */
+.s12 .dock{
+  --surface:rgba(161,161,161,.8); --edge:0; --r:999px;
+  --shadow:none; --text:#fff; --muted:.8;
+  --hover-bg:rgba(255,255,255,.18);
+  --sel-bg:rgba(255,255,255,.3); --sel-ring:none;
+  --divider:1px solid rgba(255,255,255,.35); --fs:12.5px;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:-.02em; font-weight:500;
+  border-radius:24px;
+  backdrop-filter:blur(12px);
+  corner-shape:superellipse(1.5); /* progressive enhancement, per DESIGN.md */
 }
+.s12 .dock .group-name{font-weight:500}
 
-/* 09 Porcelain Inset — light neumorphism, recessed active group, embossed nav */
-.s9 .dock{
-  --surface:linear-gradient(180deg,#f6f6f7,#e9e9ec);
-  --edge:1px solid #dcdce0; --r:18px;
-  --shadow:inset 0 1px 0 #fff,0 12px 28px rgba(0,0,0,.12);
-  --text:#27272a; --muted:.55;
-  --hover-bg:rgba(0,0,0,.04);
-  --divider:1px solid rgba(0,0,0,.07);
+/* 13 Godly Ink — godly.website button language: solid black, neutral-100 active pill */
+.s13 .dock{
+  --surface:#000; --edge:0; --r:999px;
+  --shadow:none; --text:#fff; --muted:.7;
+  --hover-bg:rgba(255,255,255,.12);
+  --sel-bg:#f5f5f5; --sel-ring:none;
+  --divider:1px solid rgba(255,255,255,.15); --fs:12.5px;
+  --font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:-.02em; font-weight:500;
+  border-radius:24px;
 }
-.s9 .dock.open .group{background:#e3e3e7;box-shadow:inset 0 2px 5px rgba(0,0,0,.1),inset 0 -1px 0 rgba(255,255,255,.7)}
-.s9 .dock .menuitem:hover{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14)}
-.s9 .dock .nav{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 1px 0 #fff}
-
-/* 10 Print Offset — off-white, solid black border, hard offset shadow, mono */
-.s10 .dock{
-  --surface:#faf9f6; --edge:1.5px solid #111; --r:9px;
-  --fs:11.5px; --font:ui-monospace,"SF Mono",Menlo,monospace;
-  --shadow:4px 4px 0 #111;
-  --text:#111; --muted:.6;
-  --hover-bg:#efede8;
-  --divider:1.5px solid #111;
-}
-.s10 .dock.open .group{background:#111;color:#faf9f6;box-shadow:none}
+.s13 .dock .group-name{font-weight:500}
+.s13 .dock.open .group{color:#000}
+.s13 .dock.open .group .group-count{opacity:.55}
 </style>
 </head>
 <body>
 <header>
-  <h1>Unship dock — 10 monochrome styling concepts</h1>
-  <p>Real picker anatomy in every card; only the skin changes. Spec: docs/superpowers/specs/2026-06-04-toolbar-style-exploration-design.md</p>
+  <h1>Unship dock — monochrome styling concepts</h1>
+  <p>Real picker anatomy in every card; only the skin changes. 11–13 derive from unship.dev/DESIGN.md (godly.website system). Spec: docs/superpowers/specs/2026-06-04-toolbar-style-exploration-design.md</p>
   <button id="tone" type="button">Stage: light</button>
 </header>
 <main class="grid">
@@ -325,40 +314,6 @@ header p{margin:0;color:#71717a;font-size:13px}
   </div>
 </section>
 
-<section class="card s5">
-  <div class="card-head">
-    <span class="num">05</span><h2>Hairline Instrument</h2>
-    <p>translucent black · 1px rules · 5px radii · ui-monospace · tabular numerals</p>
-  </div>
-  <div class="stage">
-    <div class="spec">
-      <div class="dock single">
-        <div class="row">
-          <button class="prev nav" type="button" aria-label="Previous option"></button>
-          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
-          <button class="next nav" type="button" aria-label="Next option"></button>
-        </div>
-      </div>
-      <span class="tag">1 group · collapsed</span>
-    </div>
-    <div class="spec">
-      <div class="dock multi open">
-        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
-        <div class="menu">
-          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
-          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
-        </div>
-        <div class="row">
-          <button class="prev nav" type="button" aria-label="Previous option"></button>
-          <button class="label" type="button"><span class="label-main">Split hero</span></button>
-          <button class="next nav" type="button" aria-label="Next option"></button>
-        </div>
-      </div>
-      <span class="tag">3 groups · menu open</span>
-    </div>
-  </div>
-</section>
-
 <section class="card s6">
   <div class="card-head">
     <span class="num">06</span><h2>OLED Contour</h2>
@@ -393,10 +348,10 @@ header p{margin:0;color:#71717a;font-size:13px}
   </div>
 </section>
 
-<section class="card s7">
+<section class="card s11">
   <div class="card-head">
-    <span class="num">07</span><h2>Soft Graphite</h2>
-    <p>zinc-700 surface · 22px radius · huge diffuse ambient shadow</p>
+    <span class="num">11</span><h2>Godly Pills</h2>
+    <p>no slab · free-floating frosted pills · neutral-600/30 + 8px blur · Inter 500 · −0.02em</p>
   </div>
   <div class="stage">
     <div class="spec">
@@ -427,10 +382,10 @@ header p{margin:0;color:#71717a;font-size:13px}
   </div>
 </section>
 
-<section class="card s8">
+<section class="card s12">
   <div class="card-head">
-    <span class="num">08</span><h2>Paper</h2>
-    <p>white · gray hairline · two-layer macOS shadow</p>
+    <span class="num">12</span><h2>Godly Chrome</h2>
+    <p>fixed-chrome recipe · neutral-400/80 + 12px blur slab · pill rows · superellipse</p>
   </div>
   <div class="stage">
     <div class="spec">
@@ -461,44 +416,10 @@ header p{margin:0;color:#71717a;font-size:13px}
   </div>
 </section>
 
-<section class="card s9">
+<section class="card s13">
   <div class="card-head">
-    <span class="num">09</span><h2>Porcelain Inset</h2>
-    <p>porcelain gradient · recessed active group · embossed white nav</p>
-  </div>
-  <div class="stage">
-    <div class="spec">
-      <div class="dock single">
-        <div class="row">
-          <button class="prev nav" type="button" aria-label="Previous option"></button>
-          <button class="label" type="button"><span class="label-main">Hero layout: Split hero</span><span class="option-count">2/3</span></button>
-          <button class="next nav" type="button" aria-label="Next option"></button>
-        </div>
-      </div>
-      <span class="tag">1 group · collapsed</span>
-    </div>
-    <div class="spec">
-      <div class="dock multi open">
-        <button class="group" type="button"><span class="group-name">Hero layout</span><span class="group-count">2/3</span></button>
-        <div class="menu">
-          <button class="menuitem" type="button"><span class="menu-name">Pricing card</span><span class="menu-option">Two column</span></button>
-          <button class="menuitem" type="button"><span class="menu-name">Testimonials</span><span class="menu-option">Carousel</span></button>
-        </div>
-        <div class="row">
-          <button class="prev nav" type="button" aria-label="Previous option"></button>
-          <button class="label" type="button"><span class="label-main">Split hero</span></button>
-          <button class="next nav" type="button" aria-label="Next option"></button>
-        </div>
-      </div>
-      <span class="tag">3 groups · menu open</span>
-    </div>
-  </div>
-</section>
-
-<section class="card s10">
-  <div class="card-head">
-    <span class="num">10</span><h2>Print Offset</h2>
-    <p>off-white · 1.5px black border · hard 4px offset shadow · mono type</p>
+    <span class="num">13</span><h2>Godly Ink</h2>
+    <p>solid black · neutral-100 active pill · full-round rows · no shadow at rest</p>
   </div>
   <div class="stage">
     <div class="spec">
