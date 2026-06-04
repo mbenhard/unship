@@ -18,7 +18,9 @@
   let activeGroupIndex = 0;
   let menuOpen = false;
   let placement = "bottom";
+  let placementLocked = false;
   let rescanQueued = false;
+  let renderedSignature = "";
 
   const api = {
     version: "0.1.0",
@@ -107,12 +109,14 @@
   }
 
   function applyGroupVisibility(group) {
-    group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
-    group.options.forEach((option, index) => {
-      if (index === group.activeOptionIndex) showOption(option.element);
-      else hideOption(option.element);
+    pauseObserver(() => {
+      group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
+      group.options.forEach((option, index) => {
+        if (index === group.activeOptionIndex) showOption(option.element);
+        else hideOption(option.element);
+      });
+      selectedIndexByGroup.set(group.element, group.activeOptionIndex);
     });
-    selectedIndexByGroup.set(group.element, group.activeOptionIndex);
   }
 
   function showOption(element) {
@@ -170,6 +174,8 @@
 
     const group = groups[activeGroupIndex];
     if (!group) {
+      if (renderedSignature === "none") return;
+      renderedSignature = "none";
       root.innerHTML = "";
       root.append(liveRegion);
       return;
@@ -178,22 +184,46 @@
     group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
     const option = group.options[group.activeOptionIndex];
     const mode = groups.length === 1 ? "single" : "multi";
+    const nextSignature = renderSignature(mode);
+    if (nextSignature === renderedSignature) return;
+    renderedSignature = nextSignature;
 
     root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}" role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? groupButton(group) : ""}
       ${groups.length > 1 ? menu() : ""}
       <div class="row">
-        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option">‹</button>
-        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</button>
-        <button class="next nav" type="button" data-action="next" aria-label="Next option">›</button>
+        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option">&#8249;</button>
+        <button class="label" type="button" data-action="toggle-placement" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position">
+          <span class="label-main">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
+          ${groups.length === 1 ? `<span class="option-count">${group.activeOptionIndex + 1}/${group.options.length}</span>` : ""}
+        </button>
+        <button class="next nav" type="button" data-action="next" aria-label="Next option">&#8250;</button>
       </div>
     </div>`;
     root.append(liveRegion);
   }
 
+  function renderSignature(mode) {
+    return JSON.stringify({
+      activeGroupIndex,
+      menuOpen,
+      mode,
+      placement,
+      groups: groups.map((group) => {
+        const activeOption = group.options[clamp(group.activeOptionIndex, group.options.length)];
+        return {
+          displayLabel: group.displayLabel,
+          activeOptionIndex: group.activeOptionIndex,
+          activeOptionLabel: activeOption?.label,
+          optionCount: group.options.length
+        };
+      })
+    });
+  }
+
   function groupButton(group) {
     return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
-      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span><span class="caret">▾</span>
+      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span><span class="caret">&#9662;</span>
     </button>`;
   }
 
@@ -218,6 +248,10 @@
     else if (action === "next") switchOption(1);
     else if (action === "toggle-menu") {
       menuOpen = !menuOpen;
+      render();
+    } else if (action === "toggle-placement") {
+      placementLocked = true;
+      placement = placement === "top" ? "bottom" : "top";
       render();
     } else if (action === "pick-group") {
       pickGroup(Number(button.dataset.index));
@@ -300,12 +334,34 @@
     });
   }
 
+  function pauseObserver(callback) {
+    if (!observer) return callback();
+
+    observer.disconnect();
+    try {
+      return callback();
+    } finally {
+      observer.takeRecords();
+      observeDocument();
+    }
+  }
+
+  function observeDocument() {
+    observer?.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-unship-pick", OPTION_ATTR, "hidden"]
+    });
+  }
+
   function handleDocumentFocus(event) {
     placeAwayFrom(event.target);
   }
 
   function placeAwayFrom(target) {
     if (!target || host?.contains(target)) return;
+    if (placementLocked) return;
 
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
     const rect = target.getBoundingClientRect?.();
@@ -376,31 +432,34 @@
 
   function style() {
     return `<style>
-      .dock{--ease:cubic-bezier(.37,0,.63,1);--dur:.42s;--h:26px;--nav:var(--h);--r:11px;--gap:5px;--navfs:16px;--fs:12px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(256px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border:1px solid rgba(255,255,255,.14);border-radius:calc(var(--r) + var(--gap));background:rgba(24,24,27,.94);backdrop-filter:blur(18px) saturate(1.25);color:#fafafa;font:500 var(--fs)/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 14px 32px rgba(0,0,0,.3)}
+      .dock{--ease:cubic-bezier(.37,0,.63,1);--dur:.28s;--h:34px;--nav:34px;--r:10px;--gap:6px;--navfs:18px;--fs:12px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border:1px solid rgba(255,255,255,.18);border-radius:calc(var(--r) + var(--gap));background:linear-gradient(180deg,rgba(39,39,42,.96),rgba(24,24,27,.96));backdrop-filter:blur(18px) saturate(1.2);color:#fafafa;font:600 var(--fs)/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 18px 42px rgba(0,0,0,.28)}
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
-      button:focus-visible{outline:2px solid #fafafa;outline-offset:2px}
-      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .75em 0 .9em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .16s ease}
-      .group:hover{background:rgba(255,255,255,.08)}
-      .open .group{background:rgba(255,255,255,.13)}
+      button:focus-visible{outline:0;background:rgba(255,255,255,.12)}
+      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .14s ease,box-shadow .14s ease}
+      .group:hover{background:rgba(255,255,255,.1)}
+      .open .group{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
       .group-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .group-count{margin-left:auto;opacity:.5;font-variant-numeric:tabular-nums}
-      .caret{opacity:.55;font-size:.8em;transition:transform var(--dur) var(--ease)}
+      .group-count{margin-left:auto;opacity:.62;font-variant-numeric:tabular-nums}
+      .caret{opacity:.65;font-size:.8em;transition:transform var(--dur) var(--ease)}
       .open .caret{transform:rotate(180deg)}
-      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .16s ease}
-      .open .menu{max-height:200px;opacity:1;visibility:visible}
-      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .75em 0 .9em;border-radius:var(--r);text-align:left;transition:background .12s ease}
-      .menuitem:hover{background:rgba(255,255,255,.08)}
+      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .14s ease}
+      .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
+      .menuitem:hover{background:rgba(255,255,255,.1)}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .menu-option{margin-left:auto;opacity:.5;font-size:.9em;white-space:nowrap}
+      .menu-option{margin-left:auto;opacity:.62;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:1px solid rgba(255,255,255,.1)}
-      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);border-radius:999px;transition:background .12s ease,transform .14s ease}
-      .nav:hover{background:rgba(255,255,255,.12)}
-      .nav:active{transform:scale(.86)}
-      .label{flex:1;min-width:0;text-align:center;padding:0 .4em;min-height:var(--h);display:grid;place-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:var(--r)}
-      .label:hover{background:rgba(255,255,255,.06)}
+      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:background .12s ease,transform .12s ease}
+      .nav:hover{background:rgba(255,255,255,.14)}
+      .nav:active{transform:scale(.9)}
+      .label{flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease}
+      .label:hover{background:rgba(255,255,255,.08)}
+      .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .option-count{flex:none;opacity:.62;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (prefers-reduced-motion:reduce){*{transition:none!important}}
       @media (prefers-reduced-transparency:reduce){.dock{background:rgba(24,24,27,.98);backdrop-filter:none}}
       @supports not ((backdrop-filter:blur(1px))){.dock{background:rgba(24,24,27,.98)}}
@@ -427,12 +486,7 @@
 
     rescan();
     observer = new MutationObserver(queueRescan);
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-unship-pick", OPTION_ATTR, "hidden"]
-    });
+    observeDocument();
     document.addEventListener("focusin", handleDocumentFocus, true);
     if (useGlobalShortcuts) document.addEventListener("keydown", handleGlobalKeydown);
   }

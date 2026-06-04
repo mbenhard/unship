@@ -1,4 +1,5 @@
 .DS_Store
 .unship/
+e2e/artifacts/
 node_modules/
 unship-*.tgz

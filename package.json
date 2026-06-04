@@ -15,8 +15,9 @@
   ],
   "scripts": {
     "check": "node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/setup/index.js && node --check src/picker/unship-picker.js",
+    "e2e": "node e2e/toolbar-readiness.mjs",
     "test": "node --test",
-    "verify": "npm run check && npm test && npm pack --dry-run"
+    "verify": "npm run check && npm test && npm run e2e && npm pack --dry-run"
   },
   "devDependencies": {
     "playwright": "^1.53.0"
