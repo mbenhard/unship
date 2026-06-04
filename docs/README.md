@@ -11,6 +11,7 @@ Read in this order:
 3. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
 4. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
 5. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
+6. `RELEASE.md`
 
 Older implementation plans are execution records, not current behavior specs.
 

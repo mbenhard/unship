@@ -58,3 +58,18 @@ git diff --check
 ```
 
 `npx unship check` is for consuming app roots after a variant exploration. Running it from this package repo is expected to report intentional Unship strings in the implementation and tests.
+
+## Release And Publishing
+
+Before release or publish work, read `RELEASE.md` first. Do not assume the npm package name is available: the clean `unship` name may require maintainer access or transfer. If publishing under a scoped or fallback name, update `package.json`, `package-lock.json`, README commands, bundled skill command examples, tests that assert `packageName`, and packed-tarball smoke docs in one coherent change.
+
+Publishing gates:
+
+- `git status --short` must be clean except intentional local ignored/untracked scratch dirs.
+- `npm run verify` must pass.
+- `npm publish --dry-run` must pass without package-manifest warnings.
+- The packed package contents must remain limited to the files asserted in `test/package-smoke.test.js`.
+- Do not publish to npm until `npm whoami` is authenticated and `npm owner ls <package>` or scoped package access proves the current account can publish.
+- Prefer the `next` dist-tag for the first public beta; promote to `latest` only after registry smoke tests pass.
+
+For GitHub, use `mbenhard/unship` unless the user explicitly chooses another owner or repository name.

@@ -3,3 +3,16 @@
 e2e/artifacts/
 node_modules/
 unship-*.tgz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+.env
+.env.*
+!.env.example
+.vercel/
+.turbo/
+coverage/
+playwright-report/
+test-results/
