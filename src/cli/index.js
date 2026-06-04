@@ -8,6 +8,7 @@ import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipResidue } from "../check/index.js";
 import { applyInstallPlan, applyUninstallPlan, planInstall, planUninstall } from "../install/index.js";
 import { inspectProject, setupProject } from "../setup/index.js";
+import { checkForUpdates } from "../update/index.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -23,11 +24,16 @@ try {
         printInstallResult({ ...plan, dryRun: true }, false);
       }
       const approved = !plan.ok || flags["dry-run"] || flags.yes || await confirmPlan("Proceed with Unship install?");
-      const result = !plan.ok
+      let result = !plan.ok
         ? plan
         : approved
           ? (flags["dry-run"] ? plan : await applyInstallPlan(plan))
           : { ok: false, command: "install", error: "Install cancelled.", next: [] };
+      if (result.ok && !flags.json) {
+        const pkg = await readPackageInfo();
+        const updates = await updateStatus(pkg, { disabled: Boolean(flags["no-update-check"]) });
+        result = withUpdateNextActions(result, updates);
+      }
       printInstallResult(result, flags.json);
       if (!result.ok) process.exitCode = 1;
     }
@@ -62,7 +68,11 @@ try {
     print(result, flags.json);
     if (!result.ok) process.exitCode = 1;
   } else if (command === "doctor") {
-    print(await doctor({ root: flags.root || process.cwd(), previewPorts: parsePorts(flags.ports) }), flags.json);
+    print(await doctor({
+      root: flags.root || process.cwd(),
+      previewPorts: parsePorts(flags.ports),
+      updateCheckDisabled: Boolean(flags["no-update-check"])
+    }), flags.json);
   } else if (command === "setup") {
     const result = await setupProject({
       root: flags.root || process.cwd(),
@@ -194,6 +204,7 @@ function parseFlags(items) {
     else if (item === "--all") parsed.all = true;
     else if (item === "--yes") parsed.yes = true;
     else if (item === "--repair") parsed.repair = true;
+    else if (item === "--no-update-check") parsed["no-update-check"] = true;
     else if (item === "--no-project") parsed["no-project"] = true;
     else if (item === "--print-skill") parsed["print-skill"] = true;
     else if (item === "--project") parsed.project = true;
@@ -233,8 +244,31 @@ async function printSnippet(flags) {
   else console.log(tag);
 }
 
-async function doctor({ root, previewPorts }) {
-  const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
+async function readPackageInfo() {
+  return JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
+}
+
+async function updateStatus(pkg, { disabled = false } = {}) {
+  return checkForUpdates({
+    packageName: pkg.name,
+    currentVersion: pkg.version,
+    disabled
+  });
+}
+
+function withUpdateNextActions(result, updates) {
+  if (!updates?.next) return result;
+  const next = result.next || [];
+  return {
+    ...result,
+    updates,
+    next: next.includes(updates.next) ? next : [updates.next, ...next]
+  };
+}
+
+async function doctor({ root, previewPorts, updateCheckDisabled = false }) {
+  const pkg = await readPackageInfo();
+  const updates = await updateStatus(pkg, { disabled: updateCheckDisabled });
   const project = await inspectProject({ root, previewPorts });
   const residue = await checkUnshipResidue({ root });
   const unship = summarizeUnship(residue);
@@ -242,12 +276,13 @@ async function doctor({ root, previewPorts }) {
     ok: true,
     packageName: pkg.name,
     version: pkg.version,
+    updates,
     node: process.version,
     project,
     residue,
     unship,
-    next: nextActions({ project, unship }),
-    reminder: "Unship is local preview tooling. Remove picker markup before shipping."
+    next: nextActions({ project, unship, updates }),
+    reminder: "Unship is local comparison tooling. Remove picker markup before shipping."
   };
 }
 
@@ -260,12 +295,18 @@ function summarizeUnship(residue) {
   };
 }
 
-function nextActions({ project, unship }) {
+function nextActions({ project, unship, updates }) {
   const actions = [];
-  if (!project.pickerFileFound || !project.devMountFound) {
-    actions.push("Run setup after a local app shell exists if you need the picker mounted.");
-  } else if (!project.pickerFileCurrent) {
+  if (updates?.next) actions.push(updates.next);
+
+  if (project.skillInstalled && !project.skillCurrent) {
+    actions.push("Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions.");
+  }
+
+  if (project.pickerFileFound && !project.pickerFileCurrent) {
     actions.push("Run setup --framework auto --json to refresh the stale picker file.");
+  } else if (!project.pickerFileFound || !project.devMountFound) {
+    actions.push("Run setup after a local app shell exists if you need the picker mounted.");
   }
 
   if (unship.activeExplorationCount > 0) {
@@ -285,8 +326,7 @@ function print(value, json) {
   } else if (value.kind === "skill-install") {
     printSkillInstall(value);
   } else if (value.packageName) {
-    const preview = value.project.previewServers.length ? value.project.previewServers.map((server) => server.url).join(", ") : "none detected";
-    console.log(`${value.packageName} ${value.version}\nNode ${value.node}\nFramework ${value.project.framework}\nSkill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}\nPicker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}\nDev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}\nPreview servers ${preview}\n${value.reminder}`);
+    printDoctor(value);
   } else {
     const lines = [];
     if (value.written?.length) lines.push(`Wrote ${value.written.join(", ")}`);
@@ -295,6 +335,29 @@ function print(value, json) {
     if (value.next?.length) lines.push(...value.next.map((item) => `Next: ${item}`));
     console.log(lines.length ? lines.join("\n") : "Unship initialized.");
   }
+}
+
+function printDoctor(value) {
+  const preview = value.project.previewServers.length ? value.project.previewServers.map((server) => server.url).join(", ") : "none detected";
+  const lines = [
+    `${value.packageName} ${value.version}`,
+    doctorUpdateLine(value.updates),
+    `Node ${value.node}`,
+    `Framework ${value.project.framework}`,
+    `Skill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}`,
+    `Picker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}`,
+    `Dev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}`,
+    `Preview servers ${preview}`,
+    value.reminder
+  ].filter(Boolean);
+  appendNext(lines, value.next);
+  console.log(lines.join("\n"));
+}
+
+function doctorUpdateLine(updates) {
+  if (updates?.available === true) return `Update available ${updates.current} -> ${updates.latest}`;
+  if (updates?.checked === false) return "Update check disabled";
+  return "";
 }
 
 function parsePorts(value) {
