@@ -74,30 +74,30 @@ export function scanText(file, text) {
 }
 
 export function scanExplorations(file, text) {
-  const lines = text.split(/\r?\n/);
+  const lineStarts = lineStartOffsets(text);
   const groups = [];
+  const pickRegex = attributePresenceRegex(PICK_ATTR);
+  let match;
 
-  lines.forEach((lineText, index) => {
-    if (!lineText.includes(PICK_ATTR)) return;
-
-    const tag = tagNameForAttribute(lineText, PICK_ATTR);
-    const range = findElementRange(lines, index, tag);
+  while ((match = pickRegex.exec(text))) {
+    const element = elementForAttribute(text, match.index, lineStarts);
+    const range = findElementRange(text, lineStarts, element.startOffset, element.tag);
     groups.push({
-      pick: attributeValues(lineText, PICK_ATTR, groups.length + 1)[0]?.value || `Group ${groups.length + 1}`,
+      pick: attributeValueAt(text, match.index, PICK_ATTR, groups.length + 1)?.value || `Group ${groups.length + 1}`,
       file,
-      startLine: index + 1,
+      startLine: lineIndexForOffset(lineStarts, element.startOffset) + 1,
       endLine: range.endLine,
       rangeConfidence: range.confidence,
-      rangeStartIndex: index,
-      rangeEndIndex: range.endIndex
+      rangeStartOffset: element.startOffset,
+      rangeEndOffset: range.endOffset
     });
-  });
+  }
 
   return groups.map((group) => {
     const nestedRanges = groups
-      .filter((candidate) => candidate.startLine > group.startLine && candidate.rangeEndIndex <= group.rangeEndIndex)
-      .map((candidate) => [candidate.rangeStartIndex, candidate.rangeEndIndex]);
-    const options = collectOptionLabels(lines, group.rangeStartIndex, group.rangeEndIndex, nestedRanges, group.rangeConfidence);
+      .filter((candidate) => candidate.rangeStartOffset > group.rangeStartOffset && candidate.rangeEndOffset <= group.rangeEndOffset)
+      .map((candidate) => [candidate.rangeStartOffset, candidate.rangeEndOffset]);
+    const options = collectOptionLabels(text, group.rangeStartOffset, group.rangeEndOffset, nestedRanges, group.rangeConfidence);
 
     return {
       pick: group.pick,
@@ -111,99 +111,124 @@ export function scanExplorations(file, text) {
   });
 }
 
-function tagNameForAttribute(lineText, attr) {
-  const index = lineText.indexOf(attr);
-  const before = index === -1 ? "" : lineText.slice(0, index);
-  const withoutExpressions = stripJsxExpressions(before);
-  const matches = Array.from(withoutExpressions.matchAll(/<([A-Za-z][\w:.-]*)\b/g));
-  return matches.at(-1)?.[1] || null;
+function elementForAttribute(text, attrOffset, lineStarts) {
+  const safeText = blankJsxExpressions(text);
+  const tagStart = safeText.lastIndexOf("<", attrOffset);
+  const tagEnd = safeText.lastIndexOf(">", attrOffset);
+  if (tagStart !== -1 && tagStart > tagEnd) {
+    const match = safeText.slice(tagStart, attrOffset).match(/^<([A-Za-z][\w:.-]*)\b/);
+    if (match) return { tag: match[1], startOffset: tagStart };
+  }
+
+  const lineIndex = lineIndexForOffset(lineStarts, attrOffset);
+  return { tag: null, startOffset: lineStarts[lineIndex] };
 }
 
-function findElementRange(lines, startIndex, tag) {
-  const fallbackEnd = Math.min(lines.length - 1, startIndex + MAX_RANGE_LINES);
-  if (!tag) return { endLine: null, endIndex: fallbackEnd, confidence: "low" };
+function findElementRange(text, lineStarts, startOffset, tag) {
+  const startLineIndex = lineIndexForOffset(lineStarts, startOffset);
+  const fallbackLineIndex = Math.min(lineStarts.length - 1, startLineIndex + MAX_RANGE_LINES);
+  const fallbackEndOffset = fallbackLineIndex + 1 < lineStarts.length ? lineStarts[fallbackLineIndex + 1] : text.length;
+  if (!tag) return { endLine: null, endOffset: fallbackEndOffset, confidence: "low" };
 
   let depth = 0;
-  for (let index = startIndex; index <= fallbackEnd; index += 1) {
-    depth += tagDelta(lines[index], tag);
-    if (depth <= 0) return { endLine: index + 1, endIndex: index, confidence: "high" };
-  }
-  return { endLine: null, endIndex: fallbackEnd, confidence: "low" };
-}
-
-function tagDelta(lineText, tag) {
-  let delta = 0;
+  let opened = false;
   const escaped = escapeRegExp(tag);
-  const token = new RegExp(`</?${escaped}\\b[^>]*>`, "g");
-  for (const match of stripJsxExpressions(lineText).matchAll(token)) {
+  const token = new RegExp(`</?${escaped}\\b[^>]*>`, "gs");
+  const source = blankJsxExpressions(text.slice(startOffset, fallbackEndOffset));
+
+  for (const match of source.matchAll(token)) {
     const value = match[0];
-    if (value.startsWith("</")) delta -= 1;
-    else if (!value.endsWith("/>")) delta += 1;
+    const endOffset = startOffset + match.index + value.length;
+    if (value.startsWith("</")) depth -= 1;
+    else if (value.endsWith("/>")) {
+      if (!opened) return { endLine: lineIndexForOffset(lineStarts, endOffset - 1) + 1, endOffset, confidence: "high" };
+    } else {
+      depth += 1;
+      opened = true;
+    }
+    if (opened && depth <= 0) return { endLine: lineIndexForOffset(lineStarts, endOffset - 1) + 1, endOffset, confidence: "high" };
   }
-  return delta;
+  return { endLine: null, endOffset: fallbackEndOffset, confidence: "low" };
 }
 
-function collectOptionLabels(lines, startIndex, endIndex, nestedRanges, rangeConfidence) {
+function collectOptionLabels(text, startOffset, endOffset, nestedRanges, rangeConfidence) {
   const options = [];
   const uncertainOptions = [];
   let bareCount = 0;
-  let depth = 0;
+  const optionRegex = attributePresenceRegex(OPTION_ATTR);
+  optionRegex.lastIndex = startOffset;
 
-  for (let index = startIndex; index <= endIndex; index += 1) {
-    if (isInsideNestedRange(index, nestedRanges)) {
-      depth += markupDelta(lines[index]);
-      continue;
-    }
+  let match;
+  while ((match = optionRegex.exec(text)) && match.index < endOffset) {
+    if (isInsideRange(match.index, nestedRanges)) continue;
 
-    for (const value of attributeValues(lines[index], OPTION_ATTR, bareCount + 1)) {
-      if (value.bare) bareCount += 1;
-      const depthAtAttribute = depth + markupDelta(lines[index].slice(0, value.index));
-      if (rangeConfidence !== "high" || value.kind !== "literal" || depthAtAttribute !== 1) uncertainOptions.push(value.value);
-      else options.push(value.value);
-    }
-    depth += markupDelta(lines[index]);
+    const value = attributeValueAt(text, match.index, OPTION_ATTR, bareCount + 1);
+    if (!value) continue;
+    if (value.bare) bareCount += 1;
+    const depthAtAttribute = depthAtOffset(text, startOffset, match.index);
+    if (rangeConfidence !== "high" || value.kind !== "literal" || depthAtAttribute !== 1) uncertainOptions.push(value.value);
+    else options.push(value.value);
   }
 
   return { options, uncertainOptions };
 }
 
-function attributeValues(lineText, attr, bareIndex = 1) {
-  const values = [];
+function attributeValueAt(text, offset, attr, bareIndex = 1) {
   const escaped = escapeRegExp(attr);
-  const regex = new RegExp(`${escaped}(?=\\s|=|>|\\/|$)(?:\\s*=\\s*("([^"]*)"|'([^']*)'|\\{\\s*"([^"]*)"\\s*\\}|\\{\\s*'([^']*)'\\s*\\}|\\{\\s*([^}]+?)\\s*\\}))?`, "g");
-  let match;
+  const regex = new RegExp(`^${escaped}(?=\\s|=|>|\\/|$)(?:\\s*=\\s*("([^"]*)"|'([^']*)'|\\{\\s*"([^"]*)"\\s*\\}|\\{\\s*'([^']*)'\\s*\\}|\\{\\s*([^}]+?)\\s*\\}))?`, "s");
+  const match = regex.exec(text.slice(offset));
+  if (!match) return null;
 
-  while ((match = regex.exec(lineText))) {
-    const full = match[0];
-    if (full.includes("=")) {
-      const literal = match[2] ?? match[3] ?? match[4] ?? match[5];
-      if (literal !== undefined) values.push({ kind: "literal", value: literal || `Option ${bareIndex}`, bare: false, index: match.index });
-      else values.push({ kind: "dynamic", value: (match[6] || "dynamic").trim(), bare: false, index: match.index });
-    } else {
-      values.push({ kind: "literal", value: `Option ${bareIndex}`, bare: true, index: match.index });
-    }
+  if (match[0].includes("=")) {
+    const literal = match[2] ?? match[3] ?? match[4] ?? match[5];
+    if (literal !== undefined) return { kind: "literal", value: literal || `Option ${bareIndex}`, bare: false };
+    return { kind: "dynamic", value: (match[6] || "dynamic").trim(), bare: false };
   }
 
-  return values;
+  return { kind: "literal", value: `Option ${bareIndex}`, bare: true };
 }
 
-function markupDelta(fragment) {
-  let delta = 0;
-  const token = /<\/?[A-Za-z][\w:.-]*\b[^>]*>/g;
-  for (const match of stripJsxExpressions(fragment).matchAll(token)) {
+function depthAtOffset(text, startOffset, offset) {
+  let depth = 0;
+  const token = /<\/?[A-Za-z][\w:.-]*\b[^>]*>/gs;
+  for (const match of blankJsxExpressions(text.slice(startOffset, offset)).matchAll(token)) {
     const value = match[0];
-    if (value.startsWith("</")) delta -= 1;
-    else if (!value.endsWith("/>")) delta += 1;
+    if (value.startsWith("</")) depth -= 1;
+    else if (!value.endsWith("/>")) depth += 1;
   }
-  return delta;
+  return depth;
 }
 
-function stripJsxExpressions(value) {
-  return value.replace(/\{[^{}]*\}/g, "");
+function attributePresenceRegex(attr) {
+  return new RegExp(`${escapeRegExp(attr)}(?=\\s|=|>|\\/|$)`, "g");
 }
 
-function isInsideNestedRange(index, ranges) {
-  return ranges.some(([start, end]) => index >= start && index <= end);
+function lineStartOffsets(text) {
+  const starts = [0];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "\n") starts.push(index + 1);
+  }
+  return starts;
+}
+
+function lineIndexForOffset(lineStarts, offset) {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (lineStarts[mid] <= offset && (mid === lineStarts.length - 1 || lineStarts[mid + 1] > offset)) return mid;
+    if (lineStarts[mid] > offset) high = mid - 1;
+    else low = mid + 1;
+  }
+  return lineStarts.length - 1;
+}
+
+function blankJsxExpressions(value) {
+  return value.replace(/\{[^{}]*\}/gs, (match) => match.replace(/[^\r\n]/g, " "));
+}
+
+function isInsideRange(offset, ranges) {
+  return ranges.some(([start, end]) => offset >= start && offset < end);
 }
 
 function escapeRegExp(value) {

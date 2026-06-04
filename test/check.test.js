@@ -176,3 +176,35 @@ test("check ignores JSX props before the pick attribute when finding group range
   assert.equal(result.explorations[0].endLine, 3);
   assert.equal(result.explorations[0].rangeConfidence, "high");
 });
+
+test("check bounds multiline JSX pick ranges to their element", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "Multiline.jsx"),
+    `<section
+  className="hero"
+  data-unship-pick="Hero"
+>
+  <div data-unship-option="Current">A</div>
+  <div data-unship-option="Proof" hidden>B</div>
+</section>
+<section>
+  <div data-unship-option="Outside">C</div>
+</section>
+`,
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.explorations[0], {
+    pick: "Hero",
+    file: "src/Multiline.jsx",
+    options: ["Current", "Proof"],
+    uncertainOptions: [],
+    startLine: 1,
+    endLine: 7,
+    rangeConfidence: "high"
+  });
+});

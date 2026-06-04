@@ -45,6 +45,6 @@ Archive contents:
 
 The active folder should not continue the old implementation path.
 
-## Next Step
+## Current Run
 
-Review the technical spec and implementation plan, then execute with `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+Use `docs/plans/current-run.md` for the latest active run status, linked plan, verification state, and next workflow skill.
