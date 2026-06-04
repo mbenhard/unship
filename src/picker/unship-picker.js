@@ -472,8 +472,8 @@
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-      @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
+      @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
+      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes menuIn{from{max-height:0;opacity:0}to{max-height:min(264px,calc(100vh - 168px));opacity:1}}
       @keyframes itemIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
       @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
