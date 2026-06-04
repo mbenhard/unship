@@ -71,6 +71,21 @@ test("install print-skill outputs the bundled skill without writing", async () =
   await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
 });
 
+test("install-skill plain output is user-facing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  const skillRoot = join(home, "skills");
+
+  const result = await runCliWithHome(["install-skill", "--dir", skillRoot], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Unship skill installed/);
+  assert.match(result.stdout, /Path:/);
+  assert.match(result.stdout, /Next:\n- Restart/);
+  assert.doesNotMatch(result.stdout, /^Wrote /m);
+  assert.doesNotMatch(result.stdout, /^Next: .*$/m);
+});
+
 test("install dry-run json plans shared and claude targets inside temp home", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
@@ -109,6 +124,18 @@ test("install all yes writes shared and claude targets then reruns current", asy
   const second = await runCliWithHome(["install", "--all", "--yes", "--json"], cwd, home);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(JSON.stringify(JSON.parse(second.stdout)).includes('"status":"current"'), true);
+});
+
+test("install plain output groups next actions once", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--all", "--yes"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Unship install complete/);
+  assert.match(result.stdout, /Next:\n- Restart/);
+  assert.equal((result.stdout.match(/^Next:/gm) || []).length, 1);
 });
 
 test("install repairs legacy claude command into shim", async () => {

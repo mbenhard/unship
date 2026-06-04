@@ -148,12 +148,18 @@ async function installSkill({ dir, force }) {
 
   return {
     ok: stale.length === 0,
+    kind: "skill-install",
+    destination,
     written,
     skipped,
     stale,
     next: stale.length
       ? ["Run npx @unship/cli@latest install-skill --force to refresh the stale global Unship skill."]
-      : ["Restart your agent, then ask: use unship to generate 3 variants of the hero section."]
+      : [
+          "Restart the agent that loads this skills directory.",
+          "Try: use unship to generate 3 variants of the hero section.",
+          "For slash commands, repair, and project setup, use: npx @unship/cli@latest install."
+        ]
   };
 }
 
@@ -276,6 +282,8 @@ function print(value, json) {
     printCheck(value);
   } else if (value.picker && value.mount) {
     printSetup(value);
+  } else if (value.kind === "skill-install") {
+    printSkillInstall(value);
   } else if (value.packageName) {
     const preview = value.project.previewServers.length ? value.project.previewServers.map((server) => server.url).join(", ") : "none detected";
     console.log(`${value.packageName} ${value.version}\nNode ${value.node}\nFramework ${value.project.framework}\nSkill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}\nPicker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}\nDev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}\nPreview servers ${preview}\n${value.reminder}`);
@@ -317,7 +325,7 @@ function printInstallResult(result, json) {
   }
   if (!result.ok) {
     console.log(result.error || `Unship ${result.command === "uninstall" ? "uninstall" : "install"} failed.`);
-    if (result.next?.length) console.log(result.next.map((item) => `Next: ${item}`).join("\n"));
+    printNext(result.next);
     return;
   }
   const label = result.command === "uninstall" ? "uninstall" : "install";
@@ -329,8 +337,31 @@ function printInstallResult(result, json) {
     lines.push(`Legacy ${item.status}: ${item.path}`);
   }
   if (result.project) lines.push(`Project: ${result.project.status}`);
-  if (result.next?.length) lines.push(...result.next.map((item) => `Next: ${item}`));
+  appendNext(lines, result.next);
   console.log(lines.join("\n"));
+}
+
+function printSkillInstall(value) {
+  const current = value.skipped?.includes(value.destination) && !value.stale?.length;
+  const status = value.stale?.length
+    ? "Unship skill needs refresh."
+    : current
+      ? "Unship skill is already current."
+      : "Unship skill installed.";
+  const lines = [status, `Path: ${value.destination}`];
+  appendNext(lines, value.next);
+  console.log(lines.join("\n"));
+}
+
+function appendNext(lines, next) {
+  if (!next?.length) return;
+  lines.push("", "Next:");
+  lines.push(...next.map((item) => `- ${item}`));
+}
+
+function printNext(next) {
+  if (!next?.length) return;
+  console.log(["", "Next:", ...next.map((item) => `- ${item}`)].join("\n"));
 }
 
 async function confirmPlan(question) {

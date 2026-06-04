@@ -448,11 +448,11 @@ function manualHarness(target) {
 }
 
 function nextActions({ harnesses, project }) {
-  const next = ["Restart your agent after installing Unship."];
+  const next = ["Restart the agent so it reloads Unship."];
   if (harnesses.some((item) => item.id === "agents")) {
-    next.push("Use /unship where available, or ask naturally: use unship to generate 3 variants of the hero section.");
+    next.push("Try /unship where available, or ask: use unship to generate 3 variants of the hero section.");
   }
-  if (!project) next.push("Run install --project --yes inside an app repo when you want picker setup.");
+  if (!project) next.push("Inside an app repo, run npx @unship/cli@latest install --project --yes to wire the picker.");
   return next;
 }
 
