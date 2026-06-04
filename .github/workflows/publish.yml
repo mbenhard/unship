@@ -5,6 +5,15 @@ on:
     types:
       - published
   workflow_dispatch:
+    inputs:
+      tag:
+        description: npm dist-tag to publish
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
 
 permissions:
   contents: read
@@ -35,6 +44,6 @@ jobs:
         run: npm run verify
 
       - name: Publish
-        run: npm publish --provenance --access public --tag next
+        run: npm publish --access public --tag "${NPM_DIST_TAG}"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ github.event.inputs.tag || 'latest' }}
