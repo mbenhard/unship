@@ -7,6 +7,8 @@ description: Use when the user wants to compare UI design variants, generate sec
 
 Use Unship to create temporary local UI variants in real source, let the human compare them instantly in the browser, and then clean every Unship artifact before shipping.
 
+Unship is local comparison tooling. The picker script runs in the user's local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The human chooses by naming a visible option label in chat; you settle source by keeping that option and removing temporary artifacts.
+
 ## Normal Requests
 
 Treat ordinary prompts as complete enough to begin. Examples:
@@ -47,6 +49,8 @@ $UNSHIP setup --framework auto --json
 Use the returned framework, picker path, and mount status. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
 
 If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run `$UNSHIP setup --framework auto --json`; setup refreshes stale picker files.
+
+If `/unship` is unavailable after installation, continue from the natural-language request. Do not require the slash command when this skill is already active.
 
 If `doctor` reports `project.previewServers`, treat them as hints only. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
 
@@ -110,7 +114,11 @@ Before stopping for human choice, report:
 - the variant group label;
 - the visible option labels;
 - whether picker setup is installed and current;
-- any detected preview servers as hints only.
+- whether the installed skill or picker appears stale;
+- any detected preview servers as hints only;
+- cleanup status if existing Unship artifacts already exist.
+
+If the human names a winner ambiguously, verify the selected group and option label before editing. Ambiguity includes multiple groups with the same label, repeated option labels, the user saying "the second one" after other changes, or overlapping active explorations.
 
 If no preview server is detected, say that the user should start the app normally and compare the visible option labels in the Unship picker. Only use browser automation when the user explicitly asks, setup requires manual verification, or you are changing Unship's picker/setup implementation itself. If you do verify, keep it to a functional smoke check: the picker appears, expected option labels are present, and switching does not reload the page. Do not judge visual quality for the human.
 

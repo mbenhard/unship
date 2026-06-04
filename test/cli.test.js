@@ -313,6 +313,11 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /Do not build a custom switcher/i);
   assert.match(skill, /Do not start, open, or automate a browser by default/i);
   assert.match(skill, /detected preview servers as hints/i);
+  assert.match(skill, /Unship is local comparison tooling/i);
+  assert.match(skill, /does not send telemetry/i);
+  assert.match(skill, /Picker selection does not save source/i);
+  assert.match(skill, /whether the installed skill or picker appears stale/i);
+  assert.match(skill, /multiple groups with the same label/i);
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
   assert.match(skill, /If no app source, framework signal, or preview shell exists yet/i);
   assert.match(skill, /Settle a selected group/i);
@@ -383,8 +388,19 @@ test("install-skill writes the global agents skill", async () => {
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
   assert.doesNotMatch(skill, /npx unship\b/);
   assert.doesNotMatch(skill, /lists `@unship\/cli` or `unship`/);
+  assert.match(skill, /does not send telemetry/i);
   assert.match(skill, /Settle a selected group/i);
   assert.match(skill, /Final cleanup/i);
+});
+
+test("README documents local trust and unship troubleshooting", async () => {
+  const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+
+  assert.match(readme, /Unship is local comparison tooling/i);
+  assert.match(readme, /does not send telemetry/i);
+  assert.match(readme, /\/unship does not appear/i);
+  assert.match(readme, /install --repair/);
+  assert.match(readme, /install --print-skill/);
 });
 
 test("install-skill skips, fails stale, and refreshes with force", async () => {

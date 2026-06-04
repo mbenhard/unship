@@ -6,6 +6,8 @@ Unship helps an AI agent create a few real source-level UI options, lets you com
 
 > Status: early beta. Unship is intentionally small and local-first; treat it as prototyping tooling, not production runtime infrastructure.
 
+Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. You choose by naming the visible option label in chat; the agent settles source by keeping that option and removing temporary Unship artifacts.
+
 ## Install
 
 Run the smart installer:
@@ -151,6 +153,36 @@ npx @unship/cli@latest install-skill --dir ~/.claude/skills
 ```
 
 This does not install slash commands, repair legacy files, or set up a project.
+
+## Troubleshooting
+
+### /unship does not appear
+
+Restart the agent after running `install`; most harnesses load skills and slash commands only at startup.
+
+Then check the project state:
+
+```bash
+npx @unship/cli@latest doctor --json
+```
+
+If installed Unship files are stale or legacy files are detected, refresh managed files:
+
+```bash
+npx @unship/cli@latest install --repair
+```
+
+If the slash command still is not available, use the natural-language fallback:
+
+```txt
+use unship to compare 3 directions for the hero section
+```
+
+For unsupported harnesses, print the portable skill and place it where your agent loads skills:
+
+```bash
+npx @unship/cli@latest install --print-skill
+```
 
 ## Agent Behavior
 
