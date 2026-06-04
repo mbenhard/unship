@@ -28,6 +28,8 @@ This is a design artifact. The picker only changes after a winner is picked, in 
 
 - 2026-06-04 (round 2): Added **M5 Directional Fade** per review feedback ("Directional + quick fade in/out"): M4's directional language with quick two-phase label swaps — 70ms fade-out exiting away from the incoming side, then a 110ms fade/slide-in from the pressed chevron; faster menu fade (180ms unfurl, 100ms opacity); 5px count tick; 150/200ms entrance. The demo page's swap handler gained a two-phase path (out class → 70ms timer → text swap + in class) used only by M5.
 
+- 2026-06-04 (round 3): **M5 Directional Fade selected and ported into `src/picker/unship-picker.js`.** Because the picker re-renders its shadow DOM on every state change, the port uses insertion-driven CSS animations gated by per-render flags instead of class toggles: `enter` plays a 200ms rise+fade only when the dock first appears (`dockInTop` variant for top placement); `menu-anim` plays `menuIn`/`itemIn` (180ms decel, 20ms stagger) only on menu-open renders; option switches set `data-dir` plus `swap` on the label/count so `swapIn` (110ms, ±8px from the pressed side, ±5px count tick) plays on the fresh nodes. The demo's 70ms fade-out phase is intentionally dropped in the product — the re-render acts as an instant out, keeping the state→render model synchronous. Motion tokens updated to 180ms `cubic-bezier(0,0,.2,1)`; `prefers-reduced-motion` now also disables animations.
+
 ## Page Structure
 
 - Header: title, one-line context, host-tone toggle (light/dark stage behind the docks).

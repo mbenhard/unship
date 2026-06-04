@@ -21,6 +21,8 @@
   let placementLocked = false;
   let rescanQueued = false;
   let renderedSignature = "";
+  let lastSwitchDir = null;
+  let menuJustOpened = false;
 
   const api = {
     version: "0.1.1",
@@ -144,6 +146,7 @@
     if (!group) return;
 
     group.activeOptionIndex = wrap(group.activeOptionIndex + delta, group.options.length);
+    lastSwitchDir = delta > 0 ? "next" : "prev";
     applyGroupVisibility(group);
     persistSelection(group);
     render();
@@ -172,6 +175,11 @@
   function render() {
     if (!root) return;
 
+    const switchDir = lastSwitchDir;
+    const menuAnim = menuJustOpened;
+    lastSwitchDir = null;
+    menuJustOpened = false;
+
     const group = groups[activeGroupIndex];
     if (!group) {
       if (renderedSignature === "none") return;
@@ -186,16 +194,18 @@
     const mode = groups.length === 1 ? "single" : "multi";
     const nextSignature = renderSignature(mode);
     if (nextSignature === renderedSignature) return;
+    const entering = renderedSignature === "" || renderedSignature === "none";
     renderedSignature = nextSignature;
 
-    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}" role="group" aria-label="Unship variant picker">
-      ${groups.length > 1 ? groupButton(group) : ""}
+    const swapClass = switchDir ? " swap" : "";
+    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${menuAnim && menuOpen ? " menu-anim" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
+      ${groups.length > 1 ? groupButton(group, swapClass) : ""}
       ${groups.length > 1 ? menu() : ""}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" data-action="toggle-placement" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position">
-          <span class="label-main">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
-          ${groups.length === 1 ? `<span class="option-count">${group.activeOptionIndex + 1}/${group.options.length}</span>` : ""}
+          <span class="label-main${swapClass}">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
+          ${groups.length === 1 ? `<span class="option-count${swapClass}">${group.activeOptionIndex + 1}/${group.options.length}</span>` : ""}
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
@@ -221,9 +231,9 @@
     });
   }
 
-  function groupButton(group) {
+  function groupButton(group, swapClass = "") {
     return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
-      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count">${group.activeOptionIndex + 1}/${group.options.length}</span>
+      <span class="group-name">${escapeHtml(group.displayLabel)}</span><span class="group-count${swapClass}">${group.activeOptionIndex + 1}/${group.options.length}</span>
     </button>`;
   }
 
@@ -248,6 +258,7 @@
     else if (action === "next") switchOption(1);
     else if (action === "toggle-menu") {
       menuOpen = !menuOpen;
+      if (menuOpen) menuJustOpened = true;
       render();
     } else if (action === "toggle-placement") {
       placementLocked = true;
@@ -432,7 +443,7 @@
 
   function style() {
     return `<style>
-      .dock{--ease:cubic-bezier(.37,0,.63,1);--dur:.28s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
+      .dock{--ease:cubic-bezier(0,0,.2,1);--dur:.18s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
       button:focus-visible{outline:0;background:rgba(255,255,255,.12)}
@@ -461,8 +472,24 @@
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+      @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
+      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
+      @keyframes menuIn{from{max-height:0;opacity:0}to{max-height:min(264px,calc(100vh - 168px));opacity:1}}
+      @keyframes itemIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+      @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{opacity:1;transform:none}}
+      .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
+      .dock.top.enter{animation-name:dockInTop}
+      .menu-anim .menu{animation:menuIn .18s cubic-bezier(0,0,.2,1)}
+      .menu-anim .menuitem{animation:itemIn .18s cubic-bezier(0,0,.2,1) backwards}
+      .menu-anim .menuitem:nth-child(2){animation-delay:.02s}
+      .menu-anim .menuitem:nth-child(n+3){animation-delay:.04s}
+      .dock[data-dir="next"] .row{--dx:8px}
+      .dock[data-dir="prev"] .row{--dx:-8px}
+      .dock[data-dir="next"] .group{--dy:-5px}
+      .dock[data-dir="prev"] .group{--dy:5px}
+      .label-main.swap,.option-count.swap,.group-count.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
-      @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+      @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>`;
   }
 
