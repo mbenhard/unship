@@ -66,10 +66,12 @@ It reports:
 - dev mount path, if found;
 - likely preview servers as hints only;
 - existing Unship explorations;
-- whether cleanup appears required;
+- whether active exploration or final cleanup appears required;
 - concise recommended next actions.
 
-`doctor` should avoid doing expensive full cleanup auditing unless the same data is already needed for exploration detection. If necessary, it can expose a fast mode later, but the first refactor should try to keep one `doctor --json` useful and cheap.
+`doctor` is summary-only. It may reuse the same scan result as `check`, but it should not become the authoritative cleanup audit. Keep detailed cleanup diagnostics and shipping failure semantics in `check`.
+
+`doctor --json` must preserve its current top-level compatibility fields: `ok`, `packageName`, `version`, `node`, `project`, `residue`, and `reminder`. New fields such as `unship` and `next` should be additive.
 
 Example shape:
 
@@ -95,9 +97,11 @@ Example shape:
         "file": "src/app/page.tsx",
         "options": ["Current", "Proof", "Minimal"],
         "startLine": 42,
-        "endLine": 118
+        "endLine": 118,
+        "rangeConfidence": "high"
       }
     ],
+    "activeExplorationCount": 1,
     "cleanupRequired": true
   },
   "next": [
@@ -113,6 +117,7 @@ Example shape:
 It reports:
 
 - existing explorations with group labels, files, option labels, and rough line ranges;
+- uncertain option labels and uncertain ranges when the scanner cannot confidently classify them;
 - diagnostics for remaining `data-unship-*`, picker script references, and Unship comments;
 - allowed documentation/instruction files excluded from cleanup diagnostics;
 - a concise message suitable for agent handoff.
@@ -130,7 +135,9 @@ Example shape:
       "file": "src/components/Pricing.tsx",
       "options": ["Current", "Enterprise", "Usage"],
       "startLine": 18,
-      "endLine": 96
+      "endLine": 96,
+      "rangeConfidence": "high",
+      "uncertainOptions": []
     }
   ],
   "diagnostics": [
@@ -163,7 +170,8 @@ Add a structured scanner layer used by both `doctor` and `check`.
 The scanner should walk supported source files, skip build/cache directories, and detect:
 
 - `data-unship-pick` groups;
-- direct or nearby `data-unship-option` labels;
+- direct `data-unship-option` labels when confidently detectable;
+- uncertain option-like labels when direct-child structure is unclear;
 - picker script references;
 - Unship comments.
 
@@ -172,11 +180,15 @@ The first version can use conservative text scanning rather than AST parsers. It
 Line ranges can be approximate. A good initial heuristic:
 
 1. Record the line containing `data-unship-pick`.
-2. Track subsequent lines until the next `data-unship-pick`, a likely matching closing tag at equal-or-lower indentation, or a bounded scan limit.
-3. Collect option labels inside that range.
-4. If range detection is uncertain, omit `endLine` or include a confidence field rather than pretending to know.
+2. Track subsequent lines until a likely matching closing tag at equal-or-lower indentation or a bounded scan limit.
+3. Do not use a nested `data-unship-pick` as proof that the parent group ended; nested groups are allowed inside visible options.
+4. Collect literal option labels inside the likely group range.
+5. If range detection is uncertain, omit `endLine` or set `rangeConfidence: "low"` rather than pretending to know.
+6. If an option label is dynamic or the direct-child relationship is unclear, include it in `uncertainOptions` instead of `options`.
 
 The scanner must preserve the current cleanup guarantee: if forbidden preview artifacts remain in application source, `check` exits nonzero.
+
+Use one shared scan result to feed both compatibility diagnostics and structured exploration summaries. Do not walk the same project twice in a single command just to produce old and new JSON shapes.
 
 ## Skill Workflow
 
@@ -186,9 +198,11 @@ Startup:
 
 1. Choose the CLI prefix once. If `./node_modules/.bin/unship` exists, prefer it. Otherwise use `npx unship` when the package is installed, or `npx -y unship@latest` as the fresh-repo fallback.
 2. Run one startup command: `$UNSHIP doctor --json`.
-3. If setup is missing or stale, run `$UNSHIP setup --framework auto --json`.
-4. If an existing exploration is present, ask the user which visible option to keep or whether to clean it before creating another exploration.
-5. Otherwise, inspect the app source enough to make a good edit and create variants manually.
+3. If no app source, framework signal, or preview shell exists yet, build the app normally first and defer setup until there is a local shell to mount the picker into.
+4. If setup is missing or stale in an existing app shell, run `$UNSHIP setup --framework auto --json`.
+5. If an existing exploration overlaps the requested target or the user asked to ship/finish/clean, ask which visible option to keep or whether to clean it before creating another overlapping exploration.
+6. If existing explorations are independent, or the user clearly asks for another round, report them briefly and proceed.
+7. Otherwise, inspect the named route, component, or source area first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear.
 
 Authoring:
 
@@ -208,11 +222,11 @@ Handoff:
 
 Cleanup:
 
-- When the user names a winner, manually keep that source and remove losing choices.
-- Remove all `data-unship-*` attributes, picker mounts, and Unship comments.
-- Run `$UNSHIP check --json`.
+- Settling a group: when the user names a winner for one exploration while continuing to prototype, manually keep that option's source, remove losing options for that group, and remove `data-unship-*` attributes from the settled source. Keep the picker mount if more exploration is still active or expected.
+- Final cleanup: when the user asks to ship, finish, cancel, or clean all Unship work, remove all losing choices, all `data-unship-*` attributes, picker mounts, and Unship comments.
+- Run `$UNSHIP check --json` for final cleanup.
 - Use structured `check` output to find anything missed.
-- Do not claim cleanup is complete until `check` is clean.
+- Do not claim final cleanup is complete until `check` is clean.
 
 ## Error Handling
 
@@ -220,6 +234,7 @@ Cleanup:
 - If setup returns manual instructions, the agent may patch the smallest dev-only mount point itself.
 - If scanner output is partial or uncertain, the command should still return diagnostics and mark uncertain fields explicitly.
 - If full cleanup checking finds artifacts but no structured exploration, diagnostics remain the source of truth.
+- Treat active explorations and shipping residue separately. Picker files or dev mounts can be residue for final cleanup, but only `data-unship-pick` groups should block a new overlapping exploration.
 
 ## Testing Strategy
 
@@ -231,6 +246,8 @@ Add focused tests for:
 - scanner handles multiple groups in one file.
 - scanner handles duplicate group labels without dropping either group.
 - scanner handles JSX, HTML, Astro, Vue, and Svelte-like attribute syntax at the text level.
+- scanner marks dynamic labels, unclear direct-child relationships, and uncertain ranges without false precision.
+- `doctor --json` and `check --json` preserve current top-level fields while adding structured Unship fields.
 - plain output remains concise and backwards compatible enough for humans.
 - setup behavior remains unchanged for supported frameworks.
 
@@ -248,4 +265,4 @@ This is a compatible refactor:
 
 ## Open Follow-Up
 
-After this phase ships, revisit whether a cleanup mutator is worth adding. The bar should be high: it must be safe across the supported syntax set, reduce real agent work, and avoid pulling Unship into framework parser complexity.
+No cleanup mutator belongs in this product phase. Any future cleanup mutator requires a separate spec, evidence from real cleanup failures, and a design that avoids increasing parser, runtime, or framework dependency weight.
