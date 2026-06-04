@@ -224,7 +224,36 @@ function lineIndexForOffset(lineStarts, offset) {
 }
 
 function blankJsxExpressions(value) {
-  return value.replace(/\{[^{}]*\}/gs, (match) => match.replace(/[^\r\n]/g, " "));
+  let output = "";
+  let braceDepth = 0;
+  let quote = null;
+  let escaped = false;
+
+  for (const char of value) {
+    const startsExpression = braceDepth === 0 && char === "{";
+    const blank = braceDepth > 0 || startsExpression;
+    output += blank && char !== "\n" && char !== "\r" ? " " : char;
+
+    if (startsExpression) {
+      braceDepth = 1;
+      continue;
+    }
+
+    if (braceDepth === 0) continue;
+
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === "\"" || char === "'" || char === "`") quote = char;
+    else if (char === "{") braceDepth += 1;
+    else if (char === "}") braceDepth = Math.max(0, braceDepth - 1);
+  }
+
+  return output;
 }
 
 function isInsideRange(offset, ranges) {

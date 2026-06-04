@@ -177,6 +177,35 @@ test("check ignores JSX props before the pick attribute when finding group range
   assert.equal(result.explorations[0].rangeConfidence, "high");
 });
 
+test("check ignores nested JSX props before the pick attribute", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "NestedJsxProps.jsx"),
+    `<section
+  icon={<Icon props={{foo: "bar"}} />}
+  data-unship-pick="Hero"
+>
+  <div data-unship-option="Current">A</div>
+</section>
+<section><div data-unship-option="Outside">C</div></section>
+`,
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.deepEqual(result.explorations[0], {
+    pick: "Hero",
+    file: "src/NestedJsxProps.jsx",
+    options: ["Current"],
+    uncertainOptions: [],
+    startLine: 1,
+    endLine: 6,
+    rangeConfidence: "high"
+  });
+});
+
 test("check bounds multiline JSX pick ranges to their element", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
   await mkdir(join(root, "src"), { recursive: true });
