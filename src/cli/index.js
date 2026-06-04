@@ -192,6 +192,7 @@ async function doctor({ root, previewPorts }) {
   const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
   const project = await inspectProject({ root, previewPorts });
   const residue = await checkUnshipResidue({ root });
+  const unship = summarizeUnship(residue);
   return {
     ok: true,
     packageName: pkg.name,
@@ -199,8 +200,34 @@ async function doctor({ root, previewPorts }) {
     node: process.version,
     project,
     residue,
+    unship,
+    next: nextActions({ project, unship }),
     reminder: "Unship is local preview tooling. Remove picker markup before shipping."
   };
+}
+
+function summarizeUnship(residue) {
+  return {
+    explorations: residue.explorations || [],
+    activeExplorationCount: residue.explorations?.length || 0,
+    cleanupRequired: !residue.ok,
+    artifactCount: residue.diagnostics?.length || 0
+  };
+}
+
+function nextActions({ project, unship }) {
+  const actions = [];
+  if (!project.pickerFileFound || !project.devMountFound) {
+    actions.push("Run setup after a local app shell exists if you need the picker mounted.");
+  } else if (!project.pickerFileCurrent) {
+    actions.push("Run setup --framework auto --json to refresh the stale picker file.");
+  }
+
+  if (unship.activeExplorationCount > 0) {
+    const labels = unship.explorations.map((item) => item.pick).join(", ");
+    actions.push(`Existing Unship explorations detected: ${labels}. Settle overlapping work before creating another overlapping exploration.`);
+  }
+  return actions;
 }
 
 function print(value, json) {
