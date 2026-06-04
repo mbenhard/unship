@@ -7,13 +7,15 @@ This folder now tracks the hard-reset Unship direction: a tiny local DOM picker 
 Read in this order:
 
 1. `docs/plans/current-run.md`
-2. `docs/superpowers/specs/2026-06-04-unship-seamless-install-design.md`
-3. `docs/superpowers/specs/2026-06-04-unship-agent-fast-prototyping-design.md`
-4. `docs/superpowers/plans/2026-06-04-unship-seamless-install-implementation-plan.md`
-5. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
-6. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
-7. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
-8. `RELEASE.md`
+2. `docs/superpowers/specs/2026-06-04-unship-minimal-beta-hardening-design.md`
+3. `docs/superpowers/plans/2026-06-04-unship-minimal-beta-hardening-implementation-plan.md`
+4. `docs/superpowers/specs/2026-06-04-unship-seamless-install-design.md`
+5. `docs/superpowers/specs/2026-06-04-unship-agent-fast-prototyping-design.md`
+6. `docs/superpowers/plans/2026-06-04-unship-seamless-install-implementation-plan.md`
+7. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
+8. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
+9. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
+10. `RELEASE.md`
 
 Older implementation plans are execution records, not current behavior specs.
 
@@ -36,6 +38,9 @@ Older implementation plans are execution records, not current behavior specs.
 - Doctor reports stale installed skills and picker files so agents can upgrade existing repos without spelunking.
 - Doctor and check return structured exploration summaries for agents, while remaining read-only.
 - Cleanup remains agent-edited source work. Unship has no cleanup mutator in this phase.
+- `doctor` performs a best-effort update check by default and supports `--no-update-check` for offline or CI usage.
+- `check` returns a grouped cleanup summary in addition to exact diagnostics.
+- README and the bundled skill explicitly state that Unship is local-only and does not send telemetry.
 
 ## Archive Status
 

@@ -22,7 +22,8 @@ test("packed package is small and excludes legacy implementation paths", () => {
     "src/cli/index.js",
     "src/install/index.js",
     "src/picker/unship-picker.js",
-    "src/setup/index.js"
+    "src/setup/index.js",
+    "src/update/index.js"
   ]);
   assert.equal(files.some((file) => file.startsWith("src/bridge/")), false);
   assert.equal(files.some((file) => file.startsWith("src/core/")), false);
@@ -57,7 +58,7 @@ test("packed package smoke runs seamless install commands", async () => {
   };
   const bin = join(consumer, "node_modules", ".bin", "unship");
   for (const args of [
-    ["install", "--dry-run", "--json"],
+    ["install", "--dry-run", "--json", "--no-update-check"],
     ["install-skill", "--dir", join(home, "skills"), "--json"],
     ["uninstall", "--dry-run", "--json"]
   ]) {
