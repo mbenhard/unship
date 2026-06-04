@@ -25,18 +25,22 @@ test("toolbar uses comfortable circular option controls", async () => {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
     const metrics = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const dock = host.shadowRoot.querySelector(".dock");
       const button = host.shadowRoot.querySelector(".prev");
       const box = button.getBoundingClientRect();
       const style = getComputedStyle(button);
+      const dockStyle = getComputedStyle(dock);
       return {
         width: box.width,
         height: box.height,
+        dockRadius: Number.parseFloat(dockStyle.borderTopLeftRadius),
         radius: Number.parseFloat(style.borderTopLeftRadius)
       };
     });
 
     assert.equal(metrics.width, metrics.height);
     assert.equal(metrics.width >= 32 && metrics.width <= 44, true);
+    assert.equal(metrics.dockRadius >= 21 && metrics.dockRadius <= 23, true);
     assert.equal(metrics.radius >= metrics.width / 2, true);
   } finally {
     await browser.close();
@@ -56,6 +60,7 @@ test("toolbar does not outline or ring the active variant title after switching"
       const style = getComputedStyle(label);
       return {
         activeClass: host.shadowRoot.activeElement?.className,
+        backgroundColor: style.backgroundColor,
         boxShadow: style.boxShadow,
         borderWidth: style.borderTopWidth,
         outlineStyle: style.outlineStyle,
@@ -65,9 +70,21 @@ test("toolbar does not outline or ring the active variant title after switching"
 
     assert.equal(styles.activeClass, "label");
     assert.equal(styles.borderWidth, "0px");
+    assert.equal(styles.backgroundColor, "rgba(0, 0, 0, 0)");
     assert.equal(styles.outlineStyle, "none");
     assert.equal(styles.outlineWidth, "0px");
     assert.equal(styles.boxShadow, "none");
+
+    await page.getByRole("button", { name: /toggle toolbar position/i }).hover();
+    const hoverStyles = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const style = getComputedStyle(host.shadowRoot.querySelector(".label"));
+      return {
+        backgroundColor: style.backgroundColor,
+        boxShadow: style.boxShadow
+      };
+    });
+    assert.equal(hoverStyles.backgroundColor, "rgba(0, 0, 0, 0)");
+    assert.equal(hoverStyles.boxShadow, "none");
   } finally {
     await browser.close();
   }

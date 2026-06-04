@@ -127,6 +127,7 @@ try {
   await assertVisibleOption(page, "Pricing Panel", "Detailed");
 
   const beforeBodyKey = await activeOption(page, "Pricing Panel");
+  await page.locator("main").click({ position: { x: 10, y: 10 } });
   await page.keyboard.press("ArrowLeft");
   await assert.equal(await activeOption(page, "Pricing Panel"), beforeBodyKey);
 
