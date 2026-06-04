@@ -529,10 +529,10 @@
       .menu-anim .menuitem:nth-child(n+3){animation-delay:.06s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
-      .dock[data-dir="next"] .group,.dock[data-dir="next"] .option-count{--dx:0px;--dy:8px}
-      .dock[data-dir="prev"] .group,.dock[data-dir="prev"] .option-count{--dx:0px;--dy:-8px}
-      .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
-      .option-count.swap,.group-count.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
+      .dock[data-dir="next"] .group{--dx:0px;--dy:8px}
+      .dock[data-dir="prev"] .group{--dx:0px;--dy:-8px}
+      .label-main.swap,.option-count.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+      .group-count.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     </style>`;
