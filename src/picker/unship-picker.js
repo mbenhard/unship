@@ -493,13 +493,13 @@
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes menuIn{from{max-height:0;opacity:0}to{max-height:min(264px,calc(100vh - 168px));opacity:1}}
-      @keyframes itemIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+      @keyframes menuIn{from{max-height:0}to{max-height:min(264px,calc(100vh - 168px))}}
+      @keyframes itemIn{from{opacity:0}}
       @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
-      .menu-anim .menu{animation:menuIn .2s cubic-bezier(.22,.61,.36,1)}
-      .menu-anim .menuitem{animation:itemIn .22s cubic-bezier(.22,.61,.36,1) backwards}
+      .menu-anim .menu{animation:menuIn .22s cubic-bezier(.22,.61,.36,1)}
+      .menu-anim .menuitem{animation:itemIn .24s ease backwards}
       .menu-anim .menuitem:nth-child(2){animation-delay:.03s}
       .menu-anim .menuitem:nth-child(n+3){animation-delay:.06s}
       .dock[data-dir="next"] .row{--dx:8px}
