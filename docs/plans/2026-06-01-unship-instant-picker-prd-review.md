@@ -30,12 +30,12 @@ Changes already incorporated before approval:
 
 - Replaced `.codex/skills` default with portable `.agents/skills/unship/SKILL.md`.
 - Added Claude and OpenCode shims without duplicating the shared workflow body.
-- Clarified `npx unship` package naming and development alias expectations.
+- Clarified `npx @unship/cli` package naming and development alias expectations.
 - Made subagent mode proposal-only and non-orchestrating for V1.
 - Added brand-read, instruction-precedence, variant-count, and style-override rules.
 - Hardened inline mode against duplicate IDs, forms, scripts, analytics, autoplay, focus traps, side effects, and stateful providers.
 - Made cleanup mandatory on selection, cancellation, rejection, timeout, interruption, and ship requests.
-- Tightened `npx unship check` scan scope and allowed installed instruction files.
+- Tightened `npx @unship/cli@latest check` scan scope and allowed installed instruction files.
 - Added toolbar interaction, keyboard, focus, accessibility, reduced-motion, reduced-transparency, and contrast requirements.
 - Added package and picker size budgets.
 - Added verification fixtures for runtime behavior and agent instructions.

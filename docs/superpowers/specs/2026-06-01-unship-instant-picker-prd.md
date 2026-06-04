@@ -275,7 +275,7 @@ After the human chooses, cancels, rejects the exploration, asks to ship, times o
 3. remove all `data-unship-*` attributes;
 4. remove the picker script;
 5. remove Unship comments or markers;
-6. run `npx unship check`;
+6. run `npx @unship/cli@latest check`;
 7. report clean verification.
 
 Production builds should contain no Unship artifacts unless the user explicitly asks to keep them. Installed agent instructions are allowed to remain; preview artifacts are not.
@@ -284,9 +284,9 @@ Production builds should contain no Unship artifacts unless the user explicitly 
 
 The CLI exists to make agent setup and cleanup reliable. It must stay small.
 
-The public npm package should be named `unship` for V1 so `npx unship ...` works as written. During development, `unship-design` may expose a `unship` bin as a transitional alias, but public docs and acceptance tests should target the final package name.
+The public npm package is `@unship/cli` for V1 because the clean unscoped `unship` name is taken. The installed binary remains `unship`, so local installs can still run `./node_modules/.bin/unship ...`.
 
-### `npx unship init`
+### `npx @unship/cli@latest init`
 
 Installs or updates local agent instructions.
 
@@ -318,20 +318,20 @@ Codex and Antigravity should use `.agents/skills/unship/SKILL.md` as the portabl
 
 It must not start a daemon or create session state.
 
-### `npx unship setup`
+### `npx @unship/cli@latest setup`
 
 Sets up the smallest local preview mount for the current app.
 
 Supported invocation:
 
-- `npx unship setup`
-- `npx unship setup --framework auto`
-- `npx unship setup next`
-- `npx unship setup vite`
-- `npx unship setup astro`
-- `npx unship setup sveltekit`
-- `npx unship setup nuxt`
-- `npx unship setup angular`
+- `npx @unship/cli@latest setup`
+- `npx @unship/cli@latest setup --framework auto`
+- `npx @unship/cli@latest setup next`
+- `npx @unship/cli@latest setup vite`
+- `npx @unship/cli@latest setup astro`
+- `npx @unship/cli@latest setup sveltekit`
+- `npx @unship/cli@latest setup nuxt`
+- `npx @unship/cli@latest setup angular`
 
 Setup rules:
 
@@ -349,17 +349,17 @@ Unship should support the following user experiences:
 - `/unship` where the harness supports slash skills or custom slash commands;
 - `$unship` in Codex-style skill invocation;
 - natural language, for example `Use Unship to compare three pricing directions`;
-- CLI setup through `npx unship init` and local app wiring through `npx unship setup`.
+- CLI setup through `npx @unship/cli@latest init` and local app wiring through `npx @unship/cli@latest setup`.
 
 Slash commands should be thin shims that invoke the skill. They should not duplicate the workflow body.
 
-### `npx unship snippet`
+### `npx @unship/cli@latest snippet`
 
 Prints a picker script tag or inline snippet for temporary injection.
 
 The output should be easy for agents to insert before `</body>` or through a local dev-only preview harness.
 
-### `npx unship check`
+### `npx @unship/cli@latest check`
 
 Scans source for leftover Unship artifacts.
 
@@ -381,7 +381,7 @@ Default scan rules:
 - scan common UI extensions: `.html`, `.htm`, `.js`, `.jsx`, `.ts`, `.tsx`, `.vue`, `.svelte`, `.astro`, template files, and framework route files;
 - do not fail on installed instruction files such as `.agents/skills/unship/SKILL.md`, `.claude/skills/unship/SKILL.md`, `.opencode/skills/unship/SKILL.md`, `.opencode/commands/unship.md`, `AGENTS.md`, or `CLAUDE.md` merely because they document the contract.
 
-### `npx unship doctor`
+### `npx @unship/cli@latest doctor`
 
 Small diagnostic command for agent fast paths:
 
@@ -414,14 +414,14 @@ Use Unship to try a few better pricing section directions.
 The agent should:
 
 1. inspect the existing source and design system;
-2. run `npx unship doctor --json`, refresh stale installed instructions with `npx unship init --force --json`, report detected preview servers as hints only, and run `npx unship setup --framework auto --json` when setup or picker refresh is needed;
+2. run `npx @unship/cli@latest doctor --json`, refresh stale installed instructions with `npx @unship/cli@latest init --force --json`, report detected preview servers as hints only, and run `npx @unship/cli@latest setup --framework auto --json` when setup or picker refresh is needed;
 3. identify the target files and any detected preview hints;
 4. create temporary variants using the attribute contract;
 5. tell the user which option labels to compare in their own browser preview;
 6. wait for the user to say which option to keep in chat;
 7. keep the chosen source and remove every other option;
 8. remove picker/script/attributes/markers;
-9. run `npx unship check`;
+9. run `npx @unship/cli@latest check`;
 10. summarize the final kept direction.
 
 The user should not need to run commands.
@@ -654,7 +654,7 @@ Unship V1 succeeds when:
 - no confirm button or waiting loop exists;
 - the user can simply tell the agent which title to keep;
 - the agent can clean the source to one chosen variant;
-- `npx unship check` catches leftover artifacts;
+- `npx @unship/cli@latest check` catches leftover artifacts;
 - production source is clean by default;
 - the shipped code is small enough to understand in one sitting.
 
@@ -678,7 +678,7 @@ Required coverage:
 - toolbar desktop and mobile viewport fit;
 - reduced motion;
 - reduced transparency or opaque fallback;
-- `npx unship check` residue detection;
+- `npx @unship/cli@latest check` residue detection;
 - package footprint.
 
 Agent instruction acceptance fixtures:
@@ -691,7 +691,7 @@ Agent instruction acceptance fixtures:
 - subagents are unavailable;
 - user cancels or says "never mind";
 - user asks to ship before choosing;
-- `npx unship check` fails and the agent must recover.
+- `npx @unship/cli@latest check` fails and the agent must recover.
 
 ## Recommended Build Sequence
 

@@ -196,7 +196,7 @@ The installed Unship skill should become more decisive and less open-ended.
 
 Startup:
 
-1. Choose the CLI prefix once. If `./node_modules/.bin/unship` exists, prefer it. Otherwise use `npx unship` when the package is installed, or `npx -y unship@latest` as the fresh-repo fallback.
+1. Choose the CLI prefix once. If `./node_modules/.bin/unship` exists, prefer it. Otherwise use `npx @unship/cli` when `@unship/cli` is installed locally, or `npx -y @unship/cli@latest` as the fresh-repo fallback.
 2. Run one startup command: `$UNSHIP doctor --json`.
 3. If no app source, framework signal, or preview shell exists yet, build the app normally first and defer setup until there is a local shell to mount the picker into.
 4. If setup is missing or stale in an existing app shell, run `$UNSHIP setup --framework auto --json`.
@@ -230,7 +230,7 @@ Cleanup:
 
 ## Error Handling
 
-- If `doctor` fails because the CLI is unavailable, fall back to the documented `npx -y unship@latest doctor --json` path.
+- If `doctor` fails because the CLI is unavailable, fall back to the documented `npx -y @unship/cli@latest doctor --json` path.
 - If setup returns manual instructions, the agent may patch the smallest dev-only mount point itself.
 - If scanner output is partial or uncertain, the command should still return diagnostics and mark uncertain fields explicitly.
 - If full cleanup checking finds artifacts but no structured exploration, diagnostics remain the source of truth.

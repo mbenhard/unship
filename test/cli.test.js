@@ -105,7 +105,8 @@ test("init fails loudly when an installed skill is stale", async () => {
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, false);
   assert.equal(json.stale.includes(".agents/skills/unship/SKILL.md"), true);
-  assert.match(json.next.join("\n"), /init --force/);
+  assert.match(json.next.join("\n"), /npx @unship\/cli@latest init --force --json/);
+  assert.doesNotMatch(json.next.join("\n"), /npx unship init/);
 });
 
 test("install-skill writes the global agents skill", async () => {
@@ -120,8 +121,9 @@ test("install-skill writes the global agents skill", async () => {
   assert.equal(json.written.includes(join(skillRoot, "unship", "SKILL.md")), true);
   const skill = await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
-  assert.match(skill, /npx -y unship@latest/);
+  assert.match(skill, /npx -y @unship\/cli@latest/);
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
+  assert.doesNotMatch(skill, /lists `@unship\/cli` or `unship`/);
   assert.match(skill, /Settle a selected group/i);
   assert.match(skill, /Final cleanup/i);
 });
@@ -385,7 +387,7 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, true);
-  assert.equal(json.packageName, "unship");
+  assert.equal(json.packageName, "@unship/cli");
   assert.match(json.reminder, /local preview tooling/);
   assert.equal(json.project.framework, "next");
   assert.equal(json.project.skillInstalled, true);
@@ -413,7 +415,7 @@ test("doctor json preserves compatibility fields and adds unship summary", async
 
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
-  assert.equal(json.packageName, "unship");
+  assert.equal(json.packageName, "@unship/cli");
   assert.equal(json.version, "0.1.0");
   assert.equal(typeof json.node, "string");
   assert.equal(json.project.framework, "next");
@@ -448,6 +450,6 @@ test("doctor reports a live preview server so agents can reuse it", async () => 
 test("doctor plain output reports doctor details", () => {
   const result = spawnSync(process.execPath, [CLI, "doctor"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /unship 0\.1\.0/);
+  assert.match(result.stdout, /@unship\/cli 0\.1\.0/);
   assert.match(result.stdout, /local preview tooling/);
 });

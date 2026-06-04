@@ -11,6 +11,7 @@ Read in this order:
 3. `docs/superpowers/plans/2026-06-04-unship-agent-fast-prototyping-implementation-plan.md`
 4. `docs/superpowers/specs/2026-06-01-unship-instant-picker-prd.md`
 5. `docs/superpowers/specs/2026-06-01-unship-instant-picker-technical-spec.md`
+6. `RELEASE.md`
 
 Older implementation plans are execution records, not current behavior specs.
 
@@ -26,8 +27,8 @@ Older implementation plans are execution records, not current behavior specs.
 - No confirm button. The human tells the agent in chat which visible title to keep.
 - Agent instructions live primarily in `SKILL.md`; standing `AGENTS.md`/`CLAUDE.md` files stay short.
 - Subagent mode is proposal-only in V1. Unship does not orchestrate subagents.
-- `npx unship check` must distinguish allowed installed instructions from forbidden preview artifacts.
-- `npx unship doctor --json` and `npx unship setup --framework auto --json` are the fast path for capable agents.
+- `unship check` must distinguish allowed installed instructions from forbidden preview artifacts.
+- `npx -y @unship/cli@latest doctor --json` and `npx -y @unship/cli@latest setup --framework auto --json` are the fresh-project fast path for capable agents.
 - Doctor reports likely live preview servers so agents should reuse an existing dev server before starting another.
 - Doctor reports stale installed skills and picker files so agents can upgrade existing repos without spelunking.
 - Doctor and check return structured exploration summaries for agents, while remaining read-only.

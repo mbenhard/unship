@@ -12,7 +12,7 @@ Make Unship easy to start with through a one-time global skill install, then let
 The primary onboarding path should become:
 
 ```bash
-npx unship@latest install-skill
+npx @unship/cli@latest install-skill
 ```
 
 Then in any supported agent harness:
@@ -24,18 +24,18 @@ use unship to generate 3 variants of the hero section
 The globally installed skill handles repo-local work:
 
 ```bash
-npx -y unship@latest doctor --json
-npx -y unship@latest setup --framework auto --json
+npx -y @unship/cli@latest doctor --json
+npx -y @unship/cli@latest setup --framework auto --json
 ```
 
-`npx unship init --target ...` remains as a fallback for teams that want repo-local committed instructions.
+`npx @unship/cli@latest init --target ...` remains as a fallback for teams that want repo-local committed instructions.
 
 ## Command Contract
 
 Add:
 
 ```bash
-npx unship@latest install-skill
+npx @unship/cli@latest install-skill
 ```
 
 Default behavior:
@@ -51,7 +51,7 @@ Default behavior:
 Stale behavior:
 
 - if the destination already exists and matches, return `ok: true` with `skipped`;
-- if the destination exists and differs, return `ok: false`, exit nonzero, and suggest `npx unship@latest install-skill --force`;
+- if the destination exists and differs, return `ok: false`, exit nonzero, and suggest `npx @unship/cli@latest install-skill --force`;
 - with `--force`, overwrite the managed skill.
 
 JSON shape:
@@ -74,8 +74,8 @@ The installed skill must not assume `unship` is already a project dependency.
 
 It should choose CLI invocation this way:
 
-1. If `package.json` lists `unship` in `dependencies` or `devDependencies`, use `npx unship ...`.
-2. Otherwise use `npx -y unship@latest ...`.
+1. If `package.json` lists `@unship/cli` in `dependencies` or `devDependencies`, use `npx @unship/cli@latest ...`.
+2. Otherwise use `npx -y @unship/cli@latest ...`.
 
 This avoids interactive npm prompts and lets the global skill work in fresh repos.
 
@@ -96,5 +96,5 @@ Implementation must prove:
 - stale destination fails without `--force`.
 - `--force` refreshes stale content.
 - unknown commands still fail nonzero.
-- the bundled skill documents `npx -y unship@latest` fallback behavior.
+- the bundled skill documents `npx -y @unship/cli@latest` fallback behavior.
 - `npm run verify` passes.

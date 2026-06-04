@@ -85,7 +85,7 @@ async function init({ target, force }) {
     written,
     skipped,
     stale,
-    next: stale.length ? ["Run npx unship init --force --json to refresh stale installed Unship instructions."] : []
+    next: stale.length ? ["Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions."] : []
   };
 }
 
@@ -120,7 +120,7 @@ async function installSkill({ dir, force }) {
     skipped,
     stale,
     next: stale.length
-      ? ["Run npx unship@latest install-skill --force to refresh the stale global Unship skill."]
+      ? ["Run npx @unship/cli@latest install-skill --force to refresh the stale global Unship skill."]
       : ["Restart your agent, then ask: use unship to generate 3 variants of the hero section."]
   };
 }

@@ -1,8 +1,26 @@
 {
-  "name": "unship",
+  "name": "@unship/cli",
   "version": "0.1.0",
   "description": "Tiny local DOM picker for temporary agent-authored UI variants.",
+  "keywords": [
+    "ui",
+    "variants",
+    "design",
+    "agent",
+    "local",
+    "prototype",
+    "cli"
+  ],
+  "homepage": "https://github.com/mbenhard/unship#readme",
+  "bugs": {
+    "url": "https://github.com/mbenhard/unship/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbenhard/unship.git"
+  },
   "license": "MIT",
+  "author": "Marcus Benhard",
   "type": "module",
   "bin": {
     "unship": "src/cli/index.js"
@@ -13,6 +31,9 @@
     "agent",
     "src"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "check": "node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/setup/index.js && node --check src/picker/unship-picker.js",
     "e2e": "node e2e/toolbar-readiness.mjs",

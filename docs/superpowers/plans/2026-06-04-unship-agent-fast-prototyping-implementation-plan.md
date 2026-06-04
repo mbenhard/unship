@@ -363,7 +363,7 @@ test("doctor json preserves compatibility fields and adds unship summary", async
 
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
-  assert.equal(json.packageName, "unship");
+  assert.equal(json.packageName, "@unship/cli");
   assert.equal(json.version, "0.1.0");
   assert.equal(typeof json.node, "string");
   assert.equal(json.project.framework, "next");
