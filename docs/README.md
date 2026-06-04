@@ -28,6 +28,8 @@ Read in this order:
 - `npx unship doctor --json` and `npx unship setup --framework auto --json` are the fast path for capable agents.
 - Doctor reports likely live preview servers so agents should reuse an existing dev server before starting another.
 - Doctor reports stale installed skills and picker files so agents can upgrade existing repos without spelunking.
+- Doctor and check return structured exploration summaries for agents, while remaining read-only.
+- Cleanup remains agent-edited source work. Unship has no cleanup mutator in this phase.
 
 ## Archive Status
 
@@ -43,6 +45,6 @@ Archive contents:
 
 The active folder should not continue the old implementation path.
 
-## Next Step
+## Current Run
 
-Review the technical spec and implementation plan, then execute with `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+Use `docs/plans/current-run.md` for the latest active run status, linked plan, verification state, and next workflow skill.

@@ -49,13 +49,18 @@ test("init writes portable skill by default", async () => {
   assert.equal(json.written.includes(".opencode/commands/unship.md"), true);
   const skill = await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
-  assert.match(skill, /Brand read/);
+  assert.match(skill, /Target-First Read/);
   assert.match(skill, /Fast Start/);
   assert.match(skill, /use unship to generate 4 variants/i);
   assert.match(skill, /Do not build a custom switcher/i);
   assert.match(skill, /Do not start, open, or automate a browser by default/i);
   assert.match(skill, /detected preview servers as hints/i);
+  assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
+  assert.match(skill, /If no app source, framework signal, or preview shell exists yet/i);
+  assert.match(skill, /Settle a selected group/i);
+  assert.match(skill, /Final cleanup/i);
   assert.doesNotMatch(skill, /Before stopping for human choice, open or reuse the preview page/i);
+  assert.doesNotMatch(skill, /Use subagent mode only as an authoring workflow/i);
   assert.match(skill, /project\.skillInstalled.*project\.skillCurrent/s);
   assert.doesNotMatch(skill, /unship-design/);
 });
@@ -116,6 +121,9 @@ test("install-skill writes the global agents skill", async () => {
   const skill = await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
   assert.match(skill, /npx -y unship@latest/);
+  assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
+  assert.match(skill, /Settle a selected group/i);
+  assert.match(skill, /Final cleanup/i);
 });
 
 test("install-skill skips, fails stale, and refreshes with force", async () => {
@@ -340,6 +348,27 @@ test("check command plain output includes cleanup diagnostics", async () => {
   assert.match(result.stdout, /Remove temporary Unship picker markup/);
 });
 
+test("check json includes structured exploration summaries", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(
+    join(cwd, "src", "Hero.jsx"),
+    `<section data-unship-pick="Hero">
+  <div data-unship-option="Current">A</div>
+  <div data-unship-option="Proof" hidden>B</div>
+</section>
+`
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.equal(Array.isArray(json.diagnostics), true);
+  assert.deepEqual(json.explorations[0].options, ["Current", "Proof"]);
+  assert.equal(json.cleanupRequired, true);
+});
+
 test("doctor reports package, project setup state, and residue", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
@@ -366,6 +395,33 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.equal(json.project.devMountFound, true);
   assert.equal(json.residue.ok, false);
   assert.equal(json.residue.diagnostics.some((item) => item.file === "app/page.tsx"), true);
+});
+
+test("doctor json preserves compatibility fields and adds unship summary", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
+  await writeFixture(
+    join(cwd, "app", "page.tsx"),
+    `<section data-unship-pick="Hero">
+  <div data-unship-option="Current">A</div>
+  <div data-unship-option="Proof" hidden>B</div>
+</section>
+`
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "doctor", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.packageName, "unship");
+  assert.equal(json.version, "0.1.0");
+  assert.equal(typeof json.node, "string");
+  assert.equal(json.project.framework, "next");
+  assert.equal(json.residue.ok, false);
+  assert.equal(json.unship.activeExplorationCount, 1);
+  assert.equal(json.unship.cleanupRequired, true);
+  assert.deepEqual(json.unship.explorations[0].options, ["Current", "Proof"]);
+  assert.equal(json.next.some((item) => /Hero/.test(item)), true);
 });
 
 test("doctor reports a live preview server so agents can reuse it", async () => {

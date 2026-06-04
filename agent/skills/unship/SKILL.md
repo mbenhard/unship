@@ -25,9 +25,10 @@ Parse intent this way:
 
 ## Fast Start
 
-Before reading package internals or searching `node_modules`, choose the CLI prefix:
+Before reading package internals or searching `node_modules`, choose the CLI prefix once:
 
-- If this project already lists `unship` in `package.json`, use `npx unship`.
+- If `./node_modules/.bin/unship` exists, use `./node_modules/.bin/unship`.
+- Otherwise, if this project lists `unship` in `package.json`, use `npx unship`.
 - Otherwise use `npx -y unship@latest` so npm does not stop for an install prompt.
 
 Ask the CLI what is already true:
@@ -48,11 +49,13 @@ Use the returned framework, picker path, and mount status. Only inspect Unship p
 
 If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run `$UNSHIP setup --framework auto --json`; setup refreshes stale picker files.
 
-If `doctor` reports `project.previewServers`, treat them as hints only. Do not assume they are the right app or route.
+If `doctor` reports `project.previewServers`, treat them as hints only. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
 
-## Brand read
+If no app source, framework signal, or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
 
-Before authoring variants, inspect the existing UI source. Identify components, tokens or utility classes, typography scale, spacing rhythm, layout density, copy tone, interaction patterns, and product constraints. Use the rendered page only when the user asks for browser help or source alone is insufficient. Variants must be derived from the app's vocabulary unless the user explicitly asks to depart from it.
+## Target-First Read
+
+Before authoring variants, inspect the named route, component, or source area first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient. Variants must be derived from the app's vocabulary unless the user explicitly asks to depart from it.
 
 ## Instruction Precedence
 
@@ -70,7 +73,6 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 - Include `Current` only when baseline comparison is useful.
 - Use 1-3 word labels, ideally under 18 characters.
 - Use inline mode for focused section or component work.
-- Use subagent mode only as an authoring workflow when broad exploration helps.
 
 ## Inline Mode Safety
 
@@ -81,7 +83,8 @@ Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, sub
 - Report detected preview servers as hints instead of opening, navigating, or starting a browser.
 - If no preview server is detected, tell the user to start the app the way they normally do.
 - If `setup` returns manual instructions, patch only the smallest dev-only mount point or explain what still needs manual wiring.
-- If a previous Unship exploration is still present, ask which visible option to keep or clean it before creating a new group.
+- If an existing Unship exploration overlaps the requested target, or the user asks to ship, finish, or clean, ask what to keep or clean before changing it.
+- If an existing Unship exploration is independent, or the user clearly asks for another round, report it briefly and proceed.
 - If typecheck/build fails before your edits, report that baseline state and keep Unship changes isolated.
 
 ## Markup Contract
@@ -112,18 +115,20 @@ Before stopping for human choice, report:
 
 If no preview server is detected, say that the user should start the app normally and compare the visible option labels in the Unship picker. Only use browser automation when the user explicitly asks, setup requires manual verification, or you are changing Unship's picker/setup implementation itself. If you do verify, keep it to a functional smoke check: the picker appears, expected option labels are present, and switching does not reload the page. Do not judge visual quality for the human.
 
-## Subagent Mode
-
-Subagents must not mutate the shared workspace in V1. They return briefs, sketches, file-specific recommendations, or patch-shaped proposals. The main agent edits source, normalizes options, applies the `data-unship-*` contract, and performs cleanup. If subagents are unavailable, simulate independent passes internally and implement the strongest 2-4 options.
-
 ## Cleanup
 
-Cleanup is mandatory when exploration ends, including selection, cancellation, rejection, timeout, interruption, or ship request. Keep the selected option, remove losing options, remove all `data-unship-*` attributes, remove picker script/comments, then run:
+### Settle a selected group
+
+When the human names a winner for one group and wants to continue prototyping, keep that option's real source, remove losing options for that group, and remove `data-unship-*` attributes from the settled source. Keep the picker mount if more exploration is still active or expected.
+
+### Final cleanup
+
+When the human asks to ship, finish, cancel, or clean all Unship work, remove all losing choices, all `data-unship-*` attributes, picker mounts, and Unship comments, then run:
 
 ```bash
-$UNSHIP check
+$UNSHIP check --json
 ```
 
-Do not claim completion until the check is clean.
+Do not claim final cleanup is complete until the check is clean.
 
 Do not invent lifecycle commands. The human chooses by naming the visible option in chat; the agent edits source and verifies cleanup.
