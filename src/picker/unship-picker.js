@@ -524,9 +524,9 @@
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
       .menu-anim .menu{animation:menuIn .22s cubic-bezier(.22,.61,.36,1)}
-      .menu-anim .menuitem{animation:itemIn .24s ease backwards}
-      .menu-anim .menuitem:nth-child(2){animation-delay:.03s}
-      .menu-anim .menuitem:nth-child(n+3){animation-delay:.06s}
+      .menu-anim .menuitem{animation:itemIn .22s ease .18s backwards}
+      .menu-anim .menuitem:nth-child(2){animation-delay:.22s}
+      .menu-anim .menuitem:nth-child(n+3){animation-delay:.26s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
       .dock[data-dir="next"] .group{--dx:0px;--dy:8px}
