@@ -22,6 +22,14 @@ const EXPECTED_PACKED_FILES = [
   "src/update/index.js"
 ];
 
+test("picker runtime version matches package version", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const picker = await readFile(new URL("../src/picker/unship-picker.js", import.meta.url), "utf8");
+  const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  assert.match(picker, new RegExp(`version: "${escapedVersion}"`));
+});
+
 test("packed package is small and excludes legacy implementation paths", () => {
   const result = spawnSync("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);

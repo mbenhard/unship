@@ -4,6 +4,10 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+## 0.1.6 - 2026-06-05
+
+- Align the picker runtime API version with the package version and cover it with a release smoke test.
+
 ## 0.1.5 - 2026-06-05
 
 - Refine the bundled skill around native variant creation, proportional verification, reusable picker setup, framework-safe script mounts, and hidden-option safety so agents hand off useful comparisons before doing release-level checks.
