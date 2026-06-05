@@ -72,6 +72,34 @@ test("holding the label copies a keep instruction for the agent", async () => {
   }
 });
 
+test("right-clicking the label does not start hold-to-copy", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+    await page.evaluate(() => {
+      window.__copied = [];
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: (text) => { window.__copied.push(text); return Promise.resolve(); } }
+      });
+    });
+
+    const label = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.click(label.x, label.y, { button: "right", delay: 700 });
+
+    assert.deepEqual(await page.evaluate(() => window.__copied), []);
+    assert.doesNotMatch(
+      await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
+      /Copied|Couldn't copy/
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
 test("Enter on the label copies the keep instruction and Shift+Enter minimizes", async () => {
   const browser = await chromium.launch();
   try {

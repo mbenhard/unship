@@ -254,6 +254,29 @@ test("picker global shortcuts are opt-in and guarded", async () => {
   await browser.close();
 });
 
+test("picker toolbar arrow keys do not also trigger global shortcuts", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    const source = await readFile(PICKER, "utf8");
+    await page.setContent(`
+      <section data-unship-pick="Hero">
+        <button data-unship-option="One">A</button>
+        <button data-unship-option="Two" hidden>B</button>
+        <button data-unship-option="Three" hidden>C</button>
+      </section>
+      <script data-unship-global-shortcuts>${source}</script>
+    `);
+
+    await page.getByRole("button", { name: /Hero, One/ }).focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal((await page.evaluate(() => window.__unshipPicker.getState())).groups[0].activeOptionIndex, 1);
+    assert.equal(await page.locator('[data-unship-option="Two"]').isVisible(), true);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("picker falls back to toolbar label when incoming option is not focusable", async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();

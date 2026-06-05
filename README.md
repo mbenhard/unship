@@ -67,22 +67,18 @@ Check the current project:
 npx -y @unship/cli@latest doctor --json
 ```
 
-Set up the picker when an app shell exists:
+Ask Unship for a dev-only picker mount when an app shell exists:
 
 ```bash
-npx @unship/cli@latest setup
+npx @unship/cli@latest setup --json
 ```
 
-Supported setup targets are `next`, `vite`, `astro`, `sveltekit`, `nuxt`, and `angular`:
+`setup` is framework-agnostic. It returns an inline picker snippet and instructions; your agent should add that snippet to the smallest local/dev-only app shell that renders the temporary choices.
+
+Print the picker snippet directly:
 
 ```bash
-npx @unship/cli@latest setup <target>
-```
-
-Print the picker snippet:
-
-```bash
-npx @unship/cli@latest snippet
+npx @unship/cli@latest snippet --inline
 ```
 
 Check for leftover preview artifacts:

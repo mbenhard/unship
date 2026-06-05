@@ -34,7 +34,7 @@
   let gestureCleanup = null;
 
   const api = {
-    version: "0.1.2",
+    version: "0.1.3",
     rescan,
     destroy,
     getState
@@ -433,7 +433,7 @@
   }
 
   function handleGlobalKeydown(event) {
-    if (root?.activeElement || isTypingTarget(event.target)) return;
+    if (event.defaultPrevented || event.composedPath?.().includes(host) || root?.activeElement || isTypingTarget(event.target)) return;
 
     if (event.key === "ArrowLeft") switchOption(-1);
     else if (event.key === "ArrowRight") switchOption(1);
@@ -558,6 +558,7 @@
   // release early = nothing (leaves double-click free for minimize).
   function handleLabelPointerDown(event) {
     const label = event.target.closest?.(".label");
+    if (event.button !== 0 || event.ctrlKey) return;
     if (!label || gesturePointerId !== null) return;
     const dock = root.querySelector(".dock");
     const startX = event.clientX;

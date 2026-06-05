@@ -76,8 +76,6 @@ try {
   } else if (command === "setup") {
     const result = await setupProject({
       root: flags.root || process.cwd(),
-      framework: flags.framework || flags._[0] || "auto",
-      force: Boolean(flags.force),
       dryRun: Boolean(flags["dry-run"])
     });
     print(result, flags.json);
@@ -304,9 +302,9 @@ function nextActions({ project, unship, updates }) {
   }
 
   if (project.pickerFileFound && !project.pickerFileCurrent) {
-    actions.push("Run setup --framework auto --json to refresh the stale picker file.");
+    actions.push("Run setup --json and replace stale picker mounts with the returned dev-only snippet.");
   } else if (!project.pickerFileFound || !project.devMountFound) {
-    actions.push("Run setup after a local app shell exists if you need the picker mounted.");
+    actions.push("Run setup --json after a local app shell exists if you need the picker mounted.");
   }
 
   if (unship.activeExplorationCount > 0) {
@@ -348,7 +346,6 @@ function printDoctor(value) {
     `${value.packageName} ${value.version}`,
     doctorUpdateLine(value.updates),
     `Node ${value.node}`,
-    `Framework ${value.project.framework}`,
     `Skill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}`,
     `Picker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}`,
     `Dev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}`,
@@ -444,7 +441,6 @@ async function confirmPlan(question) {
 
 function printSetup(result) {
   const lines = [
-    `Framework ${result.framework}`,
     `Picker ${result.picker.status}: ${result.picker.path}`,
     `Mount ${result.mount.status}${result.mount.file ? `: ${result.mount.file}` : ""}`
   ];

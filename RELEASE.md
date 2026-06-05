@@ -86,5 +86,5 @@ npm exec @unship/cli@next -- snippet
 Promote when satisfied:
 
 ```bash
-npm dist-tag add @unship/cli@0.1.2 latest
+npm dist-tag add @unship/cli@0.1.3 latest
 ```

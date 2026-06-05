@@ -49,18 +49,18 @@ Use the chosen prefix as `$UNSHIP` for every CLI call in this project. Do not as
 If the picker setup is missing, run:
 
 ```bash
-$UNSHIP setup --framework auto --json
+$UNSHIP setup --json
 ```
 
-Use the returned framework, picker path, and mount status. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
+Use the returned `mount.snippet` and instructions. Patch only the smallest local/dev-only app shell or preview artifact that renders the Unship options. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
 
-If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run `$UNSHIP setup --framework auto --json`; setup refreshes stale picker files.
+If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run `$UNSHIP setup --json` and replace stale picker mounts with the returned dev-only snippet when the picker is still needed.
 
 If `/unship` is unavailable after installation, continue from the natural-language request. Do not require the slash command when this skill is already active.
 
 If `doctor` reports `project.previewServers`, treat them as hints only. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
 
-If no app source, framework signal, or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
+If no app source or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
 
 ## Target-First Read
 

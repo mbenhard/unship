@@ -251,10 +251,14 @@ test("install can include project setup while no-project skips it", async () => 
 
   const included = await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
   assert.equal(included.status, 0, included.stderr);
-  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
+  const json = JSON.parse(included.stdout);
+  assert.equal(json.project.status, "manual");
+  assert.match(json.project.reason, /setup --json/);
+  assert.match(json.next.join("\n"), /setup --json/);
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
 });
 
-test("install project in empty repo defers setup instead of creating a shell", async () => {
+test("install project in empty repo leaves picker setup explicit", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
 
@@ -263,11 +267,12 @@ test("install project in empty repo defers setup instead of creating a shell", a
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.project.included, true);
-  assert.equal(json.project.status, "deferred");
+  assert.equal(json.project.status, "manual");
+  assert.match(json.project.reason, /setup --json/);
   await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
 });
 
-test("install project in dependency-only package repo defers setup", async () => {
+test("install project in dependency-only package repo leaves picker setup explicit", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
   await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { prettier: "3.0.0" } }));
@@ -277,16 +282,16 @@ test("install project in dependency-only package repo defers setup", async () =>
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.project.included, true);
-  assert.equal(json.project.status, "deferred");
+  assert.equal(json.project.status, "manual");
   await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
 });
 
 test("uninstall project removes current picker file but leaves app source deliberate", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
-  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
-  await runCliWithHome(["install", "--project", "--yes", "--json"], cwd, home);
+  const picker = await readFile(new URL("../src/picker/unship-picker.js", import.meta.url), "utf8");
+  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n<script src="/unship-picker.js" data-unship-dev></script>\n</body>\n');
+  await writeFixture(join(cwd, "public", "unship-picker.js"), picker);
 
   const result = await runCliWithHome(["uninstall", "--project", "--yes", "--json"], cwd, home);
 
@@ -344,7 +349,7 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /overlapping active explorations/i);
   assert.match(skill, /If `\/unship` is unavailable after installation, continue from the natural-language request/i);
   assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
-  assert.match(skill, /If no app source, framework signal, or preview shell exists yet/i);
+  assert.match(skill, /If no app source or preview shell exists yet/i);
   assert.match(skill, /Settle a selected group/i);
   assert.match(skill, /Final cleanup/i);
   assert.doesNotMatch(skill, /Before stopping for human choice, open or reuse the preview page/i);
@@ -497,147 +502,37 @@ test("snippet can inline the picker for local experiments", () => {
   assert.match(result.stdout, /__unshipPicker/);
 });
 
-test("setup next copies picker and injects dev-only script in app layout", async () => {
+test("setup returns a framework-agnostic inline picker snippet", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "15.0.0" } }));
-  await writeFixture(
-    join(cwd, "app", "layout.tsx"),
-    `export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`
-  );
+  await writeFixture(join(cwd, "app", "layout.tsx"), "<html><body>{children}</body></html>\n");
+
+  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.equal(json.framework, "universal");
+  assert.equal(json.picker.status, "inline");
+  assert.equal(json.mount.status, "manual");
+  assert.equal(json.mount.mode, "inline");
+  assert.match(json.mount.snippet, /<script data-unship-dev>/);
+  assert.match(json.mount.snippet, /__unshipPicker/);
+  assert.match(json.next.join("\n"), /dev-only app shell/);
+  await assert.rejects(readFile(join(cwd, "public", "unship-picker.js"), "utf8"));
+  assert.doesNotMatch(await readFile(join(cwd, "app", "layout.tsx"), "utf8"), /unship/i);
+});
+
+test("setup keeps explicit legacy targets as compatibility no-ops", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
 
   const result = spawnSync(process.execPath, [CLI, "setup", "next", "--json"], { cwd, encoding: "utf8" });
 
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
-  assert.equal(json.ok, true);
-  assert.equal(json.framework, "next");
-  assert.equal(json.picker.path, "public/unship-picker.js");
-  assert.equal(json.mount.status, "patched");
-  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
-  const layout = await readFile(join(cwd, "app", "layout.tsx"), "utf8");
-  assert.match(layout, /import Script from "next\/script";/);
-  assert.match(layout, /process\.env\.NODE_ENV === "development"/);
-  assert.match(layout, /src="\/unship-picker\.js"/);
-
-  const second = spawnSync(process.execPath, [CLI, "setup", "next", "--json"], { cwd, encoding: "utf8" });
-  assert.equal(second.status, 0, second.stderr);
-  const layoutAfterSecondRun = await readFile(join(cwd, "app", "layout.tsx"), "utf8");
-  assert.equal(layoutAfterSecondRun.match(/unship-picker/g).length, 1);
-});
-
-test("setup refreshes an out-of-date picker file", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
-  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
-  await writeFixture(join(cwd, "public", "unship-picker.js"), "old picker\n");
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.picker.status, "updated");
-  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
-});
-
-test("setup auto detects vite and patches index html", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
-  await writeFixture(join(cwd, "index.html"), '<div id="root"></div>\n</body>\n');
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.ok, true);
-  assert.equal(json.framework, "vite");
-  assert.equal(json.mount.status, "patched");
-  assert.match(await readFile(join(cwd, "public", "unship-picker.js"), "utf8"), /__unshipPicker/);
-  const html = await readFile(join(cwd, "index.html"), "utf8");
-  assert.match(html, /import\.meta\.env\.DEV/);
-  assert.match(html, /document\.createElement\("script"\)/);
-  assert.match(html, /src = "\/unship-picker\.js"/);
-  assert.doesNotMatch(html, /import\("\/unship-picker\.js"\)/);
-});
-
-test("setup repairs stale vite dynamic import mount", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { vite: "6.0.0" } }));
-  await writeFixture(
-    join(cwd, "index.html"),
-    '<div id="root"></div>\n<script type="module">\n  if (import.meta.env.DEV) import("/unship-picker.js");\n</script>\n</body>\n'
-  );
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.mount.status, "patched");
-  const html = await readFile(join(cwd, "index.html"), "utf8");
-  assert.match(html, /document\.createElement\("script"\)/);
-  assert.doesNotMatch(html, /import\("\/unship-picker\.js"\)/);
-});
-
-test("setup astro patches a common layout when present", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { astro: "5.0.0" } }));
-  await writeFixture(join(cwd, "src", "layouts", "Layout.astro"), "<html><body><slot /></body></html>\n");
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.framework, "astro");
-  assert.equal(json.mount.status, "patched");
-  assert.match(await readFile(join(cwd, "src", "layouts", "Layout.astro"), "utf8"), /import\.meta\.env\.DEV/);
-});
-
-test("setup sveltekit creates a client hook when none exists", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ devDependencies: { "@sveltejs/kit": "2.0.0" } }));
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.framework, "sveltekit");
-  assert.equal(json.picker.path, "static/unship-picker.js");
-  assert.equal(json.mount.status, "created");
-  assert.match(await readFile(join(cwd, "src", "hooks.client.ts"), "utf8"), /import\.meta\.env\.DEV/);
-});
-
-test("setup nuxt creates a client plugin when none exists", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { nuxt: "4.0.0" } }));
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.framework, "nuxt");
-  assert.equal(json.mount.status, "created");
-  assert.match(await readFile(join(cwd, "plugins", "unship.client.ts"), "utf8"), /defineNuxtPlugin/);
-});
-
-test("setup angular copies picker and returns manual mount guidance", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  await writeFixture(join(cwd, "package.json"), JSON.stringify({ dependencies: { "@angular/core": "19.0.0" } }));
-
-  const result = spawnSync(process.execPath, [CLI, "setup", "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.framework, "angular");
-  assert.equal(json.picker.path, "src/assets/unship-picker.js");
+  assert.equal(json.framework, "universal");
   assert.equal(json.mount.status, "manual");
-  assert.match(json.next.join("\n"), /localhost-only/);
-  assert.match(await readFile(join(cwd, "src", "assets", "unship-picker.js"), "utf8"), /__unshipPicker/);
+  assert.match(json.mount.snippet, /__unshipPicker/);
 });
 
 test("check command returns non-zero for source residue", async () => {
@@ -709,7 +604,7 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.equal(json.ok, true);
   assert.equal(json.packageName, "@unship/cli");
   assert.match(json.reminder, /local comparison tooling/);
-  assert.equal(json.project.framework, "next");
+  assert.equal(json.project.framework, "universal");
   assert.equal(json.project.skillInstalled, true);
   assert.equal(json.project.skillCurrent, false);
   assert.equal(json.project.pickerFileFound, true);
@@ -736,7 +631,7 @@ test("doctor json reports update availability from npm registry", async () => {
   await withServer((request, response) => {
     assert.equal(request.url, "/%40unship%2Fcli");
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ "dist-tags": { latest: "0.1.3" } }));
+    response.end(JSON.stringify({ "dist-tags": { latest: "0.1.4" } }));
   }, async (port) => {
     const result = await runCli(["doctor", "--json"], cwd, {
       UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}`
@@ -746,8 +641,8 @@ test("doctor json reports update availability from npm registry", async () => {
     const json = JSON.parse(result.stdout);
     assert.equal(json.updates.checked, true);
     assert.equal(json.updates.available, true);
-    assert.equal(json.updates.current, "0.1.2");
-    assert.equal(json.updates.latest, "0.1.3");
+    assert.equal(json.updates.current, "0.1.3");
+    assert.equal(json.updates.latest, "0.1.4");
     assert.match(json.updates.next, /install --repair/);
     assert.equal(json.next[0], json.updates.next);
   });
@@ -788,7 +683,7 @@ test("doctor next actions prioritize stale skill and picker repairs", async () =
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.match(json.next[0], /init --force --json/);
-  assert.match(json.next[1], /setup --framework auto --json/);
+  assert.match(json.next[1], /setup --json/);
   assert.equal(json.next.some((item) => /Hero/.test(item)), true);
 });
 
@@ -829,9 +724,9 @@ test("doctor json preserves compatibility fields and adds unship summary", async
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.packageName, "@unship/cli");
-  assert.equal(json.version, "0.1.2");
+  assert.equal(json.version, "0.1.3");
   assert.equal(typeof json.node, "string");
-  assert.equal(json.project.framework, "next");
+  assert.equal(json.project.framework, "universal");
   assert.equal(json.residue.ok, false);
   assert.equal(json.unship.activeExplorationCount, 1);
   assert.equal(json.unship.cleanupRequired, true);
@@ -863,6 +758,6 @@ test("doctor reports a live preview server so agents can reuse it", async () => 
 test("doctor plain output reports doctor details", () => {
   const result = spawnSync(process.execPath, [CLI, "doctor", "--no-update-check"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /@unship\/cli 0\.1\.2/);
+  assert.match(result.stdout, /@unship\/cli 0\.1\.3/);
   assert.match(result.stdout, /local comparison tooling/);
 });

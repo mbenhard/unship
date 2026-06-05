@@ -3,7 +3,6 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipResidue } from "../check/index.js";
-import { detectProject, setupProject } from "../setup/index.js";
 
 const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
 const PROJECT_PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
@@ -264,20 +263,12 @@ async function planLegacyFiles({ context, target, managedPaths, uninstall = fals
 async function planInstallProject(context) {
   const include = context.project || (context.interactive && !context.yes && !context.noProject && !context.json);
   if (context.noProject || !include) return { included: false, status: "skipped" };
-  const detected = await detectProject(context.root);
-  if (detected.framework === "universal") {
-    return {
-      included: true,
-      status: "deferred",
-      detected,
-      reason: "No supported app shell or framework signal exists yet."
-    };
-  }
-  if (context.dryRun) {
-    const setup = await setupProject({ root: context.root, framework: "auto", dryRun: true });
-    return { included: true, status: "planned", setup };
-  }
-  return { included: true, status: "pending", root: context.root, detected };
+  return {
+    included: true,
+    status: "manual",
+    root: context.root,
+    reason: "Project picker setup is explicit; run setup --json in the app repo and mount the returned dev-only snippet."
+  };
 }
 
 async function planUninstallProject(context) {
@@ -364,15 +355,6 @@ async function applyPlan(plan, mode) {
       item.error = error.message;
     }
   }
-  if (mode === "install" && plan.project?.included && plan.project.status === "pending") {
-    try {
-      const setup = await setupProject({ root: plan.project.root || process.cwd(), framework: "auto", dryRun: false });
-      plan.project = { included: true, status: setup.ok ? "complete" : "failed", setup };
-    } catch (error) {
-      plan.project.status = "failed";
-      plan.project.error = error.message;
-    }
-  }
   if (mode === "uninstall" && plan.project?.included && plan.project.status === "pending") {
     for (const file of plan.project.files || []) {
       if (file.operation !== "remove") continue;
@@ -453,7 +435,8 @@ function nextActions({ harnesses, project }) {
     next.push("Try /unship where available, or ask: use unship to compare 3 directions for the hero section.");
     next.push("If /unship is unavailable after restart, run npx @unship/cli@latest doctor --json and use the natural-language fallback.");
   }
-  if (!project) next.push("Inside an app repo, run npx @unship/cli@latest install --project --yes to wire the picker.");
+  if (project) next.push("Run npx @unship/cli@latest setup --json in the app repo to get the dev-only picker snippet.");
+  else next.push("Inside an app repo, run npx @unship/cli@latest setup --json to get the dev-only picker snippet.");
   return next;
 }
 

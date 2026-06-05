@@ -4,6 +4,12 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+## 0.1.3 - 2026-06-05
+
+- Make project setup framework-agnostic: `setup --json` now returns an inline dev-only picker snippet instead of detecting frameworks and patching app files.
+- Keep agent installation separate from app picker mounting; `install --project` now points to explicit setup instead of wiring the app.
+- Fix toolbar right-clicks starting the hold-to-copy gesture.
+- Fix toolbar arrow-key switching double-firing when global shortcuts are enabled.
 - Add toolbar minimize: double-click the option label (or press Shift+Enter on it) to collapse the dock into a small circular button; click it to restore.
 - Add hold-to-keep: press and hold the option label (or press Enter on it) to copy a ready-to-paste keep instruction for the agent; failed copies report a failure instead of claiming success.
 - Add drag-snap placement: drag the label to snap the dock to left/center/right and top/bottom anchors.
