@@ -391,6 +391,9 @@
           dock.style.height = `${height}px`;
           dock.style.borderRadius = "24px";
           dock.style.padding = "";
+          // Re-anchor edge snaps on the full dock width so the growing dock
+          // slides back to its corner instead of overflowing past the edge.
+          syncViewportBounds(width);
           setTimeout(() => {
             dock.classList.remove("boxing", "unboxing");
             dock.style.width = "";
@@ -544,6 +547,7 @@
     if (!dock || dock.classList.contains("boxing")) {
       minimized = true;
       render();
+      syncViewportBounds(MINI_SIZE_PX);
       return;
     }
 
@@ -555,6 +559,10 @@
     dock.style.height = `${MINI_SIZE_PX}px`;
     dock.style.borderRadius = `${MINI_SIZE_PX / 2}px`;
     dock.style.padding = "0px";
+    // Re-anchor edge snaps on the minimized geometry so the box morph slides
+    // the shrinking dock into the corner instead of leaving it centered on
+    // the wide dock's anchor.
+    syncViewportBounds(MINI_SIZE_PX);
     setTimeout(() => {
       minimized = true;
       render();
@@ -670,7 +678,10 @@
     });
   }
 
-  function syncViewportBounds() {
+  // controlWidth lets the minimize/restore morphs anchor on the geometry they
+  // are animating toward before it is laid out; viewport listeners pass an
+  // Event here, which the isFinite guard ignores.
+  function syncViewportBounds(controlWidth) {
     if (!host) return;
 
     const visualViewport = window.visualViewport;
@@ -681,7 +692,8 @@
     const offsetLeft = visualViewport?.offsetLeft || 0;
     // Anchor on whichever control is rendered: the dock or, when minimized,
     // the small circular button — otherwise edge snaps drift on viewport sync.
-    const dockWidth = (root?.querySelector(".dock") || root?.querySelector(".minimized"))?.offsetWidth || 328;
+    const dockWidth =
+      (Number.isFinite(controlWidth) ? controlWidth : (root?.querySelector(".dock") || root?.querySelector(".minimized"))?.offsetWidth) || 328;
     const center =
       anchorH === "left" ? offsetLeft + 10 + dockWidth / 2 :
       anchorH === "right" ? offsetLeft + width - 10 - dockWidth / 2 :
@@ -768,7 +780,7 @@
       .label{position:relative;flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease;touch-action:none}
       .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       @keyframes holdFill{to{transform:none}}
-      .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease)}
+      .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease),left .3s var(--ease)}
       .boxing .menu,.boxing .row{opacity:0;transition:opacity .12s ease}
       .boxing.unboxing .menu,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
       .dock.preboxed{overflow:hidden;transition:none}

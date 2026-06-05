@@ -211,6 +211,52 @@ test("a cancelled pointer aborts the drag gesture and the pending hold", async (
   }
 });
 
+test("minimize and restore keep an edge-snapped dock anchored to its corner", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+
+    const label = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(label.x, label.y);
+    await page.mouse.down();
+    await page.mouse.move(700, 540, { steps: 8 });
+    await page.mouse.up();
+
+    // Minimize without any viewport event: the circle must land in the same
+    // corner the dock hugged, not stay centered on the wide dock's anchor.
+    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.waitForFunction(() => {
+      const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
+      return root && !root.querySelector(".dock") && root.querySelector(".minimized");
+    });
+    await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+      Promise.all(host.shadowRoot.querySelector(".minimized").getAnimations().map((animation) => animation.finished))
+    );
+    const circleRight = await page.locator("css=[data-unship-toolbar]").evaluate(
+      (host) => host.shadowRoot.querySelector(".minimized").getBoundingClientRect().right
+    );
+    assert.equal(Math.abs(circleRight - 790) < 2, true, `minimized circle should hug the right gutter at 790, got ${circleRight}`);
+
+    // Restore: the dock must grow back into the corner, not overflow past it.
+    await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".minimized").click());
+    await page.waitForFunction(() => {
+      const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
+      return root && root.querySelector(".dock") && !root.querySelector(".minimized");
+    });
+    await page.waitForTimeout(700);
+    const dockRight = await page.locator("css=[data-unship-toolbar]").evaluate(
+      (host) => host.shadowRoot.querySelector(".dock").getBoundingClientRect().right
+    );
+    assert.equal(Math.abs(dockRight - 790) < 2, true, `restored dock should hug the right gutter at 790, got ${dockRight}`);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("a minimized edge snap keeps hugging the edge across viewport syncs", async () => {
   const browser = await chromium.launch();
   try {

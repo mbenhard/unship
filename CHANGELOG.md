@@ -8,6 +8,7 @@ All notable changes to Unship are documented here.
 - Remove the divider line above the option row in the open group menu; the row now sits at the same gap as the menu items instead of behind a line plus extra padding.
 - Shorten the copied confirmation to "✓ Copied"; the screen-reader announcement keeps the full paste instruction.
 - Shrink the minimized toolbar button from 32px to 28px and fix its hover scale-up, which snapped instead of animating because the transition referenced an easing variable that only exists on the dock.
+- Fix edge-snapped docks losing their corner on minimize and restore: the box morph now re-anchors on the geometry it is animating toward, so the shrinking dock slides into the corner and the restored dock grows back to it instead of drifting half the width difference or overflowing the viewport.
 
 ## 0.1.3 - 2026-06-05
 
