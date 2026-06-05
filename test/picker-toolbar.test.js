@@ -211,6 +211,57 @@ test("a cancelled pointer aborts the drag gesture and the pending hold", async (
   }
 });
 
+test("dragging shows a snap-zone ghost that previews the landing spot and leaves on release", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+
+    const label = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(label.x, label.y);
+    await page.mouse.down();
+    await page.mouse.move(700, 540, { steps: 8 });
+    await page.waitForTimeout(250);
+
+    // Pointer in the bottom-right zone: the ghost previews that rest spot.
+    const atRight = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const ghost = host.shadowRoot.querySelector(".ghost");
+      if (!ghost) return null;
+      const dock = host.shadowRoot.querySelector(".dock");
+      const rect = ghost.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, dockWidth: dock.offsetWidth, dockHeight: dock.offsetHeight };
+    });
+    assert.notEqual(atRight, null, "ghost should exist while dragging");
+    assert.equal(Math.abs(atRight.left - (800 - 10 - atRight.dockWidth)) < 2, true, `ghost should preview the right gutter, got left ${atRight.left}`);
+    assert.equal(Math.abs(atRight.top - (600 - 14 - atRight.dockHeight)) < 2, true, `ghost should preview the bottom band, got top ${atRight.top}`);
+
+    // Crossing into the top-left zone moves the preview there.
+    await page.mouse.move(100, 100, { steps: 8 });
+    await page.waitForTimeout(300);
+    const atLeft = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".ghost").getBoundingClientRect();
+      return { left: rect.left, top: rect.top };
+    });
+    assert.equal(Math.abs(atLeft.left - 10) < 2, true, `ghost should preview the left gutter, got left ${atLeft.left}`);
+    assert.equal(Math.abs(atLeft.top - 14) < 2, true, `ghost should preview the top band, got top ${atLeft.top}`);
+
+    // Release: the ghost goes away and the dock lands where it previewed.
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    const after = await page.locator("css=[data-unship-toolbar]").evaluate((host) => ({
+      ghost: !!host.shadowRoot.querySelector(".ghost"),
+      dockLeft: host.shadowRoot.querySelector(".dock").getBoundingClientRect().left
+    }));
+    assert.equal(after.ghost, false, "ghost should be removed after release");
+    assert.equal(Math.abs(after.dockLeft - 10) < 2, true, `dock should land on the previewed spot, got left ${after.dockLeft}`);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("minimize and restore keep an edge-snapped dock anchored to its corner", async () => {
   const browser = await chromium.launch();
   try {

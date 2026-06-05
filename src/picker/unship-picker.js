@@ -40,6 +40,7 @@
   let anchorH = null;
   let gesturePointerId = null;
   let gestureCleanup = null;
+  let ghost = null;
 
   const api = {
     version: "0.1.3",
@@ -597,6 +598,7 @@
       document.removeEventListener("pointerup", up);
       document.removeEventListener("pointercancel", cancel);
       clearTimeout(holdTimer);
+      removeGhost();
       root.querySelector(".label")?.classList.remove("holding");
       gesturePointerId = null;
       gestureCleanup = null;
@@ -610,10 +612,12 @@
         clearTimeout(holdTimer);
         label.classList.remove("holding");
         dock?.classList.add("dragging");
+        showGhost();
       }
       host.style.setProperty("--unship-left", `${e.clientX}px`);
       if (placement === "top") host.style.setProperty("--unship-top", `${Math.max(8, e.clientY - (dock?.offsetHeight || 40) / 2)}px`);
       else host.style.setProperty("--unship-bottom", `${Math.max(8, window.innerHeight - e.clientY - (dock?.offsetHeight || 40) / 2)}px`);
+      moveGhost(e.clientX, e.clientY, dock);
     };
 
     const up = (e) => {
@@ -646,6 +650,37 @@
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
     document.addEventListener("pointercancel", cancel);
+  }
+
+  // Snap-zone ghost: while dragging, a dashed outline previews the rest spot
+  // of the zone the pointer is in, using the same thresholds and gutters the
+  // release handler commits, so the preview and the landing always agree.
+  function showGhost() {
+    if (ghost) return;
+    ghost = document.createElement("div");
+    ghost.className = "ghost";
+    root.append(ghost);
+  }
+
+  function moveGhost(x, y, dock) {
+    if (!ghost || !dock) return;
+    const width = dock.offsetWidth;
+    const height = dock.offsetHeight;
+    const viewportWidth = window.innerWidth;
+    const left =
+      x < viewportWidth / 3 ? 10 :
+      x > (viewportWidth * 2) / 3 ? viewportWidth - 10 - width :
+      (viewportWidth - width) / 2;
+    const top = y < window.innerHeight / 2 ? 14 : window.innerHeight - 14 - height;
+    ghost.style.width = `${width}px`;
+    ghost.style.height = `${height}px`;
+    ghost.style.left = `${left}px`;
+    ghost.style.top = `${top}px`;
+  }
+
+  function removeGhost() {
+    ghost?.remove();
+    ghost = null;
   }
 
   function queueRescan() {
@@ -764,7 +799,8 @@
       .menuitem:first-child{margin-top:0}
       .menuitem:hover{background:rgba(255,255,255,.12)}
       .dock:not(.open) .menuitem:not(.current){max-height:0;min-height:0;margin-top:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),min-height var(--dur) var(--ease),margin var(--dur) var(--ease),opacity .15s ease,visibility 0s linear var(--dur),background .15s ease,color .15s ease}
-      .dock:not(.open) .menuitem.current{margin-top:0}
+      .dock:not(.open) .menuitem.current{margin-top:0;background:rgba(255,255,255,.12)}
+      .dock:not(.open) .menuitem.current:hover{background:rgba(255,255,255,.17)}
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -793,6 +829,8 @@
       .minimized.fading{opacity:0;transition:none;pointer-events:none}
       .dock.dragging{transition:none;cursor:grabbing}
       .dock.dragging .label{cursor:grabbing}
+      .ghost{position:fixed;z-index:2147483646;pointer-events:none;box-sizing:border-box;border:1.5px dashed rgba(128,128,128,.65);background:rgba(128,128,128,.08);border-radius:24px;transition:left .15s ease,top .15s ease;animation:ghostIn .15s ease}
+      @keyframes ghostIn{from{opacity:0}}
       .dock.snapping{transition:left .22s var(--ease),bottom .22s var(--ease),top .22s var(--ease)}
       .label:hover,.label:focus{background:transparent;box-shadow:none;outline:0}
       .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
