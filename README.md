@@ -1,12 +1,14 @@
+![Unship — iterate with your agent in the app, not in chat](https://raw.githubusercontent.com/mbenhard/unship/main/.github/assets/cover.png)
+
 # Unship
 
-Tiny local picker for comparing agent-made alternatives in real source.
+Iterate with your agent in the app, not in chat.
 
-Ask your agent for a few directions, compare them in your local preview, then select the one you like. Use Unship for UI sections, copy, product states, flows, design-system treatments, docs, CLI output, or any local surface your agent can render in source.
+Unship lets your agent create temporary options for UI details, copy, product states, flows, design-system treatments, docs, CLI output, or any local surface it can render in source. Compare them in your running app with a tiny local picker, choose the winner in chat, and have the agent clean up the rest before shipping.
 
 > Status: early beta. Unship is local-first prototyping tooling, not production experiment infrastructure.
 
-Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. You choose by naming the visible option label in chat; the agent settles source by keeping that option and removing temporary Unship artifacts.
+Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The alternatives are temporary source-level choices that should be settled or removed before release.
 
 ## Install
 
@@ -56,8 +58,8 @@ The usual loop:
 
 1. Ask for alternatives.
 2. Compare them in your running local preview.
-3. Tell the agent which option to keep.
-4. Before shipping, have the agent clean Unship markup and run `unship check`.
+3. Tell the agent which visible option label to keep; the installed skill tells it to settle that group by removing the losing options and temporary `data-unship-*` attributes from the kept source.
+4. Before shipping, run `unship check` to verify no temporary Unship artifacts remain.
 
 ## Project Commands
 
