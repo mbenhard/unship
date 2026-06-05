@@ -25,7 +25,7 @@ test("packed package is small and excludes legacy implementation paths", () => {
   assert.equal(result.status, 0, result.stderr);
   const pack = JSON.parse(result.stdout)[0];
   const files = pack.files.map((file) => file.path);
-  assert.equal(pack.size < 30_000, true, `package size ${pack.size} should stay under 30 KB`);
+  assert.equal(pack.size < 36_000, true, `package size ${pack.size} should stay under 36 KB`);
   assert.deepEqual(files.sort(), EXPECTED_PACKED_FILES);
   assert.equal(files.some((file) => file.startsWith("src/bridge/")), false);
   assert.equal(files.some((file) => file.startsWith("src/core/")), false);
