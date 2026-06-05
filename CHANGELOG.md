@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+## 0.1.3 - 2026-06-05
+
 - Fix hold-to-keep firing before the hold fill finished: the copy now commits exactly when the fill animation completes (720ms), instead of at 600ms with the fill ~80% across.
 - Remove the divider line above the option row in the open group menu; the row now sits at the same gap as the menu items instead of behind a line plus extra padding.
 - Shorten the copied confirmation to "✓ Copied"; the screen-reader announcement keeps the full paste instruction.
@@ -11,8 +13,6 @@ All notable changes to Unship are documented here.
 - Fix edge-snapped docks losing their corner on minimize and restore: the box morph now re-anchors on the geometry it is animating toward, so the shrinking dock slides into the corner and the restored dock grows back to it instead of drifting half the width difference or overflowing the viewport.
 - Add a snap-zone ghost while dragging the dock: a dashed outline previews the rest spot of the zone the pointer is in, using the same thresholds the release commits, so the preview and the landing always agree.
 - Give the closed-state group bar a permanent soft gray fill (the hover tone), with hover stepping slightly brighter, so the active group reads as a distinct surface at rest.
-
-## 0.1.3 - 2026-06-05
 
 - Make project setup framework-agnostic: `setup --json` now returns an inline dev-only picker snippet instead of detecting frameworks and patching app files.
 - Keep agent installation separate from app picker mounting; `install --project` now points to explicit setup instead of wiring the app.
