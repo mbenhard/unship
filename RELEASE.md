@@ -29,11 +29,13 @@ The package should publish only these files:
 - `agent/AGENTS.md`
 - `agent/skills/unship/SKILL.md`
 - `package.json`
+- `src/agent-targets/index.js`
 - `src/agent/index.js`
 - `src/check/index.js`
 - `src/cli/index.js`
 - `src/install/index.js`
 - `src/picker/unship-picker.js`
+- `src/project-files/index.js`
 - `src/setup/index.js`
 - `src/update/index.js`
 

@@ -1,5 +1,6 @@
-import { access, readFile, readdir } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { walkProjectFiles } from "../project-files/index.js";
 
 const BUNDLED_SKILL = new URL("../../agent/skills/unship/SKILL.md", import.meta.url);
 const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
@@ -10,7 +11,6 @@ const SKILL_PATHS = [
 ];
 const PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
 const SEARCH_EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".astro", ".vue", ".svelte"]);
-const IGNORE_DIRS = new Set([".git", "node_modules", ".next", ".nuxt", ".svelte-kit", "dist", "build", "coverage"]);
 const DEFAULT_PREVIEW_PORTS = [3000, 3001, 5173, 5174, 4173, 4321, 4200, 8080];
 
 export async function setupProject({ root = process.cwd(), dryRun = false } = {}) {
@@ -146,39 +146,10 @@ async function fileMatches(path, referenceUrl) {
 }
 
 async function findFirstMount(root) {
-  for await (const file of walk(root)) {
-    const rel = toPosix(relative(root, file));
+  for await (const { file, rel } of walkProjectFiles({ root, extensions: SEARCH_EXTENSIONS })) {
     if (PICKER_CANDIDATES.includes(rel)) continue;
     const text = await readFile(file, "utf8");
     if (text.includes("data-unship-dev") || text.includes("unship-picker.js")) return { file: rel };
   }
   return null;
-}
-
-async function* walk(dir) {
-  let entries = [];
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
-      yield* walk(full);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    if (SEARCH_EXTENSIONS.has(extension(entry.name))) yield full;
-  }
-}
-
-function extension(name) {
-  const index = name.lastIndexOf(".");
-  return index === -1 ? "" : name.slice(index);
-}
-
-function toPosix(path) {
-  return path.split(sep).join("/");
 }

@@ -20,6 +20,7 @@
 
   let host;
   let root;
+  let styleNode;
   let liveRegion;
   let observer;
   let groups = [];
@@ -278,8 +279,7 @@
     if (!group) {
       if (renderedSignature === "none") return;
       renderedSignature = "none";
-      root.innerHTML = "";
-      root.append(liveRegion);
+      setToolbarHtml("");
       return;
     }
 
@@ -293,13 +293,12 @@
 
     // Minimized form: a small circular button holding the diamond mark.
     if (minimized) {
-      root.innerHTML = `${style()}<button class="minimized ${placement}" type="button" data-action="restore" aria-label="Restore Unship toolbar — ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}"></button>`;
-      root.append(liveRegion);
+      setToolbarHtml(`<button class="minimized ${placement}" type="button" data-action="restore" aria-label="Restore Unship toolbar — ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}"></button>`);
       return;
     }
 
     const swapClass = switchDir ? " swap" : "";
-    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
+    setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu(swapClass) : ""}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
@@ -309,7 +308,21 @@
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
-    </div>`;
+    </div>`);
+  }
+
+  function setToolbarHtml(html) {
+    root.innerHTML = "";
+    if (!styleNode) {
+      styleNode = document.createElement("style");
+      styleNode.textContent = css();
+    }
+    root.append(styleNode);
+    if (html) {
+      const template = document.createElement("template");
+      template.innerHTML = html;
+      root.append(template.content);
+    }
     root.append(liveRegion);
   }
 
@@ -626,8 +639,8 @@
       if (!dragging) return;
 
       dock?.classList.remove("dragging");
-      anchorH = e.clientX < window.innerWidth / 3 ? "left" : e.clientX > (window.innerWidth * 2) / 3 ? "right" : "center";
-      placement = e.clientY < window.innerHeight / 2 ? "top" : "bottom";
+      anchorH = horizontalAnchorFor(e.clientX, window.innerWidth);
+      placement = placementFor(e.clientY, window.innerHeight);
       dock?.classList.add("snapping");
       dock?.classList.toggle("top", placement === "top");
       dock?.classList.toggle("bottom", placement !== "top");
@@ -666,12 +679,14 @@
     if (!ghost || !dock) return;
     const width = dock.offsetWidth;
     const height = dock.offsetHeight;
-    const viewportWidth = window.innerWidth;
-    const left =
-      x < viewportWidth / 3 ? 10 :
-      x > (viewportWidth * 2) / 3 ? viewportWidth - 10 - width :
-      (viewportWidth - width) / 2;
-    const top = y < window.innerHeight / 2 ? 14 : window.innerHeight - 14 - height;
+    const { left, top } = ghostRectFor({
+      x,
+      y,
+      width,
+      height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    });
     ghost.style.width = `${width}px`;
     ghost.style.height = `${height}px`;
     ghost.style.left = `${left}px`;
@@ -729,10 +744,7 @@
     // the small circular button — otherwise edge snaps drift on viewport sync.
     const dockWidth =
       (Number.isFinite(controlWidth) ? controlWidth : (root?.querySelector(".dock") || root?.querySelector(".minimized"))?.offsetWidth) || 328;
-    const center =
-      anchorH === "left" ? offsetLeft + 10 + dockWidth / 2 :
-      anchorH === "right" ? offsetLeft + width - 10 - dockWidth / 2 :
-      offsetLeft + width / 2;
+    const center = anchorCenterFor(anchorH, { offsetLeft, viewportWidth: width, controlWidth: dockWidth });
     const visibleBottom = visualViewport
       ? Math.max(14, window.innerHeight - visualViewport.height - visualViewport.offsetTop + 14)
       : 14;
@@ -742,6 +754,33 @@
     host.style.setProperty("--unship-max-width", `${Math.max(240, width - 20)}px`);
     host.style.setProperty("--unship-bottom", `${visibleBottom}px`);
     host.style.setProperty("--unship-top", `${visibleTop}px`);
+  }
+
+  function horizontalAnchorFor(x, viewportWidth) {
+    if (x < viewportWidth / 3) return "left";
+    if (x > (viewportWidth * 2) / 3) return "right";
+    return "center";
+  }
+
+  function placementFor(y, viewportHeight) {
+    return y < viewportHeight / 2 ? "top" : "bottom";
+  }
+
+  function ghostRectFor({ x, y, width, height, viewportWidth, viewportHeight }) {
+    const anchor = horizontalAnchorFor(x, viewportWidth);
+    return {
+      left:
+        anchor === "left" ? 10 :
+        anchor === "right" ? viewportWidth - 10 - width :
+        (viewportWidth - width) / 2,
+      top: placementFor(y, viewportHeight) === "top" ? 14 : viewportHeight - 14 - height
+    };
+  }
+
+  function anchorCenterFor(anchor, { offsetLeft, viewportWidth, controlWidth }) {
+    if (anchor === "left") return offsetLeft + 10 + controlWidth / 2;
+    if (anchor === "right") return offsetLeft + viewportWidth - 10 - controlWidth / 2;
+    return offsetLeft + viewportWidth / 2;
   }
 
   function restorePersistedSelection(groupIndex, label, options) {
@@ -784,8 +823,8 @@
     })[character]);
   }
 
-  function style() {
-    return `<style>
+  function css() {
+    return `
       .dock{--ease:cubic-bezier(.32,.72,0,1);--dur:.28s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
@@ -849,8 +888,7 @@
       .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
       .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
-      @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-    </style>`;
+      @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
   }
 
   function init() {

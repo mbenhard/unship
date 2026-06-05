@@ -4,7 +4,7 @@
 
 Iterate with your agent in the app, not in chat.
 
-Unship lets your agent create temporary options for UI details, copy, product states, flows, design-system treatments, docs, CLI output, or any local surface it can render in source. Compare them in your running app with a tiny local picker, choose the winner in chat, and have the agent clean up the rest before shipping.
+Unship lets your agent create temporary options for UI details, copy, product states, flows, design-system treatments, rendered docs, CLI output, or any local surface it can render in source. Compare them in your running app with a tiny local picker, choose the winner in chat, and have the agent clean up the rest before shipping.
 
 > Status: early beta. Unship is local-first prototyping tooling, not production experiment infrastructure.
 
@@ -97,6 +97,8 @@ Unship works best when the alternatives can coexist in one rendered local surfac
 
 More complex screens and flows are possible, but the agent has to shape them into something DOM-local: a comparison route, a flow mock, a step preview, or a source-contained version of the screen. If the alternatives require separate routes, real navigation state, backend side effects, auth changes, analytics, or long-lived sessions, Unship can still help sketch them, but it is not orchestrating that flow for you.
 
+Raw Markdown is not directly comparable by the picker. For README, docs, CLI, or DX alternatives, the agent should render a temporary local preview surface first, then remove that preview work before shipping.
+
 Avoid inline Unship options around duplicate active IDs, submit controls, global scripts, autoplay media, focus traps, destructive side effects, or stateful providers. In those cases, compare a safer shell or smaller slice.
 
 ## Repo-Local Instructions
@@ -107,7 +109,7 @@ Commit the Unship skill into a project only when your team wants repo-local agen
 npx @unship/cli@latest init
 ```
 
-Harness-specific targets are `antigravity`, `claude`, `opencode`, and `all`:
+Harness-specific targets are `codex`, `antigravity`, `claude`, `opencode`, and `all`:
 
 ```bash
 npx @unship/cli@latest init --target <target>

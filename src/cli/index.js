@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { initTargetFiles } from "../agent-targets/index.js";
 import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipResidue } from "../check/index.js";
 import { applyInstallPlan, applyUninstallPlan, planInstall, planUninstall } from "../install/index.js";
@@ -87,7 +88,7 @@ try {
 
 async function init({ target, force }) {
   const templates = await getAgentTemplates();
-  const files = targetFiles(target, templates);
+  const files = initTargetFiles(target, templates);
   const written = [];
   const skipped = [];
   const stale = [];
@@ -119,28 +120,6 @@ async function init({ target, force }) {
     stale,
     next: stale.length ? ["Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions."] : []
   };
-}
-
-function targetFiles(target, templates) {
-  const skill = (path) => ({ path, content: templates.skill, staleGuard: true, forceOverwrite: true });
-  const pointer = (path, content) => ({ path, content, forceOverwrite: false });
-  const command = (path, content) => ({ path, content, staleGuard: true, forceOverwrite: true });
-
-  if (target === "codex") return [skill(".agents/skills/unship/SKILL.md"), pointer("AGENTS.md", templates.agents)];
-  if (target === "antigravity") return [skill(".agents/skills/unship/SKILL.md"), pointer("AGENTS.md", templates.agents)];
-  if (target === "claude") return [skill(".claude/skills/unship/SKILL.md"), pointer("CLAUDE.md", templates.claude)];
-  if (target === "opencode") return [skill(".opencode/skills/unship/SKILL.md"), command(".opencode/commands/unship.md", templates.opencodeCommand)];
-  if (target === "all") {
-    return [
-      skill(".agents/skills/unship/SKILL.md"),
-      skill(".claude/skills/unship/SKILL.md"),
-      skill(".opencode/skills/unship/SKILL.md"),
-      command(".opencode/commands/unship.md", templates.opencodeCommand),
-      pointer("AGENTS.md", templates.agents),
-      pointer("CLAUDE.md", templates.claude)
-    ];
-  }
-  throw new Error(`Unknown init target: ${target}`);
 }
 
 function parseFlags(items) {

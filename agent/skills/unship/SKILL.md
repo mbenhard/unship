@@ -1,11 +1,11 @@
 ---
 name: unship
-description: "Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup."
+description: "Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, rendered docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup."
 ---
 
 # Unship
 
-Use Unship to create temporary alternatives in real source, let the human compare them in the local browser, and then clean every Unship artifact before shipping. Unship is a decision surface for work that designers and developers judge best in the actual app: UI, copy, product states, flows, design-system treatments, docs previews, and developer experience surfaces.
+Use Unship to create temporary alternatives in real source, let the human compare them in the local browser, and then clean every Unship artifact before shipping. Unship is a decision surface for work that designers and developers judge best in the actual app: UI, copy, product states, flows, design-system treatments, rendered docs previews, and developer experience surfaces.
 
 Unship is local comparison tooling. The picker script runs in the user's local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The human chooses by naming a visible option label in chat; you settle source by keeping that option and removing temporary artifacts.
 
@@ -22,13 +22,13 @@ Treat ordinary prompts as complete enough to begin. Examples:
 Parse intent this way:
 
 - A number means exactly that many visible choices unless the user says `plus current`.
-- A section, element, state, flow step, design-system sample, docs preview, or DX surface defines the smallest source scope that can be varied cleanly.
+- A section, element, state, flow step, design-system sample, rendered docs preview, or DX surface defines the smallest source scope that can be varied cleanly.
 - `copywriting` means preserve structure and vary message, proof, CTA, tone, and hierarchy.
 - `visual`, `layout`, or `design` means vary composition while staying inside the app's design language.
 - `state` means compare realistic product states such as empty, loading, error, success, long-label, reduced-motion, or permission-limited views.
 - `flow` means compare a small source-contained path or step sequence, not a production experiment framework.
 - `system`, `tokens`, or `design system` means compare local component or style treatments that can be rendered in source.
-- `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface.
+- `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface. Do not treat raw Markdown files as directly comparable by the picker.
 - If the target is ambiguous, inspect the page/source first and choose the most likely match.
 
 ## Fast Start

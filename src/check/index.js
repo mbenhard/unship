@@ -1,31 +1,13 @@
-import { readdir, readFile } from "node:fs/promises";
-import { relative, sep } from "node:path";
+import { readFile } from "node:fs/promises";
+import { walkProjectFiles } from "../project-files/index.js";
 
-const DEFAULT_IGNORES = new Set([
-  ".git",
-  "node_modules",
-  ".pnpm-store",
-  ".yarn",
-  ".unship",
-  ".superpowers",
-  "coverage",
-  ".cache",
-  ".next",
-  ".nuxt",
-  ".svelte-kit",
-  "dist",
-  "build"
-]);
-
-const BUILD_DIRS = new Set(["dist", "build", ".next", ".nuxt", ".svelte-kit"]);
-const EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".astro", ".mdx", ".liquid", ".hbs", ".handlebars", ".njk", ".ejs"]);
+const EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".astro", ".md", ".mdx", ".liquid", ".hbs", ".handlebars", ".njk", ".ejs"]);
 const PATTERNS = ["data-unship-pick", "data-unship-option", "unship-picker", "<!-- unship"];
 const PICK_ATTR = "data-unship-pick";
 const OPTION_ATTR = "data-unship-option";
 const MAX_RANGE_LINES = 200;
 
 const ALLOWED_PATHS = [
-  /^docs\//,
   /^agent\/skills\/unship\/SKILL\.md$/,
   /^\.agents\/skills\/unship\/SKILL\.md$/,
   /^\.claude\/skills\/unship\/SKILL\.md$/,
@@ -38,12 +20,12 @@ const ALLOWED_PATHS = [
 export async function checkUnshipResidue({ root = process.cwd(), includeBuild = false } = {}) {
   const diagnostics = [];
   const explorations = [];
-  for await (const file of walk(root, { includeBuild })) {
-    const rel = toPosix(relative(root, file));
-    if (isAllowedDocumentation(rel)) continue;
+  for await (const { file, rel } of walkProjectFiles({ root, extensions: EXTENSIONS, includeBuild, strict: true })) {
+    if (isAllowedInstructionFile(rel)) continue;
     const text = await readFile(file, "utf8");
-    diagnostics.push(...scanText(rel, text));
-    explorations.push(...scanExplorations(rel, text));
+    const scanSource = sourceForScanning(rel, text);
+    diagnostics.push(...scanText(rel, scanSource));
+    explorations.push(...scanExplorations(rel, scanSource));
   }
   const summary = summarizeCleanup({ diagnostics, explorations });
   return {
@@ -287,34 +269,47 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function* walk(dir, options) {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = `${dir}/${entry.name}`;
-    if (entry.isDirectory()) {
-      if (shouldIgnoreDirectory(entry.name, options)) continue;
-      yield* walk(full, options);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    if (EXTENSIONS.has(extension(entry.name))) yield full;
-  }
-}
-
-function shouldIgnoreDirectory(name, { includeBuild }) {
-  if (includeBuild && BUILD_DIRS.has(name)) return false;
-  return DEFAULT_IGNORES.has(name);
-}
-
-function isAllowedDocumentation(rel) {
+function isAllowedInstructionFile(rel) {
   return ALLOWED_PATHS.some((pattern) => pattern.test(rel));
 }
 
-function extension(name) {
-  const index = name.lastIndexOf(".");
-  return index === -1 ? "" : name.slice(index);
+function sourceForScanning(file, text) {
+  if (file.endsWith(".md") || file.endsWith(".mdx")) return blankMarkdownFences(text);
+  return text;
 }
 
-function toPosix(path) {
-  return path.split(sep).join("/");
+function blankMarkdownFences(text) {
+  let fence = null;
+  return text.split(/(?<=\n)/).map((line) => {
+    const newlineMatch = line.match(/(\r?\n)$/);
+    const newline = newlineMatch ? newlineMatch[0] : "";
+    const body = newline ? line.slice(0, -newline.length) : line;
+    const candidate = markdownFence(body);
+    let blank = false;
+    if (fence) {
+      blank = true;
+      if (
+        candidate &&
+        candidate.marker === fence.marker &&
+        candidate.length >= fence.length &&
+        candidate.closing
+      ) {
+        fence = null;
+      }
+    } else if (candidate) {
+      blank = true;
+      fence = candidate;
+    }
+    return blank ? `${body.replace(/[^\t]/g, " ")}${newline}` : line;
+  }).join("");
+}
+
+function markdownFence(line) {
+  const match = /^(?: {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match) return null;
+  return {
+    marker: match[1][0],
+    length: match[1].length,
+    closing: /^\s*$/.test(match[2])
+  };
 }

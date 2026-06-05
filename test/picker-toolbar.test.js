@@ -248,6 +248,18 @@ test("dragging shows a snap-zone ghost that previews the landing spot and leaves
     assert.equal(Math.abs(atLeft.left - 10) < 2, true, `ghost should preview the left gutter, got left ${atLeft.left}`);
     assert.equal(Math.abs(atLeft.top - 14) < 2, true, `ghost should preview the top band, got top ${atLeft.top}`);
 
+    // Crossing into the center zone keeps the top snap but centers the preview.
+    await page.mouse.move(400, 100, { steps: 8 });
+    await page.waitForTimeout(300);
+    const atCenter = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const ghost = host.shadowRoot.querySelector(".ghost");
+      const dock = host.shadowRoot.querySelector(".dock");
+      const rect = ghost.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, dockWidth: dock.offsetWidth };
+    });
+    assert.equal(Math.abs(atCenter.left - ((800 - atCenter.dockWidth) / 2)) < 2, true, `ghost should preview the centered rest spot, got left ${atCenter.left}`);
+    assert.equal(Math.abs(atCenter.top - 14) < 2, true, `ghost should keep previewing the top band, got top ${atCenter.top}`);
+
     // Release: the ghost goes away and the dock lands where it previewed.
     await page.mouse.up();
     await page.waitForTimeout(400);
@@ -256,7 +268,7 @@ test("dragging shows a snap-zone ghost that previews the landing spot and leaves
       dockLeft: host.shadowRoot.querySelector(".dock").getBoundingClientRect().left
     }));
     assert.equal(after.ghost, false, "ghost should be removed after release");
-    assert.equal(Math.abs(after.dockLeft - 10) < 2, true, `dock should land on the previewed spot, got left ${after.dockLeft}`);
+    assert.equal(Math.abs(after.dockLeft - ((800 - atCenter.dockWidth) / 2)) < 2, true, `dock should land on the previewed centered spot, got left ${after.dockLeft}`);
   } finally {
     await browser.close();
   }

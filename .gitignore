@@ -1,11 +1,19 @@
 .DS_Store
 .unship/
+
+# Local planning, dogfood apps, generated artifacts, and agent workspace state.
+# Public docs live in README/CHANGELOG/CONTRIBUTING/RELEASE/SECURITY.
 docs/
 e2e/artifacts/
 explorations/
 node_modules/
 unship-tests/
 unship-tests-v2/
+.claude/
+.superpowers/
+AGENTS.md
+CLAUDE.md
+
 unship-*.tgz
 npm-debug.log*
 yarn-debug.log*

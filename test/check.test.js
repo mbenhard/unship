@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { checkUnshipResidue } from "../src/check/index.js";
+
+async function writeFixture(path, content) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+
+test("check fails when the root cannot be read", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+
+  await assert.rejects(
+    checkUnshipResidue({ root: join(root, "missing") }),
+    /Cannot read project directory/
+  );
+});
 
 test("check reports unship preview artifacts in application source", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
@@ -42,12 +56,60 @@ test("check reports every artifact occurrence on the same line", async () => {
   ]);
 });
 
-test("check allows docs and installed instruction files to document the contract", async () => {
+test("check allows installed instruction files to document the contract", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
-  await mkdir(join(root, "docs"), { recursive: true });
-  await mkdir(join(root, ".agents", "skills", "unship"), { recursive: true });
-  await writeFile(join(root, "docs", "guide.md"), "`data-unship-pick`\n", "utf8");
-  await writeFile(join(root, ".agents", "skills", "unship", "SKILL.md"), "`data-unship-option`\n", "utf8");
+  const paths = [
+    ".agents/skills/unship/SKILL.md",
+    ".claude/skills/unship/SKILL.md",
+    ".opencode/skills/unship/SKILL.md",
+    ".opencode/commands/unship.md",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ];
+  await Promise.all(paths.map((path) => writeFixture(join(root, path), "`data-unship-option`\n")));
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test("check reports unship artifacts in rendered docs markdown source", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await writeFixture(
+    join(root, "docs", "guide.md"),
+    '<section data-unship-pick="Docs"><div data-unship-option="A">A</div></section>\n'
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostics.length, 2);
+  assert.equal(result.diagnostics[0].file, "docs/guide.md");
+  assert.deepEqual(result.explorations[0].options, ["A"]);
+});
+
+test("check ignores unship examples inside markdown fenced code", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await writeFile(
+    join(root, "README.md"),
+    '```html\n<section data-unship-pick="Docs"><div data-unship-option="A">A</div></section>\n```\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test("check respects markdown fence marker length and type", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await writeFile(
+    join(root, "README.md"),
+    '````md\n```html\n<section data-unship-pick="Docs"><div data-unship-option="A">A</div></section>\n```\n````\n~~~md\n```html\n<div data-unship-option="B"></div>\n```\n~~~\n',
+    "utf8"
+  );
 
   const result = await checkUnshipResidue({ root });
 

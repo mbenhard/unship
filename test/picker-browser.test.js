@@ -222,6 +222,37 @@ test("toolbar does not rerender from its own visibility writes", async () => {
   }
 });
 
+test("toolbar keeps one style node and live region across render modes", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section id="hero" data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+    const counts = () => page.locator("css=[data-unship-toolbar]").evaluate((host) => ({
+      styles: host.shadowRoot.querySelectorAll("style").length,
+      liveRegions: host.shadowRoot.querySelectorAll("[aria-live]").length
+    }));
+
+    assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
+
+    await page.getByRole("button", { name: /next option/i }).click();
+    await page.waitForTimeout(80);
+    assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
+
+    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelector(".minimized"));
+    assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
+
+    await page.locator("#hero").evaluate((node) => node.remove());
+    await page.waitForFunction(() => {
+      const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
+      return root && !root.querySelector(".dock") && !root.querySelector(".minimized");
+    });
+    assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
+  } finally {
+    await browser.close();
+  }
+});
+
 test("toolbar does not rerender when rescanned groups keep the same visible state", async () => {
   const browser = await chromium.launch();
   try {

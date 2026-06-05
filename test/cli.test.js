@@ -7,6 +7,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 
 const CLI = new URL("../src/cli/index.js", import.meta.url).pathname;
+const PACKAGE_VERSION = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")).version;
 
 async function writeFixture(path, content) {
   await mkdir(dirname(path), { recursive: true });
@@ -49,6 +50,12 @@ async function runCliWithHome(args, cwd, home) {
     XDG_CONFIG_HOME: join(home, ".config"),
     CLAUDE_CONFIG_DIR: join(home, ".claude")
   });
+}
+
+function nextPatchVersion(version) {
+  const parts = version.split(".").map(Number);
+  parts[2] += 1;
+  return parts.join(".");
 }
 
 test("help lists seamless install commands", () => {
@@ -353,6 +360,21 @@ test("init antigravity writes workspace skill", async () => {
   assert.match(await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
 });
 
+test("init codex writes only shared workspace files", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const result = spawnSync(process.execPath, [CLI, "init", "--target", "codex", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.written.sort(), [
+    ".agents/skills/unship/SKILL.md",
+    "AGENTS.md"
+  ]);
+  assert.match(await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  await assert.rejects(readFile(join(cwd, ".claude", "skills", "unship", "SKILL.md"), "utf8"));
+  await assert.rejects(readFile(join(cwd, ".opencode", "commands", "unship.md"), "utf8"));
+});
+
 test("init all writes shared skill plus claude and opencode shims", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const result = spawnSync(process.execPath, [CLI, "init", "--target", "all", "--json"], { cwd, encoding: "utf8" });
@@ -476,6 +498,17 @@ test("check command returns non-zero for source residue", async () => {
   assert.equal(JSON.parse(result.stdout).ok, false);
 });
 
+test("check command fails instead of reporting clean for a missing root", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--json", "--root", join(cwd, "missing")], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /Cannot read project directory/);
+});
+
 test("check command plain output includes cleanup summary before diagnostics", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await import("node:fs/promises").then(({ mkdir, writeFile }) =>
@@ -556,11 +589,12 @@ test("doctor json can disable update checks", async () => {
 
 test("doctor json reports update availability from npm registry", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const latest = nextPatchVersion(PACKAGE_VERSION);
 
   await withServer((request, response) => {
     assert.equal(request.url, "/%40unship%2Fcli");
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ "dist-tags": { latest: "0.1.4" } }));
+    response.end(JSON.stringify({ "dist-tags": { latest } }));
   }, async (port) => {
     const result = await runCli(["doctor", "--json"], cwd, {
       UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}`
@@ -570,8 +604,8 @@ test("doctor json reports update availability from npm registry", async () => {
     const json = JSON.parse(result.stdout);
     assert.equal(json.updates.checked, true);
     assert.equal(json.updates.available, true);
-    assert.equal(json.updates.current, "0.1.3");
-    assert.equal(json.updates.latest, "0.1.4");
+    assert.equal(json.updates.current, PACKAGE_VERSION);
+    assert.equal(json.updates.latest, latest);
     assert.match(json.updates.next, /install --repair/);
     assert.equal(json.next[0], json.updates.next);
   });
@@ -653,7 +687,7 @@ test("doctor json preserves compatibility fields and adds unship summary", async
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.packageName, "@unship/cli");
-  assert.equal(json.version, "0.1.3");
+  assert.equal(json.version, PACKAGE_VERSION);
   assert.equal(typeof json.node, "string");
   assert.equal(json.project.framework, "universal");
   assert.equal(json.residue.ok, false);
@@ -687,6 +721,6 @@ test("doctor reports a live preview server so agents can reuse it", async () => 
 test("doctor plain output reports doctor details", () => {
   const result = spawnSync(process.execPath, [CLI, "doctor", "--no-update-check"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /@unship\/cli 0\.1\.3/);
+  assert.equal(result.stdout.split("\n")[0], `@unship/cli ${PACKAGE_VERSION}`);
   assert.match(result.stdout, /local comparison tooling/);
 });

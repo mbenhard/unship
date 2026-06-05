@@ -4,6 +4,13 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+## 0.1.4 - 2026-06-05
+
+- Tighten docs/DX guidance around rendered comparison surfaces and make `check` scan Markdown outside fenced code blocks while respecting Markdown fence marker length and type.
+- Make `check --root` fail loudly for missing or unreadable project roots instead of reporting a false clean result.
+- Centralize project file traversal and `init --target` file mapping to reduce duplicated CLI/setup logic.
+- Refactor picker rendering internals to reuse a stable style node and shared snap geometry helpers without changing picker UX.
+- Document the public/local repo boundary in `.gitignore` so local planning docs, dogfood apps, artifacts, and agent workspace state stay private.
 - Remove the legacy `install-skill` command from the public CLI surface. Use `install --print-skill` when a manual skill file is needed for an unsupported harness.
 
 ## 0.1.3 - 2026-06-05
