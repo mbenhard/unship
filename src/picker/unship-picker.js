@@ -30,6 +30,8 @@
   let holdTimer = null;
   let holdFired = false;
   let anchorH = null;
+  let gesturePointerId = null;
+  let gestureCleanup = null;
 
   const api = {
     version: "0.1.2",
@@ -48,6 +50,7 @@
   }
 
   function destroy() {
+    gestureCleanup?.();
     observer?.disconnect();
     document.removeEventListener("keydown", handleGlobalKeydown);
     window.visualViewport?.removeEventListener("resize", syncViewportBounds);
@@ -291,8 +294,8 @@
       ${groups.length > 1 ? menu(swapClass) : ""}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
-        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move">
-          <span class="label-main${swapClass}">${copied ? "✓ Copied. Paste it to your agent" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
+        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize">
+          <span class="label-main${swapClass}">${copied === "ok" ? "✓ Copied. Paste it to your agent" : copied === "fail" ? "Couldn't copy. Try again" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
           ${groups.length === 1 && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
@@ -401,7 +404,13 @@
   }
 
   function handleToolbarKeydown(event) {
-    if (event.key === "ArrowLeft") {
+    if ((event.key === "Enter" || event.key === " ") && event.target.closest?.(".label")) {
+      // Keyboard parity for the pointer-only label gestures: Enter/Space keeps
+      // the current option, Shift+Enter minimizes.
+      event.preventDefault();
+      if (event.shiftKey) handleLabelDblclick(event);
+      else keepCurrent();
+    } else if (event.key === "ArrowLeft") {
       event.preventDefault();
       switchOption(-1);
     } else if (event.key === "ArrowRight") {
@@ -446,7 +455,9 @@
       incomingOption.focus({ preventScroll: true });
       return;
     }
-    setTimeout(() => root?.querySelector(".label")?.focus({ preventScroll: true }));
+    // focusVisible:false keeps the programmatic refocus after option switches
+    // from painting the keyboard focus ring; Tab focus still shows it.
+    setTimeout(() => root?.querySelector(".label")?.focus({ preventScroll: true, focusVisible: false }));
   }
 
   function isFocusable(element) {
@@ -462,15 +473,16 @@
     liveRegion.textContent = `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`;
   }
 
-  // Copy a ready-to-paste keep instruction for the agent.
-  function keepCurrent() {
+  // Copy a ready-to-paste keep instruction for the agent. Only claims success
+  // when a copy path actually succeeded; otherwise shows a failure state.
+  async function keepCurrent() {
     const group = groups[activeGroupIndex];
     if (!group) return;
     const option = group.options[group.activeOptionIndex];
-    copyText(`Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`);
-    copied = true;
+    const ok = await copyText(`Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`);
+    copied = ok ? "ok" : "fail";
     render();
-    liveRegion.textContent = "Copied. Paste the keep instruction to your agent";
+    liveRegion.textContent = ok ? "Copied. Paste the keep instruction to your agent" : "Copy failed";
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = false;
@@ -478,17 +490,21 @@
     }, 1800);
   }
 
-  function copyText(text) {
+  async function copyText(text) {
     if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).catch(() => {});
-      return;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {}
     }
     const scratch = document.createElement("textarea");
     scratch.value = text;
     document.body.append(scratch);
     scratch.select();
-    try { document.execCommand("copy"); } catch {}
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch {}
     scratch.remove();
+    return ok;
   }
 
   // Scroll the page to the active group when switching. window.scrollTo (not
@@ -542,12 +558,13 @@
   // release early = nothing (leaves double-click free for minimize).
   function handleLabelPointerDown(event) {
     const label = event.target.closest?.(".label");
-    if (!label) return;
+    if (!label || gesturePointerId !== null) return;
     const dock = root.querySelector(".dock");
     const startX = event.clientX;
     const startY = event.clientY;
     let dragging = false;
     holdFired = false;
+    gesturePointerId = event.pointerId;
 
     label.classList.add("holding");
     holdTimer = setTimeout(() => {
@@ -557,8 +574,18 @@
       keepCurrent();
     }, 600);
 
+    const cleanup = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancel);
+      clearTimeout(holdTimer);
+      root.querySelector(".label")?.classList.remove("holding");
+      gesturePointerId = null;
+      gestureCleanup = null;
+    };
+
     const move = (e) => {
-      if (holdFired) return;
+      if (e.pointerId !== gesturePointerId || holdFired) return;
       if (!dragging) {
         if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) return;
         dragging = true;
@@ -572,10 +599,8 @@
     };
 
     const up = (e) => {
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
-      clearTimeout(holdTimer);
-      root.querySelector(".label")?.classList.remove("holding");
+      if (e.pointerId !== gesturePointerId) return;
+      cleanup();
       if (!dragging) return;
 
       dock?.classList.remove("dragging");
@@ -588,8 +613,21 @@
       setTimeout(() => root.querySelector(".dock")?.classList.remove("snapping"), 260);
     };
 
+    // A cancelled pointer (touch interrupted, capture lost) aborts the gesture
+    // and snaps back to the last committed anchor instead of finishing a drag.
+    const cancel = (e) => {
+      if (e.pointerId !== gesturePointerId) return;
+      cleanup();
+      if (dragging) {
+        dock?.classList.remove("dragging");
+        syncViewportBounds();
+      }
+    };
+
+    gestureCleanup = cleanup;
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancel);
   }
 
   function queueRescan() {
@@ -631,7 +669,9 @@
     );
     const width = Math.min(...widths);
     const offsetLeft = visualViewport?.offsetLeft || 0;
-    const dockWidth = root?.querySelector(".dock")?.offsetWidth || 328;
+    // Anchor on whichever control is rendered: the dock or, when minimized,
+    // the small circular button — otherwise edge snaps drift on viewport sync.
+    const dockWidth = (root?.querySelector(".dock") || root?.querySelector(".minimized"))?.offsetWidth || 328;
     const center =
       anchorH === "left" ? offsetLeft + 10 + dockWidth / 2 :
       anchorH === "right" ? offsetLeft + width - 10 - dockWidth / 2 :
@@ -732,7 +772,8 @@
       .dock.dragging{transition:none;cursor:grabbing}
       .dock.dragging .label{cursor:grabbing}
       .dock.snapping{transition:left .22s var(--ease),bottom .22s var(--ease),top .22s var(--ease)}
-      .label:hover,.label:focus,.label:focus-visible{background:transparent;box-shadow:none}
+      .label:hover,.label:focus{background:transparent;box-shadow:none;outline:0}
+      .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
