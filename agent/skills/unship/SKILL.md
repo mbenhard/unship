@@ -31,22 +31,50 @@ Parse intent this way:
 - `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface. Do not treat raw Markdown files as directly comparable by the picker.
 - If the target is ambiguous, inspect the page/source first and choose the most likely match.
 
-## Fast Start
+## Command Prefix
 
-Before reading package internals or searching `node_modules`, choose the CLI prefix once:
+Choose the CLI prefix only when a CLI command is needed:
 
 - If `./node_modules/.bin/unship` exists, use `./node_modules/.bin/unship`.
 - Otherwise use `npx -y @unship/cli@latest` so npm does not stop for an install prompt.
 
-Ask the CLI what is already true:
-
-```bash
-$UNSHIP doctor --json
-```
-
 Use the chosen prefix as `$UNSHIP` for every CLI call in this project. Do not assume a bare `unship` binary is on PATH.
 
-If the picker setup is missing, run:
+For status checks during normal prototyping, prefer:
+
+```bash
+$UNSHIP doctor --json --no-update-check
+```
+
+Use `doctor` when setup freshness, stale installed files, or existing Unship work matters. If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run setup only when the picker is still needed.
+
+If `/unship` is unavailable after installation, continue from the natural-language request. Do not require the slash command when this skill is already active.
+
+If no app source or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
+
+## Variant Creation
+
+Use this path for ordinary requests to generate, compare, or explore alternatives. Create the smallest source-level comparison that lets the human judge the options in the running local preview. Inspect the named route, component, source area, or local comparison artifact first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear.
+
+Alternatives must be derived from the app's vocabulary unless the user explicitly asks to depart from it. Avoid unrelated refactors. Extract helpers only when they make the temporary comparison clearer or avoid obvious repeated markup.
+
+Keep verification proportional to the phase. Before the first handoff, do only comparison-readiness verification:
+
+- the expected `data-unship-pick` group exists;
+- the expected option labels exist;
+- the options are direct children of the group;
+- exactly one direct option is initially visible;
+- hidden direct options are actually hidden, including computed `display: none` when a rendered DOM can be checked cheaply.
+
+Do not run full release checks during ordinary variant creation unless the source cannot be edited safely without them. Full typecheck, build, browser automation, mobile smoke, `unship check`, and cleanup verification belong to picker setup changes, selected-option cleanup, or final shipping cleanup.
+
+If the target is ambiguous, inspect the page/source first and choose the most likely match. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient.
+
+## Picker Setup
+
+Picker setup is local development infrastructure. Reuse an existing dev-only picker mount when present. Do not reinstall, inline, copy, repair, or replace the picker during ordinary variant creation unless the picker is missing, stale, or the user asked to change setup.
+
+If picker setup is missing and the comparison needs it now, run:
 
 ```bash
 $UNSHIP setup --json
@@ -54,17 +82,9 @@ $UNSHIP setup --json
 
 Use the returned `mount.snippet` and instructions. Patch only the smallest local/dev-only app shell or preview artifact that renders the Unship options. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
 
-If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run `$UNSHIP setup --json` and replace stale picker mounts with the returned dev-only snippet when the picker is still needed.
+Framework script helpers can enforce ordering rules that plain scripts do not. If the picker has no strict ordering requirement, prefer the simplest valid dev-only script mount for the app shell. In Next.js App Router, do not place a sync or defer `next/script` mount outside the root document or root `head`; move it into the root `head`, add `async`, or use a plain dev-only `<script>` include instead.
 
-If `/unship` is unavailable after installation, continue from the natural-language request. Do not require the slash command when this skill is already active.
-
-If `doctor` reports `project.previewServers`, treat them as hints only. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
-
-If no app source or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
-
-## Target-First Read
-
-Before authoring alternatives, inspect the named route, component, source area, or local comparison artifact first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient. Alternatives must be derived from the app's vocabulary unless the user explicitly asks to depart from it.
+If `doctor` reports `project.previewServers`, treat detected preview servers as hints instead of opening, navigating, or starting a browser. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
 
 ## Instruction Precedence
 
@@ -86,6 +106,14 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 ## Inline Mode Safety
 
 Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, submit controls, global scripts, analytics triggers, autoplay media, focus traps, destructive side effects, and stateful providers. If unsafe, reduce scope or explain that inline mode is not suitable.
+
+## Hidden Option Safety
+
+Inactive options rely on `hidden`. Variant-specific CSS must not accidentally override hidden state. Be careful with option classes that set `display: grid`, `display: flex`, or `display: block`; if needed, preserve this local comparison guard near the relevant CSS:
+
+```css
+[hidden] { display: none !important; }
+```
 
 ## Smooth Workflow Edges
 
@@ -119,8 +147,8 @@ Before stopping for human choice, report:
 
 - the variant group label;
 - the visible option labels;
-- whether picker setup is installed and current;
-- whether the installed skill or picker appears stale;
+- comparison-readiness checks run;
+- whether picker setup was reused, changed, skipped, or not checked;
 - any detected preview servers as hints only;
 - cleanup status if existing Unship artifacts already exist.
 

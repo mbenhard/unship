@@ -152,6 +152,11 @@ npx @unship/cli@latest install --print-skill
 The installed skill teaches agents to:
 
 - inspect the named route, component, or source area first;
+- create the smallest source-level comparison that lets you judge the options;
+- run comparison-readiness checks before handoff, including option labels, direct-child structure, and hidden-option visibility;
+- keep verification proportional: full typecheck, build, browser smoke, `unship check`, and cleanup verification belong to setup changes, selected-option cleanup, or final shipping cleanup;
+- reuse existing dev-only picker setup instead of reinstalling or repairing it during ordinary variant creation;
+- mount the picker in the smallest valid dev-only app shell and avoid invalid framework script-helper placement;
 - avoid opening or automating a browser by default;
 - treat detected preview servers as hints, not proof targets;
 - summarize existing Unship explorations from `doctor` and `check`;

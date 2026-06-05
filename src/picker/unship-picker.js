@@ -157,7 +157,7 @@
       originalDisplayByOption.set(element, element.style.display || "");
     }
     if (!element.hidden) element.hidden = true;
-    if (element.style.display !== "none") element.style.display = "none";
+    if (element.style.display !== "none" && getComputedStyle(element).display !== "none") element.style.display = "none";
   }
 
   function switchOption(delta) {

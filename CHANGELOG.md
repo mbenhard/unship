@@ -4,6 +4,11 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+## 0.1.5 - 2026-06-05
+
+- Refine the bundled skill around native variant creation, proportional verification, reusable picker setup, framework-safe script mounts, and hidden-option safety so agents hand off useful comparisons before doing release-level checks.
+- Avoid adding inline `display: none` to options that are already hidden by normal browser rules, reducing hydration mismatch risk when local SSR previews load the picker.
+
 ## 0.1.4 - 2026-06-05
 
 - Tighten docs/DX guidance around rendered comparison surfaces and make `check` scan Markdown outside fenced code blocks while respecting Markdown fence marker length and type.

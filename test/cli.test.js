@@ -75,7 +75,8 @@ test("install print-skill outputs the bundled skill without writing", async () =
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /name: unship/);
-  assert.match(result.stdout, /Fast Start/);
+  assert.match(result.stdout, /Variant Creation/);
+  assert.match(result.stdout, /comparison-readiness verification/);
   await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
 });
 
@@ -318,8 +319,9 @@ test("init writes portable skill by default", async () => {
   assert.equal(json.written.includes(".opencode/commands/unship.md"), true);
   const skill = await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
-  assert.match(skill, /Target-First Read/);
-  assert.match(skill, /Fast Start/);
+  assert.match(skill, /Command Prefix/);
+  assert.match(skill, /Variant Creation/);
+  assert.match(skill, /Picker Setup/);
   assert.match(skill, /use unship to compare 4 hero directions/i);
   assert.match(skill, /empty, loading, and error states/i);
   assert.match(skill, /button system treatments/i);
@@ -329,11 +331,21 @@ test("init writes portable skill by default", async () => {
   assert.match(skill, /Unship is local comparison tooling/i);
   assert.match(skill, /does not send telemetry/i);
   assert.match(skill, /Picker selection does not save source/i);
-  assert.match(skill, /whether the installed skill or picker appears stale/i);
+  assert.match(skill, /Keep verification proportional to the phase/i);
+  assert.match(skill, /comparison-readiness verification/i);
+  assert.match(skill, /exactly one direct option is initially visible/i);
+  assert.match(skill, /computed `display:\s*none`/i);
+  assert.match(skill, /Do not run full release checks during ordinary variant creation/i);
+  assert.match(skill, /Variant-specific CSS must not accidentally override hidden state/i);
+  assert.match(skill, /\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/i);
+  assert.match(skill, /Framework script helpers can enforce ordering rules/i);
+  assert.match(skill, /Next\.js App Router/i);
+  assert.match(skill, /do not place a sync or defer `next\/script` mount outside the root document or root `head`/i);
+  assert.match(skill, /whether picker setup was reused, changed, skipped, or not checked/i);
   assert.match(skill, /multiple groups with the same label/i);
   assert.match(skill, /the variant group label/i);
   assert.match(skill, /the visible option labels/i);
-  assert.match(skill, /whether picker setup is installed and current/i);
+  assert.match(skill, /comparison-readiness checks run/i);
   assert.match(skill, /any detected preview servers as hints only/i);
   assert.match(skill, /cleanup status if existing Unship artifacts already exist/i);
   assert.match(skill, /repeated option labels/i);

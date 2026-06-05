@@ -27,6 +27,23 @@ test("picker discovers one group and switches without network or reload", async 
   await browser.close();
 });
 
+test("picker does not add inline display styles to already-hidden inactive options", async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.setContent(`
+    <section data-unship-pick="Hero">
+      <div data-unship-option="Current">A</div>
+      <div data-unship-option="Proof-led" hidden>B</div>
+    </section>
+    <script>${await readFile(PICKER, "utf8")}</script>
+  `);
+
+  const hiddenStyle = await page.locator('[data-unship-option="Proof-led"]').getAttribute("style");
+  assert.equal(hiddenStyle, null);
+  assert.equal(await page.locator('[data-unship-option="Proof-led"]').isVisible(), false);
+  await browser.close();
+});
+
 test("picker keeps multiple groups independent", async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
