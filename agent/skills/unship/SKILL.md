@@ -1,6 +1,6 @@
 ---
 name: unship
-description: Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup.
+description: "Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup."
 ---
 
 # Unship

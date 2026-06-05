@@ -47,6 +47,24 @@ test("release docs list every packed package file", async () => {
   }
 });
 
+test("bundled skill frontmatter stays YAML-safe", async () => {
+  const skill = await readFile(new URL("../agent/skills/unship/SKILL.md", import.meta.url), "utf8");
+  const frontmatter = skill.match(/^---\n([\s\S]*?)\n---\n/);
+  assert.notEqual(frontmatter, null);
+
+  for (const line of frontmatter[1].split("\n").filter(Boolean)) {
+    const field = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    assert.notEqual(field, null, `frontmatter line should be key/value YAML: ${line}`);
+
+    const value = field[2];
+    const isQuoted = /^(['"]).*\1$/.test(value);
+    assert.equal(/:\s/.test(value) && !isQuoted, false, `quote frontmatter values containing colon-space: ${line}`);
+  }
+
+  assert.match(frontmatter[1], /^name:\s+unship$/m);
+  assert.match(frontmatter[1], /^description:\s+".+"$/m);
+});
+
 test("packed package smoke runs seamless install commands", async () => {
   const packDir = await mkdtemp(join(tmpdir(), "unship-pack-"));
   const consumer = await mkdtemp(join(tmpdir(), "unship-consumer-"));
