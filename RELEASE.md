@@ -66,25 +66,32 @@ npm org ls unship --json
 npm access list packages @unship --json
 ```
 
+Local `npm whoami` may return `E401` on this machine. That does not block the normal publish path when GitHub trusted publishing is configured; use the GitHub `Publish` workflow below.
+
 ## Publish
 
-For the first public beta, prefer `next` before `latest`:
+Default path: publish from GitHub Actions using npm trusted publishing.
 
 ```bash
-npm publish --tag next --access public
-npm view @unship/cli dist-tags version
+gh workflow run publish.yml --ref main -f tag=latest
+gh run watch <run-id> --exit-status
+npm view @unship/cli@latest version dist-tags gitHead --json
 ```
 
-Smoke test from the registry:
+Use `tag=next` instead of `tag=latest` when intentionally publishing a prerelease channel.
+
+Smoke test from the registry after the workflow succeeds:
 
 ```bash
-npm exec @unship/cli@next -- install --dry-run --json
-npm exec @unship/cli@next -- doctor --json
-npm exec @unship/cli@next -- snippet
+npm exec @unship/cli@latest -- install --dry-run --json --no-update-check
+npm exec @unship/cli@latest -- doctor --json --no-update-check
+npm exec @unship/cli@latest -- snippet
+npm exec @unship/cli@latest -- setup --json
 ```
 
-Promote when satisfied:
+After publishing, refresh this machine's installed agent files so local Codex and Claude Code load the new bundled skill after restart:
 
 ```bash
-npm dist-tag add @unship/cli@0.1.3 latest
+npm exec @unship/cli@latest -- install --repair --yes --no-project --no-update-check
+npm exec @unship/cli@latest -- install --dry-run --json --no-update-check
 ```

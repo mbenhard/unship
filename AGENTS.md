@@ -93,7 +93,7 @@ Publishing gates:
 - `npm run verify` must pass.
 - `npm publish --dry-run` must pass without package-manifest warnings.
 - The packed package contents must remain limited to the files asserted in `test/package-smoke.test.js`.
-- `npm whoami` must be authenticated with permission to publish under the `@unship` scope.
-- Publish with the dist-tag requested in `RELEASE.md` or by the user, then run registry smoke tests before calling the release complete.
+- Publish through the GitHub `Publish` workflow by default: `gh workflow run publish.yml --ref main -f tag=latest`, then watch the run to completion. Local `npm whoami` returning `E401` is expected on this machine and does not block trusted publishing.
+- Publish with the dist-tag requested in `RELEASE.md` or by the user, then run the registry smoke tests and refresh local installed agent files before calling the release complete.
 
 For GitHub, use `mbenhard/unship` unless the user explicitly chooses another owner or repository name.
