@@ -74,11 +74,12 @@ test("packed package smoke runs seamless install commands", async () => {
   const bin = join(consumer, "node_modules", ".bin", "unship");
   for (const args of [
     ["install", "--dry-run", "--json", "--no-update-check"],
-    ["install-skill", "--dir", join(home, "skills"), "--json"],
+    ["install", "--print-skill"],
     ["uninstall", "--dry-run", "--json"]
   ]) {
     const result = spawnSync(bin, args, { cwd: consumer, encoding: "utf8", env });
     assert.equal(result.status, 0, `${args.join(" ")}\n${result.stderr}\n${result.stdout}`);
-    assert.equal(JSON.parse(result.stdout).ok, true);
+    if (args.includes("--print-skill")) assert.match(result.stdout, /name: unship/);
+    else assert.equal(JSON.parse(result.stdout).ok, true);
   }
 });

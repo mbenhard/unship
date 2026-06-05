@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+- Remove the legacy `install-skill` command from the public CLI surface. Use `install --print-skill` when a manual skill file is needed for an unsupported harness.
+
 ## 0.1.3 - 2026-06-05
 
 - Fix hold-to-keep firing before the hold fill finished: the copy now commits exactly when the fill animation completes (720ms), instead of at 600ms with the fill ~80% across.

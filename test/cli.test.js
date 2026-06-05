@@ -56,7 +56,8 @@ test("help lists seamless install commands", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /install/);
   assert.match(result.stdout, /uninstall/);
-  assert.match(result.stdout, /install-skill/);
+  assert.match(result.stdout, /install --print-skill/);
+  assert.doesNotMatch(result.stdout, /install-skill/);
 });
 
 test("install print-skill outputs the bundled skill without writing", async () => {
@@ -71,19 +72,16 @@ test("install print-skill outputs the bundled skill without writing", async () =
   await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
 });
 
-test("install-skill plain output is user-facing", async () => {
+test("install-skill is not public product surface", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
-  const skillRoot = join(home, "skills");
 
-  const result = await runCliWithHome(["install-skill", "--dir", skillRoot], cwd, home);
+  const result = await runCliWithHome(["install-skill", "--json"], cwd, home);
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Unship skill installed/);
-  assert.match(result.stdout, /Path:/);
-  assert.match(result.stdout, /Next:\n- Restart/);
-  assert.doesNotMatch(result.stdout, /^Wrote /m);
-  assert.doesNotMatch(result.stdout, /^Next: .*$/m);
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /Unknown command: install-skill/);
 });
 
 test("install dry-run json plans shared and claude targets inside temp home", async () => {
@@ -302,19 +300,6 @@ test("uninstall project removes current picker file but leaves app source delibe
   assert.match(await readFile(join(cwd, "index.html"), "utf8"), /unship-picker\.js/);
 });
 
-test("install-skill remains skill only", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  const home = join(cwd, "home");
-  const skillRoot = join(home, "skills");
-  await writeFixture(join(home, ".claude", "commands", "unship.md"), "Run unship next --json\n");
-
-  const result = await runCliWithHome(["install-skill", "--dir", skillRoot, "--json"], cwd, home);
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8"), /name: unship/);
-  assert.match(await readFile(join(home, ".claude", "commands", "unship.md"), "utf8"), /unship next/);
-});
-
 test("init writes portable skill by default", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const result = spawnSync(process.execPath, [CLI, "init", "--json"], { cwd, encoding: "utf8" });
@@ -404,36 +389,6 @@ test("init fails loudly when an installed skill is stale", async () => {
   assert.doesNotMatch(json.next.join("\n"), /npx unship init/);
 });
 
-test("install-skill writes the global agents skill", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  const skillRoot = join(cwd, "global-skills");
-
-  const result = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
-
-  assert.equal(result.status, 0, result.stderr);
-  const json = JSON.parse(result.stdout);
-  assert.equal(json.ok, true);
-  assert.equal(json.written.includes(join(skillRoot, "unship", "SKILL.md")), true);
-  const skill = await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8");
-  assert.match(skill, /name: unship/);
-  assert.match(skill, /npx -y @unship\/cli@latest/);
-  assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
-  assert.doesNotMatch(skill, /npx unship\b/);
-  assert.doesNotMatch(skill, /lists `@unship\/cli` or `unship`/);
-  assert.match(skill, /does not send telemetry/i);
-  assert.match(skill, /the variant group label/i);
-  assert.match(skill, /the visible option labels/i);
-  assert.match(skill, /whether picker setup is installed and current/i);
-  assert.match(skill, /any detected preview servers as hints only/i);
-  assert.match(skill, /cleanup status if existing Unship artifacts already exist/i);
-  assert.match(skill, /repeated option labels/i);
-  assert.match(skill, /"the second one"/i);
-  assert.match(skill, /overlapping active explorations/i);
-  assert.match(skill, /If `\/unship` is unavailable after installation, continue from the natural-language request/i);
-  assert.match(skill, /Settle a selected group/i);
-  assert.match(skill, /Final cleanup/i);
-});
-
 test("README documents local trust and unship troubleshooting", async () => {
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
 
@@ -446,32 +401,6 @@ test("README documents local trust and unship troubleshooting", async () => {
   assert.match(readme, /install --repair/);
   assert.match(readme, /natural-language fallback/);
   assert.match(readme, /install --print-skill/);
-});
-
-test("install-skill skips, fails stale, and refreshes with force", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  const skillRoot = join(cwd, "global-skills");
-
-  const first = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
-  assert.equal(first.status, 0, first.stderr);
-
-  const second = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
-  assert.equal(second.status, 0, second.stderr);
-  assert.equal(JSON.parse(second.stdout).skipped.includes(join(skillRoot, "unship", "SKILL.md")), true);
-
-  await writeFixture(join(skillRoot, "unship", "SKILL.md"), "---\nname: unship\n---\nSTALE_MARKER_DO_NOT_KEEP\n");
-
-  const stale = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--json"], { cwd, encoding: "utf8" });
-  assert.equal(stale.status, 1);
-  const staleJson = JSON.parse(stale.stdout);
-  assert.equal(staleJson.ok, false);
-  assert.equal(staleJson.stale.includes(join(skillRoot, "unship", "SKILL.md")), true);
-  assert.match(staleJson.next.join("\n"), /install-skill --force/);
-
-  const forced = spawnSync(process.execPath, [CLI, "install-skill", "--dir", skillRoot, "--force", "--json"], { cwd, encoding: "utf8" });
-  assert.equal(forced.status, 0, forced.stderr);
-  assert.equal(JSON.parse(forced.stdout).written.includes(join(skillRoot, "unship", "SKILL.md")), true);
-  assert.doesNotMatch(await readFile(join(skillRoot, "unship", "SKILL.md"), "utf8"), /STALE_MARKER_DO_NOT_KEEP/);
 });
 
 test("unknown commands fail instead of printing help as success", () => {

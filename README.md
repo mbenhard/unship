@@ -115,16 +115,6 @@ npx @unship/cli@latest init --target <target>
 
 Codex and Antigravity both use `.agents/skills/unship/SKILL.md`.
 
-## Advanced Skill Install
-
-Use the older skill-only installer only when you need to target a specific skills directory yourself:
-
-```bash
-npx @unship/cli@latest install-skill --dir ~/.claude/skills
-```
-
-This does not install slash commands, repair legacy files, or set up a project.
-
 ## Troubleshooting
 
 ### /unship does not appear

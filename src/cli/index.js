@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { getAgentTemplates } from "../agent/index.js";
@@ -54,13 +53,6 @@ try {
     const result = await init({ target: flags.target || "all", force: Boolean(flags.force) });
     print(result, flags.json);
     if (!result.ok) process.exitCode = 1;
-  } else if (command === "install-skill") {
-    const result = await installSkill({
-      dir: flags.dir || join(homedir(), ".agents", "skills"),
-      force: Boolean(flags.force)
-    });
-    print(result, flags.json);
-    if (!result.ok) process.exitCode = 1;
   } else if (command === "snippet") {
     await printSnippet(flags);
   } else if (command === "check") {
@@ -82,7 +74,7 @@ try {
   } else if (command === "help" || command === "--help" || command === "-h") {
     printHelp();
   } else {
-    throw new Error(`Unknown command: ${command}. Use one of: install, uninstall, init, install-skill, setup, snippet, check, doctor.`);
+    throw new Error(`Unknown command: ${command}. Use one of: install, uninstall, init, setup, snippet, check, doctor.`);
   }
 } catch (error) {
   if (flags.json) {
@@ -126,48 +118,6 @@ async function init({ target, force }) {
     skipped,
     stale,
     next: stale.length ? ["Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions."] : []
-  };
-}
-
-async function installSkill({ dir, force }) {
-  const templates = await getAgentTemplates();
-  const destination = join(dir, "unship", "SKILL.md");
-  const written = [];
-  const skipped = [];
-  const stale = [];
-
-  await mkdir(dirname(destination), { recursive: true });
-  try {
-    const existing = await readFile(destination, "utf8");
-    if (existing === templates.skill) {
-      skipped.push(destination);
-    } else if (!force) {
-      stale.push(destination);
-      skipped.push(destination);
-    } else {
-      await writeFile(destination, templates.skill, "utf8");
-      written.push(destination);
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    await writeFile(destination, templates.skill, "utf8");
-    written.push(destination);
-  }
-
-  return {
-    ok: stale.length === 0,
-    kind: "skill-install",
-    destination,
-    written,
-    skipped,
-    stale,
-    next: stale.length
-      ? ["Run npx @unship/cli@latest install-skill --force to refresh the stale global Unship skill."]
-      : [
-          "Restart the agent that loads this skills directory.",
-          "Try: use unship to compare 3 directions for the hero section.",
-          "For slash commands, repair, and project setup, use: npx @unship/cli@latest install."
-        ]
   };
 }
 
@@ -326,8 +276,6 @@ function print(value, json) {
     printCheck(value);
   } else if (value.picker && value.mount) {
     printSetup(value);
-  } else if (value.kind === "skill-install") {
-    printSkillInstall(value);
   } else if (value.packageName) {
     printDoctor(value);
   } else {
@@ -406,18 +354,6 @@ function printInstallResult(result, json) {
   console.log(lines.join("\n"));
 }
 
-function printSkillInstall(value) {
-  const current = value.skipped?.includes(value.destination) && !value.stale?.length;
-  const status = value.stale?.length
-    ? "Unship skill needs refresh."
-    : current
-      ? "Unship skill is already current."
-      : "Unship skill installed.";
-  const lines = [status, `Path: ${value.destination}`];
-  appendNext(lines, value.next);
-  console.log(lines.join("\n"));
-}
-
 function appendNext(lines, next) {
   if (!next?.length) return;
   lines.push("", "Next:");
@@ -472,5 +408,5 @@ function printCheck(result) {
 }
 
 function printHelp() {
-  console.log("Usage: unship install|uninstall|init|install-skill|setup|snippet|check|doctor");
+  console.log("Usage: unship install|install --print-skill|uninstall|init|setup|snippet|check|doctor");
 }
