@@ -18,11 +18,18 @@
   let activeGroupIndex = 0;
   let menuOpen = false;
   let placement = "bottom";
-  let placementLocked = false;
   let rescanQueued = false;
   let renderedSignature = "";
   let lastSwitchDir = null;
-  let menuJustOpened = false;
+  // Minimize, hold-to-keep, drag-snap, and scroll-to-group state. Placement is
+  // bottom-only unless the user drags the dock; there is no label-click
+  // placement toggle and no focus-driven auto-flip.
+  let minimized = false;
+  let copied = false;
+  let copiedTimer = null;
+  let holdTimer = null;
+  let holdFired = false;
+  let anchorH = null;
 
   const api = {
     version: "0.1.2",
@@ -42,7 +49,6 @@
 
   function destroy() {
     observer?.disconnect();
-    document.removeEventListener("focusin", handleDocumentFocus, true);
     document.removeEventListener("keydown", handleGlobalKeydown);
     window.visualViewport?.removeEventListener("resize", syncViewportBounds);
     window.visualViewport?.removeEventListener("scroll", syncViewportBounds);
@@ -161,6 +167,7 @@
     menuOpen = false;
     render();
     announce(groups[activeGroupIndex]);
+    scrollToGroup(groups[activeGroupIndex]);
   }
 
   function pickGroup(index) {
@@ -170,24 +177,43 @@
     const group = groups[activeGroupIndex];
     const dock = root?.querySelector(".dock");
 
-    if (menuOpen && dock) {
-      // Update the visible texts in place, then contract the menu like a
-      // regular close. The hidden menu list goes stale but the next render
-      // (required before the menu can reopen) rebuilds it.
+    const items = dock ? Array.from(dock.querySelectorAll(".menu .menuitem")) : [];
+    const oldItem = dock?.querySelector(".menuitem.current");
+    const newItem = items.find((item) => Number(item.dataset.index) === index);
+
+    if (menuOpen && dock && oldItem && newItem && oldItem !== newItem) {
+      // Swap the two rows' roles in place, then contract. The collapse pushes
+      // the newly current row up into the header position — the reverse of the
+      // open morph. The DOM is updated to exactly match the next render.
       const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
-      const groupBtn = dock.querySelector(".group");
-      groupBtn?.setAttribute("aria-label", `Active group ${group.displayLabel}`);
-      const nameEl = dock.querySelector(".group-name");
-      if (nameEl) nameEl.textContent = group.displayLabel;
-      const countEl = dock.querySelector(".group-count");
-      if (countEl) countEl.textContent = `${group.activeOptionIndex + 1}/${group.options.length}`;
+      const oldIndex = items.indexOf(oldItem);
+      const oldGroup = groups[oldIndex];
+      const oldOption = oldGroup.options[clamp(oldGroup.activeOptionIndex, oldGroup.options.length)];
+
+      oldItem.classList.remove("current");
+      oldItem.removeAttribute("aria-current");
+      oldItem.removeAttribute("aria-haspopup");
+      oldItem.removeAttribute("aria-expanded");
+      oldItem.dataset.action = "pick-group";
+      oldItem.dataset.index = String(oldIndex);
+      oldItem.setAttribute("aria-label", `${oldGroup.displayLabel}, ${oldOption.label}`);
+      oldItem.innerHTML = `<span class="menu-name">${escapeHtml(oldGroup.displayLabel)}</span><span class="menu-option">${escapeHtml(oldOption.label)}</span>`;
+
+      newItem.classList.add("current");
+      newItem.setAttribute("aria-current", "true");
+      newItem.setAttribute("aria-haspopup", "menu");
+      newItem.dataset.action = "toggle-menu";
+      delete newItem.dataset.index;
+      newItem.setAttribute("aria-label", `Active group ${group.displayLabel}`);
+      newItem.innerHTML = `<span class="menu-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group)}`;
+
       const labelMain = dock.querySelector(".label-main");
       if (labelMain) labelMain.textContent = option.label;
       dock
         .querySelector(".label")
         ?.setAttribute(
           "aria-label",
-          `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position`
+          `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move`
         );
       closeMenu();
     } else {
@@ -195,6 +221,24 @@
       render();
     }
     announce(group);
+    scrollToGroup(group);
+  }
+
+  function openMenu() {
+    if (menuOpen) return;
+    menuOpen = true;
+
+    const dock = root?.querySelector(".dock");
+    if (!dock) {
+      render();
+      return;
+    }
+
+    // Class toggle instead of a re-render so the rows transition into place
+    // and the active row is pushed down into its list position by layout.
+    dock.classList.add("open");
+    dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "true");
+    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
   function closeMenu() {
@@ -207,9 +251,8 @@
       return;
     }
 
-    dock.classList.remove("open", "menu-anim");
-    dock.querySelector(".group")?.setAttribute("aria-expanded", "false");
-    dock.querySelector(".menu")?.setAttribute("aria-hidden", "true");
+    dock.classList.remove("open");
+    dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
@@ -217,9 +260,7 @@
     if (!root) return;
 
     const switchDir = lastSwitchDir;
-    const menuAnim = menuJustOpened;
     lastSwitchDir = null;
-    menuJustOpened = false;
 
     const group = groups[activeGroupIndex];
     if (!group) {
@@ -238,15 +279,21 @@
     const entering = renderedSignature === "" || renderedSignature === "none";
     renderedSignature = nextSignature;
 
+    // Minimized form: a small circular button holding the diamond mark.
+    if (minimized) {
+      root.innerHTML = `${style()}<button class="minimized ${placement}" type="button" data-action="restore" aria-label="Restore Unship toolbar — ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}"></button>`;
+      root.append(liveRegion);
+      return;
+    }
+
     const swapClass = switchDir ? " swap" : "";
-    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${menuAnim && menuOpen ? " menu-anim" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
-      ${groups.length > 1 ? groupButton(group, swapClass) : ""}
-      ${groups.length > 1 ? menu() : ""}
+    root.innerHTML = `${style()}<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
+      ${groups.length > 1 ? menu(swapClass) : ""}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
-        <button class="label" type="button" data-action="toggle-placement" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Toggle toolbar position">
-          <span class="label-main${swapClass}">${escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
-          ${groups.length === 1 ? counterMarkup("option-count", group, swapClass) : ""}
+        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move">
+          <span class="label-main${swapClass}">${copied ? "✓ Copied. Paste it to your agent" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
+          ${groups.length === 1 && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
@@ -260,6 +307,8 @@
       menuOpen,
       mode,
       placement,
+      minimized,
+      copied,
       groups: groups.map((group) => {
         const activeOption = group.options[clamp(group.activeOptionIndex, group.options.length)];
         return {
@@ -272,26 +321,27 @@
     });
   }
 
-  function groupButton(group, swapClass = "") {
-    return `<button class="group" type="button" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}">
-      <span class="group-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group, swapClass)}
-    </button>`;
-  }
-
   function counterMarkup(className, group, swapClass = "") {
     return `<span class="${className}"><span class="${className}-current${swapClass}">${group.activeOptionIndex + 1}</span><span class="${className}-slash">/</span><span class="${className}-total">${group.options.length}</span></span>`;
   }
 
-  function menu() {
+  // One list, two roles: the active row doubles as the closed-state header.
+  // Closed, only the active row is visible; opening expands the other rows in
+  // document order around it, so the header visually morphs into its place in
+  // the list (and back on close) purely through layout.
+  function menu(swapClass = "") {
     const items = groups
       .map((group, index) => {
-        if (index === activeGroupIndex) return "";
+        const current = index === activeGroupIndex;
+        if (current) {
+          return `<button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group, swapClass)}</button>`;
+        }
         const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
         return `<button class="menuitem" type="button" role="menuitem" data-action="pick-group" data-index="${index}" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-option">${escapeHtml(option.label)}</span></button>`;
       })
       .join("");
 
-    return `<div class="menu" role="menu" aria-hidden="${!menuOpen}">${items}</div>`;
+    return `<div class="menu" role="menu">${items}</div>`;
   }
 
   function handleToolbarClick(event) {
@@ -302,17 +352,45 @@
     if (action === "previous") switchOption(-1);
     else if (action === "next") switchOption(1);
     else if (action === "toggle-menu") {
-      if (menuOpen) {
-        closeMenu();
+      if (menuOpen) closeMenu();
+      else openMenu();
+    } else if (action === "restore") {
+      const square = root.querySelector(".minimized");
+      if (square && !square.classList.contains("fading")) {
+        square.classList.add("fading");
+        setTimeout(() => {
+          minimized = false;
+          render();
+          // Reverse box morph: snap to the square's geometry with transitions
+          // OFF (preboxed), commit a reflow, then enable transitions and grow
+          // to natural size.
+          const dock = root.querySelector(".dock");
+          if (!dock) return;
+          const width = dock.offsetWidth;
+          const height = dock.offsetHeight;
+          dock.classList.add("preboxed");
+          dock.style.width = "32px";
+          dock.style.height = "32px";
+          dock.style.borderRadius = "16px";
+          dock.style.padding = "0px";
+          void dock.offsetHeight;
+          dock.classList.remove("preboxed");
+          dock.classList.add("boxing", "unboxing");
+          dock.style.width = `${width}px`;
+          dock.style.height = `${height}px`;
+          dock.style.borderRadius = "24px";
+          dock.style.padding = "";
+          setTimeout(() => {
+            dock.classList.remove("boxing", "unboxing");
+            dock.style.width = "";
+            dock.style.height = "";
+            dock.style.borderRadius = "";
+          }, 320);
+        }, 30);
       } else {
-        menuOpen = true;
-        menuJustOpened = true;
+        minimized = false;
         render();
       }
-    } else if (action === "toggle-placement") {
-      placementLocked = true;
-      placement = placement === "top" ? "bottom" : "top";
-      render();
     } else if (action === "pick-group") {
       pickGroup(Number(button.dataset.index));
     }
@@ -384,6 +462,136 @@
     liveRegion.textContent = `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`;
   }
 
+  // Copy a ready-to-paste keep instruction for the agent.
+  function keepCurrent() {
+    const group = groups[activeGroupIndex];
+    if (!group) return;
+    const option = group.options[group.activeOptionIndex];
+    copyText(`Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`);
+    copied = true;
+    render();
+    liveRegion.textContent = "Copied. Paste the keep instruction to your agent";
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copied = false;
+      render();
+    }, 1800);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+      return;
+    }
+    const scratch = document.createElement("textarea");
+    scratch.value = text;
+    document.body.append(scratch);
+    scratch.select();
+    try { document.execCommand("copy"); } catch {}
+    scratch.remove();
+  }
+
+  // Scroll the page to the active group when switching. window.scrollTo (not
+  // scrollIntoView) so an embedded frame never scrolls its parent page; skips
+  // hidden groups (e.g. nested inside an inactive option) and groups that are
+  // already mostly on screen, so nearby groups do not jitter.
+  function scrollToGroup(group) {
+    const element = group?.element;
+    if (!element?.getBoundingClientRect) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const visible = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+    if (visible >= Math.min(rect.height, viewportHeight) * 0.6) return;
+    const top = window.scrollY + rect.top - Math.max(24, (viewportHeight - rect.height) / 2);
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? "auto" : "smooth" });
+  }
+
+  // Double-click the label collapses the dock via a box morph — real
+  // width/height/border-radius animate to the minimized button's exact
+  // geometry, so the corners stay correct throughout.
+  function handleLabelDblclick(event) {
+    if (!event.target.closest?.(".label") || minimized) return;
+    clearTimeout(holdTimer);
+    menuOpen = false;
+
+    const dock = root.querySelector(".dock");
+    if (!dock || dock.classList.contains("boxing")) {
+      minimized = true;
+      render();
+      return;
+    }
+
+    dock.style.width = `${dock.offsetWidth}px`;
+    dock.style.height = `${dock.offsetHeight}px`;
+    void dock.offsetHeight;
+    dock.classList.add("boxing");
+    dock.style.width = "32px";
+    dock.style.height = "32px";
+    dock.style.borderRadius = "16px";
+    dock.style.padding = "0px";
+    setTimeout(() => {
+      minimized = true;
+      render();
+    }, 300);
+  }
+
+  // One pointer gesture on the label, three outcomes that cannot overlap:
+  // hold still 600ms = keep; move 6px first = drag-snap (cancels the hold);
+  // release early = nothing (leaves double-click free for minimize).
+  function handleLabelPointerDown(event) {
+    const label = event.target.closest?.(".label");
+    if (!label) return;
+    const dock = root.querySelector(".dock");
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+    holdFired = false;
+
+    label.classList.add("holding");
+    holdTimer = setTimeout(() => {
+      if (dragging) return;
+      holdFired = true;
+      root.querySelector(".label")?.classList.remove("holding");
+      keepCurrent();
+    }, 600);
+
+    const move = (e) => {
+      if (holdFired) return;
+      if (!dragging) {
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) return;
+        dragging = true;
+        clearTimeout(holdTimer);
+        label.classList.remove("holding");
+        dock?.classList.add("dragging");
+      }
+      host.style.setProperty("--unship-left", `${e.clientX}px`);
+      if (placement === "top") host.style.setProperty("--unship-top", `${Math.max(8, e.clientY - (dock?.offsetHeight || 40) / 2)}px`);
+      else host.style.setProperty("--unship-bottom", `${Math.max(8, window.innerHeight - e.clientY - (dock?.offsetHeight || 40) / 2)}px`);
+    };
+
+    const up = (e) => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      clearTimeout(holdTimer);
+      root.querySelector(".label")?.classList.remove("holding");
+      if (!dragging) return;
+
+      dock?.classList.remove("dragging");
+      anchorH = e.clientX < window.innerWidth / 3 ? "left" : e.clientX > (window.innerWidth * 2) / 3 ? "right" : "center";
+      placement = e.clientY < window.innerHeight / 2 ? "top" : "bottom";
+      dock?.classList.add("snapping");
+      dock?.classList.toggle("top", placement === "top");
+      dock?.classList.toggle("bottom", placement !== "top");
+      syncViewportBounds();
+      setTimeout(() => root.querySelector(".dock")?.classList.remove("snapping"), 260);
+    };
+
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }
+
   function queueRescan() {
     if (rescanQueued) return;
     rescanQueued = true;
@@ -414,21 +622,6 @@
     });
   }
 
-  function handleDocumentFocus(event) {
-    placeAwayFrom(event.target);
-  }
-
-  function placeAwayFrom(target) {
-    if (!target || host?.contains(target)) return;
-    if (placementLocked) return;
-
-    const viewportHeight = window.visualViewport?.height || window.innerHeight;
-    const rect = target.getBoundingClientRect?.();
-    placement = rect && rect.bottom > viewportHeight - 96 ? "top" : "bottom";
-    root?.querySelector(".dock")?.classList.toggle("top", placement === "top");
-    root?.querySelector(".dock")?.classList.toggle("bottom", placement !== "top");
-  }
-
   function syncViewportBounds() {
     if (!host) return;
 
@@ -437,7 +630,12 @@
       (width) => Number.isFinite(width) && width > 0
     );
     const width = Math.min(...widths);
-    const center = (visualViewport?.offsetLeft || 0) + width / 2;
+    const offsetLeft = visualViewport?.offsetLeft || 0;
+    const dockWidth = root?.querySelector(".dock")?.offsetWidth || 328;
+    const center =
+      anchorH === "left" ? offsetLeft + 10 + dockWidth / 2 :
+      anchorH === "right" ? offsetLeft + width - 10 - dockWidth / 2 :
+      offsetLeft + width / 2;
     const visibleBottom = visualViewport
       ? Math.max(14, window.innerHeight - visualViewport.height - visualViewport.offsetTop + 14)
       : 14;
@@ -495,18 +693,18 @@
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
       button:focus-visible{outline:0;background:rgba(255,255,255,.12)}
-      .group{display:flex;align-items:center;gap:.65em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);margin-bottom:var(--gap);transition:background .18s ease,color .18s ease}
-      .group:hover{background:rgba(255,255,255,.12)}
-      .open .group{background:#f5f5f5;color:#000}
-      .open .group .group-count{opacity:.55}
-      .group-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
       .group-count,.option-count{display:inline-flex;align-items:baseline}
       .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
-      .menu{display:grid;gap:var(--gap);overflow:hidden;max-height:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),opacity .16s ease,visibility 0s linear var(--dur)}
-      .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;opacity:1;visibility:visible;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
-      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;transition:background .12s ease}
+      .menu{display:block;margin-bottom:var(--gap)}
+      .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:max-height var(--dur) var(--ease),min-height var(--dur) var(--ease),margin var(--dur) var(--ease),opacity .2s ease .07s,background .15s ease,color .15s ease}
+      .menuitem:first-child{margin-top:0}
       .menuitem:hover{background:rgba(255,255,255,.12)}
+      .dock:not(.open) .menuitem:not(.current){max-height:0;min-height:0;margin-top:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),min-height var(--dur) var(--ease),margin var(--dur) var(--ease),opacity .15s ease,visibility 0s linear var(--dur),background .15s ease,color .15s ease}
+      .dock:not(.open) .menuitem.current{margin-top:0}
+      .open .menuitem.current{background:#f5f5f5;color:#000}
+      .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
@@ -517,24 +715,32 @@
       .next::before{transform:rotate(45deg) translate(-1px,1px)}
       .nav:hover{background:rgba(255,255,255,.12)}
       .nav:active{transform:scale(.9)}
-      .label{flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease}
+      .label{position:relative;flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease;touch-action:none}
+      .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill .6s linear .12s forwards}
+      @keyframes holdFill{to{transform:none}}
+      .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease)}
+      .boxing .menu,.boxing .row{opacity:0;transition:opacity .12s ease}
+      .boxing.unboxing .menu,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
+      .dock.preboxed{overflow:hidden;transition:none}
+      .preboxed .menu,.preboxed .row{opacity:0;transition:none}
+      .minimized{position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;width:32px;height:32px;padding:0;border-radius:50%;background:#000;cursor:pointer;display:grid;place-items:center;transition:transform .16s var(--ease),opacity .14s ease;animation:miniIn .14s cubic-bezier(0,0,.2,1)}
+      @keyframes miniIn{from{transform:translateX(-50%) scale(1.06)}to{transform:translateX(-50%)}}
+      .minimized::before{content:"";width:6px;height:6px;border:1.5px solid #fff;transform:rotate(45deg)}
+      .minimized.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
+      .minimized:hover{transform:translateX(-50%) scale(1.12)}
+      .minimized.fading{opacity:0;transition:none;pointer-events:none}
+      .dock.dragging{transition:none;cursor:grabbing}
+      .dock.dragging .label{cursor:grabbing}
+      .dock.snapping{transition:left .22s var(--ease),bottom .22s var(--ease),top .22s var(--ease)}
       .label:hover,.label:focus,.label:focus-visible{background:transparent;box-shadow:none}
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-      @keyframes dockIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) translateY(10px)}60%{opacity:1}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes menuIn{from{max-height:0}to{max-height:min(264px,calc(100vh - 168px))}}
-      @keyframes itemIn{from{opacity:0}}
-      @keyframes groupIn{from{background:rgba(255,255,255,.12);color:#fff}}
+      @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
+      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
       @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
       .dock.top.enter{animation-name:dockInTop}
-      .menu-anim .menu{animation:menuIn var(--dur) var(--ease)}
-      .menu-anim .group{animation:groupIn var(--dur) var(--ease)}
-      .menu-anim .menuitem{animation:itemIn .24s ease .22s backwards}
-      .menu-anim .menuitem:nth-child(2){animation-delay:.26s}
-      .menu-anim .menuitem:nth-child(n+3){animation-delay:.3s}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
       .dock[data-dir="next"] .group-count-current,.dock[data-dir="next"] .option-count-current{--dx:0px;--dy:8px}
@@ -559,6 +765,8 @@
     root.addEventListener("click", handleToolbarClick);
     root.addEventListener("mousedown", handleToolbarMouseDown);
     root.addEventListener("keydown", handleToolbarKeydown);
+    root.addEventListener("dblclick", handleLabelDblclick);
+    root.addEventListener("pointerdown", handleLabelPointerDown);
 
     liveRegion = document.createElement("div");
     liveRegion.setAttribute("aria-live", "polite");
@@ -567,7 +775,6 @@
     rescan();
     observer = new MutationObserver(queueRescan);
     observeDocument();
-    document.addEventListener("focusin", handleDocumentFocus, true);
     if (useGlobalShortcuts) document.addEventListener("keydown", handleGlobalKeydown);
   }
 
