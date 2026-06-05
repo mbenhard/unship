@@ -188,14 +188,14 @@ test("picker group button opens a menu for choosing groups", async () => {
     <script>${await readFile(PICKER, "utf8")}</script>
   `);
 
-  await page.getByRole("button", { name: /Active group Hero/ }).click();
-  assert.equal(await page.getByRole("menuitem", { name: /Pricing, Simple/ }).isVisible(), true);
+  await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
+  await page.getByRole("menuitem", { name: /Pricing, Simple/ }).waitFor({ state: "visible" });
   await page.getByRole("menuitem", { name: /Pricing, Simple/ }).click();
   assert.equal((await page.evaluate(() => window.__unshipPicker.getState())).activeGroupIndex, 1);
   await browser.close();
 });
 
-test("picker group menu omits the active group and shows current option summaries", async () => {
+test("picker group menu lists all groups in page order with the active group marked", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -215,11 +215,18 @@ test("picker group menu omits the active group and shows current option summarie
       <script>${await readFile(PICKER, "utf8")}</script>
     `);
 
-    await page.getByRole("button", { name: /Active group Hero/ }).click();
-    const menuText = await page.locator("[data-unship-toolbar]").evaluate((host) =>
-      Array.from(host.shadowRoot.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent.trim())
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
+    const menu = await page.locator("[data-unship-toolbar]").evaluate((host) =>
+      Array.from(host.shadowRoot.querySelectorAll('[role="menuitem"]')).map((item) => ({
+        text: item.textContent.trim(),
+        current: item.getAttribute("aria-current") === "true"
+      }))
     );
-    assert.deepEqual(menuText, ["PricingSimple", "FooterShort"]);
+    assert.deepEqual(menu, [
+      { text: "Hero1/2", current: true },
+      { text: "PricingSimple", current: false },
+      { text: "FooterShort", current: false }
+    ]);
   } finally {
     await browser.close();
   }
@@ -265,7 +272,7 @@ test("picker falls back to toolbar label when incoming option is not focusable",
   await browser.close();
 });
 
-test("picker moves to top when bottom-focused host controls would be obscured", async () => {
+test("picker stays at the bottom when host controls take focus", async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
   await page.setContent(`
@@ -275,8 +282,10 @@ test("picker moves to top when bottom-focused host controls would be obscured", 
   `);
 
   await page.locator("#bottom").focus();
+  await page.waitForTimeout(50);
   const dockClass = await page.locator("[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".dock").className);
-  assert.match(dockClass, /top/);
+  assert.match(dockClass, /bottom/);
+  assert.doesNotMatch(dockClass, /top/);
   await browser.close();
 });
 

@@ -24,6 +24,9 @@ test("toolbar uses comfortable circular option controls", async () => {
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+    await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+      Promise.all(host.shadowRoot.querySelector(".dock").getAnimations({ subtree: true }).map((animation) => animation.finished))
+    );
     const metrics = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
       const dock = host.shadowRoot.querySelector(".dock");
       const button = host.shadowRoot.querySelector(".prev");
@@ -151,7 +154,7 @@ test("toolbar does not outline or ring the active variant title after switching"
     assert.equal(styles.outlineWidth, "0px");
     assert.equal(styles.boxShadow, "none");
 
-    await page.getByRole("button", { name: /toggle toolbar position/i }).hover();
+    await page.getByRole("button", { name: /hold to keep this option/i }).hover();
     const hoverStyles = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
       const style = getComputedStyle(host.shadowRoot.querySelector(".label"));
       return {
@@ -166,23 +169,33 @@ test("toolbar does not outline or ring the active variant title after switching"
   }
 });
 
-test("toolbar label toggles manual top and bottom placement", async () => {
+test("toolbar placement changes only by dragging the label", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
 
-    await page.getByRole("button", { name: /toggle toolbar position/i }).click();
-    assert.equal(
-      await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".dock").classList.contains("top")),
-      true
-    );
-
-    await page.getByRole("button", { name: /toggle toolbar position/i }).click();
+    await page.getByRole("button", { name: /hold to keep this option/i }).click();
     assert.equal(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".dock").classList.contains("bottom")),
       true
     );
+
+    const label = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(label.x, label.y);
+    await page.mouse.down();
+    await page.mouse.move(700, 80, { steps: 8 });
+    await page.mouse.up();
+
+    const placement = await page.locator("css=[data-unship-toolbar]").evaluate((host) => ({
+      top: host.shadowRoot.querySelector(".dock").classList.contains("top"),
+      left: Number.parseFloat(host.style.getPropertyValue("--unship-left"))
+    }));
+    assert.equal(placement.top, true);
+    assert.equal(placement.left > (800 * 2) / 3, true);
   } finally {
     await browser.close();
   }
