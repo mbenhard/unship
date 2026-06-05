@@ -1,8 +1,5 @@
 .DS_Store
 .unship/
-/.superpowers/
-/AGENTS.md
-/CLAUDE.md
 docs/
 e2e/artifacts/
 explorations/
