@@ -25,8 +25,8 @@ test("double-clicking the label minimizes the dock to a circular button and clic
       const box = element.getBoundingClientRect();
       return { width: box.width, height: box.height, radius: getComputedStyle(element).borderTopLeftRadius };
     });
-    assert.equal(button.width, 32);
-    assert.equal(button.height, 32);
+    assert.equal(button.width, 28);
+    assert.equal(button.height, 28);
     assert.equal(button.radius, "50%");
 
     await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".minimized").click());
@@ -65,7 +65,7 @@ test("holding the label copies a keep instruction for the agent", async () => {
     ]);
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      /Copied\. Paste it to your agent/
+      /✓ Copied/
     );
   } finally {
     await browser.close();
@@ -117,7 +117,7 @@ test("Enter on the label copies the keep instruction and Shift+Enter minimizes",
     await page.waitForFunction(() => window.__copied.length === 1);
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      /Copied\. Paste it to your agent/
+      /✓ Copied/
     );
 
     await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label").focus());
@@ -236,7 +236,7 @@ test("a minimized edge snap keeps hugging the edge across viewport syncs", async
     const left = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
       Number.parseFloat(host.style.getPropertyValue("--unship-left"))
     );
-    // 800 - 10 gutter - half the 32px button = 774; the unfixed code anchored
+    // 800 - 10 gutter - half the 28px button = 776; the unfixed code anchored
     // on a phantom 328px dock and pushed the button to 626.
     assert.equal(left > 700, true, `minimized right snap should hug the edge, got ${left}`);
   } finally {

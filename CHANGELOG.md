@@ -4,6 +4,11 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+- Fix hold-to-keep firing before the hold fill finished: the copy now commits exactly when the fill animation completes (720ms), instead of at 600ms with the fill ~80% across.
+- Remove the divider line above the option row in the open group menu; the row now sits at the same gap as the menu items instead of behind a line plus extra padding.
+- Shorten the copied confirmation to "✓ Copied"; the screen-reader announcement keeps the full paste instruction.
+- Shrink the minimized toolbar button from 32px to 28px and fix its hover scale-up, which snapped instead of animating because the transition referenced an easing variable that only exists on the dock.
+
 ## 0.1.3 - 2026-06-05
 
 - Make project setup framework-agnostic: `setup --json` now returns an inline dev-only picker snippet instead of detecting frameworks and patching app files.

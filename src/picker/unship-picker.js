@@ -3,6 +3,14 @@
 
   const OPTION_ATTR = "data-unship-option";
   const GROUP_SELECTOR = "[data-unship-pick]";
+  // Hold-to-keep timing: the commit timer equals the fill animation's delay
+  // plus duration, so the pill is fully filled exactly when the copy fires.
+  const HOLD_FILL_DELAY_MS = 120;
+  const HOLD_FILL_MS = 600;
+  const HOLD_COMMIT_MS = HOLD_FILL_DELAY_MS + HOLD_FILL_MS;
+  // Minimized button diameter; the box morph animates the dock to and from
+  // this exact geometry, so it must stay in sync with the .minimized CSS.
+  const MINI_SIZE_PX = 28;
   const currentScript = document.currentScript;
   const persistLocal = currentScript?.getAttribute("data-unship-persist") === "local";
   const useGlobalShortcuts = currentScript?.hasAttribute("data-unship-global-shortcuts");
@@ -295,7 +303,7 @@
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize">
-          <span class="label-main${swapClass}">${copied === "ok" ? "✓ Copied. Paste it to your agent" : copied === "fail" ? "Couldn't copy. Try again" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
+          <span class="label-main${swapClass}">${copied === "ok" ? "✓ Copied" : copied === "fail" ? "Couldn't copy. Try again" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
           ${groups.length === 1 && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
@@ -372,9 +380,9 @@
           const width = dock.offsetWidth;
           const height = dock.offsetHeight;
           dock.classList.add("preboxed");
-          dock.style.width = "32px";
-          dock.style.height = "32px";
-          dock.style.borderRadius = "16px";
+          dock.style.width = `${MINI_SIZE_PX}px`;
+          dock.style.height = `${MINI_SIZE_PX}px`;
+          dock.style.borderRadius = `${MINI_SIZE_PX / 2}px`;
           dock.style.padding = "0px";
           void dock.offsetHeight;
           dock.classList.remove("preboxed");
@@ -543,9 +551,9 @@
     dock.style.height = `${dock.offsetHeight}px`;
     void dock.offsetHeight;
     dock.classList.add("boxing");
-    dock.style.width = "32px";
-    dock.style.height = "32px";
-    dock.style.borderRadius = "16px";
+    dock.style.width = `${MINI_SIZE_PX}px`;
+    dock.style.height = `${MINI_SIZE_PX}px`;
+    dock.style.borderRadius = `${MINI_SIZE_PX / 2}px`;
     dock.style.padding = "0px";
     setTimeout(() => {
       minimized = true;
@@ -554,8 +562,9 @@
   }
 
   // One pointer gesture on the label, three outcomes that cannot overlap:
-  // hold still 600ms = keep; move 6px first = drag-snap (cancels the hold);
-  // release early = nothing (leaves double-click free for minimize).
+  // hold still until the fill completes = keep; move 6px first = drag-snap
+  // (cancels the hold); release early = nothing (leaves double-click free
+  // for minimize).
   function handleLabelPointerDown(event) {
     const label = event.target.closest?.(".label");
     if (event.button !== 0 || event.ctrlKey) return;
@@ -573,7 +582,7 @@
       holdFired = true;
       root.querySelector(".label")?.classList.remove("holding");
       keepCurrent();
-    }, 600);
+    }, HOLD_COMMIT_MS);
 
     const cleanup = () => {
       document.removeEventListener("pointermove", move);
@@ -748,8 +757,8 @@
       .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
-      .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease),padding-top var(--dur) var(--ease)}
-      .open .row{margin-top:var(--gap);padding-top:var(--gap);border-top:1px solid rgba(255,255,255,.15)}
+      .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
+      .open .row{margin-top:var(--gap)}
       .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
@@ -757,14 +766,14 @@
       .nav:hover{background:rgba(255,255,255,.12)}
       .nav:active{transform:scale(.9)}
       .label{position:relative;flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease;touch-action:none}
-      .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill .6s linear .12s forwards}
+      .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       @keyframes holdFill{to{transform:none}}
       .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease)}
       .boxing .menu,.boxing .row{opacity:0;transition:opacity .12s ease}
       .boxing.unboxing .menu,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
       .dock.preboxed{overflow:hidden;transition:none}
       .preboxed .menu,.preboxed .row{opacity:0;transition:none}
-      .minimized{position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;width:32px;height:32px;padding:0;border-radius:50%;background:#000;cursor:pointer;display:grid;place-items:center;transition:transform .16s var(--ease),opacity .14s ease;animation:miniIn .14s cubic-bezier(0,0,.2,1)}
+      .minimized{position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;width:${MINI_SIZE_PX}px;height:${MINI_SIZE_PX}px;padding:0;border-radius:50%;background:#000;cursor:pointer;display:grid;place-items:center;transition:transform .2s cubic-bezier(.32,.72,0,1),opacity .14s ease;animation:miniIn .14s cubic-bezier(0,0,.2,1)}
       @keyframes miniIn{from{transform:translateX(-50%) scale(1.06)}to{transform:translateX(-50%)}}
       .minimized::before{content:"";width:6px;height:6px;border:1.5px solid #fff;transform:rotate(45deg)}
       .minimized.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
