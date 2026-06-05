@@ -117,7 +117,7 @@ try {
   await page.getByRole("button", { name: /next option/i }).click();
   await assertVisibleOption(page, "Hero", "Compact Story With A Long Variant Name");
 
-  await page.getByRole("button", { name: /active group hero/i }).click();
+  await page.getByRole("menuitem", { name: /active group hero/i }).click();
   await screenshot(page, "desktop-menu-open");
   await assertToolbarQuality(page, { viewportWidth: 1280, viewportHeight: 800, menuOpen: true });
 
@@ -137,6 +137,16 @@ try {
 
   await page.locator(".bottom-field").focus();
   await page.waitForTimeout(30);
+  await assert.equal(await dockPlacement(page), "bottom");
+
+  const labelPoint = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+    const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  });
+  await page.mouse.move(labelPoint.x, labelPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(640, 60, { steps: 8 });
+  await page.mouse.up();
   await assert.equal(await dockPlacement(page), "top");
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
@@ -144,7 +154,7 @@ try {
   await waitForToolbar(mobile);
   await screenshot(mobile, "mobile-initial");
   await assertToolbarQuality(mobile, { viewportWidth: 390, viewportHeight: 844 });
-  await mobile.getByRole("button", { name: /active group hero/i }).click();
+  await mobile.getByRole("menuitem", { name: /active group hero/i }).click();
   await screenshot(mobile, "mobile-menu-open");
   await assertToolbarQuality(mobile, { viewportWidth: 390, viewportHeight: 844, menuOpen: true });
   await mobile.close();
@@ -163,14 +173,29 @@ async function screenshot(page, name) {
 
 async function waitForToolbar(page) {
   await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot?.querySelector(".dock"));
+  await settleToolbar(page);
+}
+
+async function settleToolbar(page) {
+  await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+    Promise.all(
+      host.shadowRoot
+        .querySelector(".dock")
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => {}))
+    )
+  );
 }
 
 async function assertToolbarQuality(page, { viewportWidth, viewportHeight, menuOpen = false }) {
+  await settleToolbar(page);
   const metrics = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
     const root = host.shadowRoot;
     const dock = root.querySelector(".dock");
     const box = dock.getBoundingClientRect();
-    const parts = Array.from(root.querySelectorAll("button")).map((button) => {
+    // Collapsed menu rows stay in the DOM at zero height while the menu is
+    // closed; only visible controls are held to the comfort targets.
+    const parts = Array.from(root.querySelectorAll("button")).filter((button) => button.getBoundingClientRect().height > 0).map((button) => {
       const rect = button.getBoundingClientRect();
       return {
         className: button.className,
