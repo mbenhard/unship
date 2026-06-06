@@ -437,11 +437,12 @@ test("README documents local trust and unship troubleshooting", async () => {
   assert.match(readme, /Unship is local comparison tooling/i);
   assert.match(readme, /does not send telemetry/i);
   assert.match(readme, /picker selection does not save source/i);
-  assert.match(readme, /\/unship does not appear/i);
-  assert.match(readme, /Restart the agent after running `install`/);
+  assert.match(readme, /unship\.dev/i);
+  assert.match(readme, /`\/unship` does not appear/i);
+  assert.match(readme, /restart your agent/i);
   assert.match(readme, /doctor --json/);
   assert.match(readme, /install --repair/);
-  assert.match(readme, /natural-language fallback/);
+  assert.match(readme, /Natural language still works/i);
   assert.match(readme, /install --print-skill/);
 });
 

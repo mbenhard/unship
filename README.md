@@ -1,16 +1,16 @@
-![Unship — iterate with your agent in the app, not in chat](https://raw.githubusercontent.com/mbenhard/unship/main/.github/assets/cover.png)
+![Unship - iterate with your agent in the app, not in chat](https://raw.githubusercontent.com/mbenhard/unship/main/.github/assets/cover.png)
 
 # Unship
 
 Iterate with your agent in the app, not in chat.
 
-Unship lets your agent create temporary options for UI details, copy, product states, flows, design-system treatments, rendered docs, CLI output, or any local surface it can render in source. Compare them in your running app with a tiny local picker, choose the winner in chat, and have the agent clean up the rest before shipping.
+[unship.dev](https://unship.dev)
 
-> Status: early beta. Unship is local-first prototyping tooling, not production experiment infrastructure.
+Unship gives your coding agent a tiny local picker for comparing alternatives in your real app. The agent adds temporary options in source, you switch between them in the browser, and after you choose a winner the agent removes the rest.
 
-Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The alternatives are temporary source-level choices that should be settled or removed before release.
+> Early beta. Unship is local comparison tooling, not production experiment infrastructure.
 
-Trying Unship in a real project? Feedback is welcome, especially if the agent got confused. Open an issue for [agent trouble](https://github.com/mbenhard/unship/issues/new?template=01-agent-trouble.yml), a [picker bug](https://github.com/mbenhard/unship/issues/new?template=02-picker-bug.yml), [docs confusion](https://github.com/mbenhard/unship/issues/new?template=03-docs-confusing.yml), or a focused [feature idea](https://github.com/mbenhard/unship/issues/new?template=04-feature-idea.yml).
+Unship does not send telemetry. No remote service. No session store. Picker selection does not save source, write files, or make product decisions. You choose by naming a visible option label in chat.
 
 ## Install
 
@@ -18,179 +18,134 @@ Trying Unship in a real project? Feedback is welcome, especially if the agent go
 npx @unship/cli@latest install
 ```
 
+Want your agent to handle setup safely? Copy this:
+
+```txt
+Set up Unship for this repo. Run `npx @unship/cli@latest install --dry-run`, explain what it detected and which files it would write, then ask me before running the install. If I approve, run `npx @unship/cli@latest install --yes`.
+```
+
 Restart your agent, then ask naturally:
 
 ```txt
 use unship to compare 4 hero directions
-use unship to explore empty, loading, and error states for the import flow
-use unship to compare 3 button system treatments
-use unship to render 3 CLI help output directions
+use unship to explore loading, empty, and error states for import
+use unship to compare 3 pricing page CTA treatments
 ```
 
 Where supported, `/unship` works too:
 
 ```txt
-/unship compare 3 pricing page directions
+/unship compare 3 hero directions
 ```
 
-`install` detects known coding harnesses, installs the Unship skill, adds slash-command shims where supported, and can be re-run later to repair or refresh setup.
-
-For unsupported harnesses:
+For unsupported agents:
 
 ```bash
 npx @unship/cli@latest install --print-skill
 ```
 
-Put the printed `SKILL.md` in the place your agent loads skills from.
+Put the printed `SKILL.md` wherever your agent loads skills.
 
 ## How It Works
 
-The agent creates temporary choices in normal source:
+1. Ask your agent for alternatives.
+2. The agent adds temporary `data-unship-*` options in source.
+3. You compare them in your local preview with the picker.
+4. You tell the agent which visible label to keep.
+5. The agent removes losing options and runs `unship check` before shipping.
 
 ```html
 <section data-unship-pick="Hero">
-  <div data-unship-option="Current">...</div>
-  <div data-unship-option="Proof-led" hidden>...</div>
+  <div data-unship-option="Current">
+    ...
+  </div>
+
+  <div data-unship-option="Proof-led" hidden>
+    ...
+  </div>
+
+  <div data-unship-option="Direct" hidden>
+    ...
+  </div>
 </section>
 ```
 
-The picker switches direct child options in the DOM. There is no bridge, session store, reload loop, source swapper, or production dependency by default.
+The picker switches direct child options. It does not reload the app, swap source, save state, or add a production dependency by default.
 
-The usual loop:
+## Good For
 
-1. Ask for alternatives.
-2. Compare them in your running local preview.
-3. Tell the agent which visible option label to keep; the installed skill tells it to settle that group by removing the losing options and temporary `data-unship-*` attributes from the kept source.
-4. Before shipping, have the agent run `unship check` to verify no temporary Unship artifacts remain.
+- UI section variants
+- copy and CTA directions
+- loading, empty, error, and success states
+- small flow previews
+- design-system treatment comparisons
+- rendered docs or CLI output previews
 
-## Agent Project Commands
+Unship works best when the options can live safely in one local rendered surface.
 
-The installed skill can run these commands while working in an app repo. You can run them yourself, but the intended loop is agent-owned.
+## Not For
 
-Check the current project:
+- production experiments
+- analytics-backed A/B tests
+- persistent user sessions
+- backend side effects
+- auth or payment flows
+- global scripts, duplicate active IDs, focus traps, or destructive controls
+
+If a comparison is too risky to inline, ask the agent to make a smaller preview surface.
+
+## Commands
+
+Most users only need `install`, then natural-language prompts.
 
 ```bash
-npx -y @unship/cli@latest doctor --json
-```
-
-Ask Unship for a dev-only picker mount when an app shell exists:
-
-```bash
+npx @unship/cli@latest install
+npx @unship/cli@latest doctor --json
 npx @unship/cli@latest setup --json
-```
-
-`setup` is framework-agnostic. It returns an inline picker snippet and instructions; your agent should add that snippet to the smallest local/dev-only app shell that renders the temporary choices.
-
-Print the picker snippet directly:
-
-```bash
-npx @unship/cli@latest snippet --inline
-```
-
-Check for leftover preview artifacts:
-
-```bash
 npx @unship/cli@latest check --json
 ```
 
-`check` is read-only. The agent still edits source to keep a winner or remove temporary work.
+`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release.
 
-## Limits
+The npm package is `@unship/cli`. The binary is `unship`, so local installs can run:
 
-Unship works best when the alternatives can coexist in one rendered local surface.
+```bash
+./node_modules/.bin/unship check --json
+```
 
-More complex screens and flows are possible, but the agent has to shape them into something DOM-local: a comparison route, a flow mock, a step preview, or a source-contained version of the screen. If the alternatives require separate routes, real navigation state, backend side effects, auth changes, analytics, or long-lived sessions, Unship can still help sketch them, but it is not orchestrating that flow for you.
-
-Raw Markdown is not directly comparable by the picker. For README, docs, CLI, or DX alternatives, the agent should render a temporary local preview surface first, then remove that preview work before shipping.
-
-Avoid inline Unship options around duplicate active IDs, submit controls, global scripts, autoplay media, focus traps, destructive side effects, or stateful providers. In those cases, compare a safer shell or smaller slice.
-
-## Repo-Local Instructions
-
-Commit the Unship skill into a project only when your team wants repo-local agent instructions:
+If your team wants repo-local agent instructions:
 
 ```bash
 npx @unship/cli@latest init
 ```
 
-Harness-specific targets are `codex`, `antigravity`, `claude`, `opencode`, and `all`:
-
-```bash
-npx @unship/cli@latest init --target <target>
-```
-
-Codex and Antigravity both use `.agents/skills/unship/SKILL.md`.
+Targets: `codex`, `antigravity`, `claude`, `opencode`, or `all`.
 
 ## Troubleshooting
 
-### /unship does not appear
+If `/unship` does not appear, restart your agent. Most agents load skills and slash commands at startup.
 
-Restart the agent after running `install`; most harnesses load skills and slash commands only at startup.
-
-Then check the project state:
+Then check setup:
 
 ```bash
 npx @unship/cli@latest doctor --json
 ```
 
-If installed Unship files are stale or legacy files are detected, refresh managed files:
+If installed files are stale:
 
 ```bash
 npx @unship/cli@latest install --repair
 ```
 
-If the slash command still is not available, use the natural-language fallback:
+Natural language still works even when the slash command is unavailable:
 
 ```txt
 use unship to compare 3 directions for the hero section
 ```
 
-For unsupported harnesses, print the portable skill and place it where your agent loads skills:
+## Feedback
 
-```bash
-npx @unship/cli@latest install --print-skill
-```
-
-## Agent Behavior
-
-The installed skill teaches agents to:
-
-- inspect the named route, component, or source area first;
-- create the smallest source-level comparison that lets you judge the options;
-- run comparison-readiness checks before handoff, including option labels, direct-child structure, and hidden-option visibility;
-- keep verification proportional: full typecheck, build, browser smoke, `unship check`, and cleanup verification belong to setup changes, selected-option cleanup, or final shipping cleanup;
-- reuse existing dev-only picker setup instead of reinstalling or repairing it during ordinary variant creation;
-- mount the picker in the smallest valid dev-only app shell and avoid invalid framework script-helper placement;
-- avoid opening or automating a browser by default;
-- treat detected preview servers as hints, not proof targets;
-- summarize existing Unship explorations from `doctor` and `check`;
-- distinguish settling one selected group from final cleanup;
-- keep all Unship artifacts local and temporary.
-
-Natural prompts should work:
-
-```txt
-use unship to generate 4 variants for hero section
-generate 3 copywriting variants for the pricing section with unship
-generate 4 variants of the CTA row in the onboarding section with unship
-```
-
-## Package And Binary
-
-The npm package is `@unship/cli`. The installed executable is still `unship`, so local project installs can use:
-
-```bash
-./node_modules/.bin/unship doctor --json
-```
-
-## What Unship Is Not
-
-- No bridge.
-- No session store.
-- No source swapping during preview.
-- No reload loop.
-- No confirm button.
-- No production dependency by default.
+Trying Unship in a real project? Feedback is welcome, especially if the agent got confused. Open an issue for [agent trouble](https://github.com/mbenhard/unship/issues/new?template=01-agent-trouble.yml), a [picker bug](https://github.com/mbenhard/unship/issues/new?template=02-picker-bug.yml), [docs confusion](https://github.com/mbenhard/unship/issues/new?template=03-docs-confusing.yml), or a focused [feature idea](https://github.com/mbenhard/unship/issues/new?template=04-feature-idea.yml).
 
 ## Development
 
