@@ -61,6 +61,11 @@ function nextPatchVersion(version) {
 test("help lists seamless install commands", () => {
   const result = spawnSync(process.execPath, [CLI, "help"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Iterate with your agent in the app/);
+  assert.match(result.stdout, /Workflow:/);
+  assert.match(result.stdout, /Ask your agent for design or content options/);
+  assert.match(result.stdout, /Your agent cleans up unused variants before shipping/);
+  assert.match(result.stdout, /check verifies that no Unship preview artifacts remain/);
   assert.match(result.stdout, /install/);
   assert.match(result.stdout, /uninstall/);
   assert.match(result.stdout, /install --print-skill/);
@@ -140,6 +145,8 @@ test("install plain output groups next actions once", async () => {
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Unship install complete/);
+  assert.match(result.stdout, /ask your agent for options/);
+  assert.match(result.stdout, /have the agent run npx @unship\/cli@latest check --json/);
   assert.match(result.stdout, /Next:\n- Restart/);
   assert.match(result.stdout, /If \/unship is unavailable after restart/);
   assert.match(result.stdout, /natural-language fallback/);
@@ -242,6 +249,7 @@ test("uninstall dry-run plain output names uninstall", async () => {
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Unship uninstall dry run/);
+  assert.match(result.stdout, /No files were changed/);
   assert.doesNotMatch(result.stdout, /Unship install dry run/);
 });
 
@@ -536,6 +544,18 @@ test("check command plain output includes cleanup summary before diagnostics", a
   assert.match(result.stdout, /Remove temporary Unship picker markup/);
 });
 
+test("check command plain output makes clean status explicit", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, "src", "App.jsx"), "<main>Clean</main>\n");
+
+  const result = spawnSync(process.execPath, [CLI, "check"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^Unship check passed\./);
+  assert.match(result.stdout, /No Unship preview artifacts found\./);
+  assert.match(result.stdout, /No data-unship markers, picker references, or Unship comments were detected\./);
+});
+
 test("check json includes structured exploration summaries", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   await writeFixture(
@@ -578,6 +598,8 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.equal(json.ok, true);
   assert.equal(json.packageName, "@unship/cli");
   assert.match(json.reminder, /local comparison tooling/);
+  assert.match(json.reminder, /Have the agent remove unused variants/);
+  assert.match(json.reminder, /run unship check before shipping/);
   assert.equal(json.project.framework, "universal");
   assert.equal(json.project.skillInstalled, true);
   assert.equal(json.project.skillCurrent, false);

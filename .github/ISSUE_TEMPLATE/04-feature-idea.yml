@@ -1,0 +1,34 @@
+name: Feature idea
+description: Suggest a focused improvement to the agent workflow, CLI, scanner, or picker.
+title: "Idea: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the workflow pain before proposing the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed behavior
+      description: What should Unship or the installed agent instructions do differently?
+    validations:
+      required: true
+  - type: checkboxes
+    id: area
+    attributes:
+      label: Area
+      options:
+        - label: Agent instructions
+        - label: CLI command output
+        - label: Picker behavior
+        - label: Cleanup/check scanner
+        - label: Documentation
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any simpler workaround or smaller version of the idea?

@@ -209,7 +209,7 @@ async function doctor({ root, previewPorts, updateCheckDisabled = false }) {
     residue,
     unship,
     next: nextActions({ project, unship, updates }),
-    reminder: "Unship is local comparison tooling. Remove picker markup before shipping."
+    reminder: "Unship is local comparison tooling. Have the agent remove unused variants and run unship check before shipping."
   };
 }
 
@@ -322,6 +322,12 @@ function printInstallResult(result, json) {
   }
   const label = result.command === "uninstall" ? "uninstall" : "install";
   const lines = [result.dryRun ? `Unship ${label} dry run.` : `Unship ${label} complete.`];
+  if (result.dryRun) {
+    lines.push("No files were changed.");
+  } else if (result.command !== "uninstall") {
+    lines.push("Workflow: ask your agent for options, compare them in your local preview, pick a direction in chat, and have the agent clean up the unused variants.");
+    lines.push("Before shipping: have the agent run npx @unship/cli@latest check --json.");
+  }
   for (const harness of result.harnesses || []) {
     lines.push(`${harness.name}: ${harness.status}`);
   }
@@ -365,7 +371,11 @@ function printSetup(result) {
 
 function printCheck(result) {
   if (result.ok) {
-    console.log(result.summary?.message || "No Unship preview artifacts found.");
+    console.log([
+      "Unship check passed.",
+      result.summary?.message || "No Unship preview artifacts found.",
+      "No data-unship markers, picker references, or Unship comments were detected."
+    ].join("\n"));
     return;
   }
 
@@ -387,5 +397,27 @@ function printCheck(result) {
 }
 
 function printHelp() {
-  console.log("Usage: unship install|install --print-skill|uninstall|init|setup|snippet|check|doctor");
+  console.log(`Unship
+Iterate with your agent in the app, not in chat.
+
+Usage:
+  unship install [--yes|--dry-run|--json]
+  unship setup --json
+  unship check [--json]
+  unship doctor [--json]
+  unship snippet [--inline|--json]
+  unship init [--target codex|claude|opencode|antigravity|all]
+  unship uninstall [--yes|--dry-run|--json]
+  unship install --print-skill
+
+Workflow:
+  1. Install the agent workflow once.
+  2. Ask your agent for design or content options.
+  3. Compare them in your local preview.
+  4. Pick a direction in chat.
+  5. Your agent cleans up unused variants before shipping.
+
+Agent notes:
+  setup returns a dev-only picker snippet when a local preview needs one.
+  check verifies that no Unship preview artifacts remain.`);
 }

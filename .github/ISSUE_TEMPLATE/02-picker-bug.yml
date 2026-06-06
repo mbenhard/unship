@@ -1,0 +1,45 @@
+name: Picker bug
+description: The local toolbar, option switching, copied keep instruction, or DOM behavior was wrong.
+title: "Picker bug: "
+labels: ["bug", "picker"]
+body:
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: "Chrome 126 on macOS"
+    validations:
+      required: true
+  - type: input
+    id: surface
+    attributes:
+      label: Rendered surface
+      description: Where the picker was mounted.
+      placeholder: "Astro home page, Next.js route, static HTML preview"
+    validations:
+      required: true
+  - type: textarea
+    id: markup
+    attributes:
+      label: Minimal markup or component shape
+      description: Include the `data-unship-pick` group and direct child options if possible.
+      render: html
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Describe the visible picker behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Paste any browser console errors.
+      render: shell

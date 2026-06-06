@@ -1,0 +1,35 @@
+name: Docs or workflow confusion
+description: Something in the README, CLI output, or installed skill was unclear.
+title: "Docs confusion: "
+labels: ["docs", "feedback"]
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where was the confusion?
+      options:
+        - README
+        - CLI help or command output
+        - Installed agent skill
+        - Website
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: confusing
+    attributes:
+      label: What was confusing?
+      description: Quote the line or describe the moment where the workflow stopped making sense.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect it to say or do?
+      description: Rough wording is welcome. This does not need to be polished.
+  - type: input
+    id: context
+    attributes:
+      label: Your context
+      description: Were you installing, asking for variants, picking a winner, or cleaning up?
+      placeholder: "first install, agent cleanup, checking before ship"

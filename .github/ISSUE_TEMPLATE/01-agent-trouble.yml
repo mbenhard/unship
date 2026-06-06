@@ -1,0 +1,54 @@
+name: Agent had trouble using Unship
+description: The coding agent misunderstood the workflow, mounted the picker poorly, or failed cleanup.
+title: "Agent trouble: "
+labels: ["agent", "feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Unship. This is the most useful kind of beta feedback: where the agent loop got confusing.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent or harness
+      description: Codex, Claude Code, Cursor, OpenCode, Antigravity, or another setup.
+      placeholder: "Codex desktop"
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project stack or rendered surface
+      description: The framework/app surface where the agent tried to compare variants.
+      placeholder: "Astro page, Next.js route, Vite component, README preview, CLI output"
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: What did you ask the agent?
+      description: Paste the prompt or summarize the request.
+      placeholder: "use unship to compare 3 hero directions"
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What went wrong?
+      description: Describe the confusing step, bad output, missing setup, cleanup issue, or agent behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: Relevant Unship command output
+      description: Paste `doctor --json`, `check --json`, or install/setup output if you have it.
+      render: shell
+  - type: checkboxes
+    id: cleanup
+    attributes:
+      label: Cleanup state
+      options:
+        - label: The agent settled one selected option.
+        - label: The agent ran `unship check` before finishing.
+        - label: Leftover `data-unship-*` or picker code remained.

@@ -10,6 +10,8 @@ Unship lets your agent create temporary options for UI details, copy, product st
 
 Unship is local comparison tooling. The picker script runs only in your local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The alternatives are temporary source-level choices that should be settled or removed before release.
 
+Trying Unship in a real project? Feedback is welcome, especially if the agent got confused. Open an issue for [agent trouble](https://github.com/mbenhard/unship/issues/new?template=01-agent-trouble.yml), a [picker bug](https://github.com/mbenhard/unship/issues/new?template=02-picker-bug.yml), [docs confusion](https://github.com/mbenhard/unship/issues/new?template=03-docs-confusing.yml), or a focused [feature idea](https://github.com/mbenhard/unship/issues/new?template=04-feature-idea.yml).
+
 ## Install
 
 ```bash
@@ -59,9 +61,11 @@ The usual loop:
 1. Ask for alternatives.
 2. Compare them in your running local preview.
 3. Tell the agent which visible option label to keep; the installed skill tells it to settle that group by removing the losing options and temporary `data-unship-*` attributes from the kept source.
-4. Before shipping, run `unship check` to verify no temporary Unship artifacts remain.
+4. Before shipping, have the agent run `unship check` to verify no temporary Unship artifacts remain.
 
-## Project Commands
+## Agent Project Commands
+
+The installed skill can run these commands while working in an app repo. You can run them yourself, but the intended loop is agent-owned.
 
 Check the current project:
 
