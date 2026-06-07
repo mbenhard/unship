@@ -4,7 +4,7 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
-- Add native Claude Code plugin packaging: `.claude-plugin/plugin.json` plus a self-hosted marketplace manifest so `/plugin marketplace add mbenhard/unship` works, with tests keeping manifest versions in sync with the package version and out of the npm tarball.
+- Add native Claude Code plugin packaging: a self-hosted marketplace manifest plus a dependency-free `plugin/` directory so `/plugin marketplace add mbenhard/unship` installs only the manifest and skill, with tests keeping manifest versions package-synced, the plugin skill copy byte-identical, and everything out of the npm tarball.
 
 ## 0.1.7 - 2026-06-07
 

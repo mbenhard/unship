@@ -10,5 +10,5 @@
   "repository": "https://github.com/mbenhard/unship",
   "license": "MIT",
   "keywords": ["ui", "variants", "alternatives", "design", "agent", "local", "prototype"],
-  "skills": "./agent/skills/"
+  "skills": "./skills/"
 }

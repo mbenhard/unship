@@ -39,7 +39,7 @@ The package should publish only these files:
 - `src/setup/index.js`
 - `src/update/index.js`
 
-The `files` array in `package.json` and `test/package-smoke.test.js` enforce this. The Claude Code plugin manifests in `.claude-plugin/` stay out of the tarball; when bumping the package version, bump the `version` fields in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to match. `test/plugin-manifest.test.js` enforces the sync.
+The `files` array in `package.json` and `test/package-smoke.test.js` enforce this. The Claude Code plugin files in `.claude-plugin/` and `plugin/` stay out of the tarball; when bumping the package version, bump the `version` fields in `plugin/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to match, and refresh `plugin/skills/unship/SKILL.md` whenever the bundled skill changes. `test/plugin-manifest.test.js` enforces both.
 
 ## GitHub
 
