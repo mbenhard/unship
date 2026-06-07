@@ -53,6 +53,12 @@ Claude Code users can load the skill through the plugin system instead:
 /plugin install unship@unship-marketplace
 ```
 
+The cross-agent [skills CLI](https://skills.sh) works too:
+
+```bash
+npx skills add mbenhard/unship
+```
+
 ## How It Works
 
 1. Ask your agent for alternatives.

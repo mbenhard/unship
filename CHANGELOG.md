@@ -5,6 +5,7 @@ All notable changes to Unship are documented here.
 ## Unreleased
 
 - Add native Claude Code plugin packaging: a self-hosted marketplace manifest plus a dependency-free `plugin/` directory so `/plugin marketplace add mbenhard/unship` installs only the manifest and skill, with tests keeping manifest versions package-synced, the plugin skill copy byte-identical, and everything out of the npm tarball.
+- Document the cross-agent skills CLI install path (`npx skills add mbenhard/unship`) in the README.
 
 ## 0.1.7 - 2026-06-07
 
