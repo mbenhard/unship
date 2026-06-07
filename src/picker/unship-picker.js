@@ -45,7 +45,7 @@
   let ghost = null;
 
   const api = {
-    version: "0.1.6",
+    version: "0.1.7",
     rescan,
     destroy,
     getState
