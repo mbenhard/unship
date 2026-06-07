@@ -1,0 +1,21 @@
+{
+  "name": "unship-marketplace",
+  "owner": {
+    "name": "Marcus Benhard"
+  },
+  "description": "Unship - local browser picker for comparing agent-made UI, copy, state, and design alternatives before settling source.",
+  "plugins": [
+    {
+      "name": "unship",
+      "displayName": "Unship",
+      "source": "./",
+      "version": "0.1.7",
+      "description": "Tiny local picker for comparing agent-made alternatives in real source.",
+      "author": { "name": "Marcus Benhard" },
+      "homepage": "https://github.com/mbenhard/unship#readme",
+      "repository": "https://github.com/mbenhard/unship",
+      "license": "MIT",
+      "keywords": ["ui", "variants", "alternatives", "design", "agent", "local"]
+    }
+  ]
+}

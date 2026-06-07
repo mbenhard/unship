@@ -1,0 +1,14 @@
+{
+  "name": "unship",
+  "displayName": "Unship",
+  "version": "0.1.7",
+  "description": "Tiny local picker for comparing agent-made alternatives in real source. Create temporary UI, copy, state, and flow variants in the running app, compare them in the local browser picker, then keep one and clean the rest before shipping.",
+  "author": {
+    "name": "Marcus Benhard"
+  },
+  "homepage": "https://github.com/mbenhard/unship#readme",
+  "repository": "https://github.com/mbenhard/unship",
+  "license": "MIT",
+  "keywords": ["ui", "variants", "alternatives", "design", "agent", "local", "prototype"],
+  "skills": "./agent/skills/"
+}

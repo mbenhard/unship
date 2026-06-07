@@ -46,6 +46,13 @@ npx @unship/cli@latest install --print-skill
 
 Put the printed `SKILL.md` wherever your agent loads skills.
 
+Claude Code users can load the skill through the plugin system instead:
+
+```txt
+/plugin marketplace add mbenhard/unship
+/plugin install unship@unship-marketplace
+```
+
 ## How It Works
 
 1. Ask your agent for alternatives.
