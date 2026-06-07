@@ -131,6 +131,47 @@ test("Enter on the label copies the keep instruction and Shift+Enter minimizes",
   }
 });
 
+test("arrow buttons clear hold-to-copy status immediately", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
+    await page.evaluate(() => {
+      window.__copied = [];
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: (text) => { window.__copied.push(text); return Promise.resolve(); } }
+      });
+    });
+
+    const labelBox = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(labelBox.x, labelBox.y);
+    await page.mouse.down();
+    await page.waitForFunction(() => window.__copied.length === 1);
+    await page.mouse.up();
+    assert.match(
+      await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
+      /✓ Copied/
+    );
+
+    await page.getByRole("button", { name: /next option/i }).click();
+    assert.equal(
+      await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
+      "Hero: Visual"
+    );
+
+    await page.getByRole("button", { name: /previous option/i }).click();
+    assert.equal(
+      await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
+      "Hero: Current"
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
 test("keyboard focus shows a visible ring on the label", async () => {
   const browser = await chromium.launch();
   try {

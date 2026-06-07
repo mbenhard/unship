@@ -165,6 +165,7 @@
     const group = groups[activeGroupIndex];
     if (!group) return;
 
+    clearCopiedStatus();
     group.activeOptionIndex = wrap(group.activeOptionIndex + delta, group.options.length);
     lastSwitchDir = delta > 0 ? "next" : "prev";
     applyGroupVisibility(group);
@@ -177,6 +178,7 @@
   function switchGroup(delta) {
     if (groups.length < 2) return;
 
+    clearCopiedStatus();
     activeGroupIndex = wrap(activeGroupIndex + delta, groups.length);
     menuOpen = false;
     render();
@@ -187,6 +189,7 @@
   function pickGroup(index) {
     if (!Number.isInteger(index) || !groups[index]) return;
 
+    clearCopiedStatus();
     activeGroupIndex = index;
     const group = groups[activeGroupIndex];
     const dock = root?.querySelector(".dock");
@@ -310,6 +313,12 @@
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
     </div>`);
+  }
+
+  function renderPreservingLabelFocus() {
+    const restoreLabelFocus = root?.activeElement?.classList?.contains("label");
+    render();
+    if (restoreLabelFocus) root?.querySelector(".label")?.focus({ preventScroll: true, focusVisible: false });
   }
 
   function setToolbarHtml(html) {
@@ -507,13 +516,19 @@
     const option = group.options[group.activeOptionIndex];
     const ok = await copyText(`Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`);
     copied = ok ? "ok" : "fail";
-    render();
+    renderPreservingLabelFocus();
     liveRegion.textContent = ok ? "Copied. Paste the keep instruction to your agent" : "Copy failed";
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = false;
-      render();
+      renderPreservingLabelFocus();
     }, 1800);
+  }
+
+  function clearCopiedStatus() {
+    if (!copied) return;
+    copied = false;
+    clearTimeout(copiedTimer);
   }
 
   async function copyText(text) {

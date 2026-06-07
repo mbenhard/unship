@@ -5,6 +5,7 @@ All notable changes to Unship are documented here.
 ## Unreleased
 
 - Remember the toolbar's dragged snap position locally across refreshes without persisting variant selection by default.
+- Clear the copied confirmation immediately when navigating options or groups, and keep keyboard focus in the toolbar after copying.
 
 ## 0.1.6 - 2026-06-05
 
