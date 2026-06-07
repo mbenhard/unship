@@ -39,6 +39,7 @@
   let holdTimer = null;
   let holdFired = false;
   let anchorH = null;
+  restoreToolbarPlacement();
   let gesturePointerId = null;
   let gestureCleanup = null;
   let ghost = null;
@@ -641,6 +642,7 @@
       dock?.classList.remove("dragging");
       anchorH = horizontalAnchorFor(e.clientX, window.innerWidth);
       placement = placementFor(e.clientY, window.innerHeight);
+      persistToolbarPlacement();
       dock?.classList.add("snapping");
       dock?.classList.toggle("top", placement === "top");
       dock?.classList.toggle("bottom", placement !== "top");
@@ -783,6 +785,32 @@
     return offsetLeft + viewportWidth / 2;
   }
 
+  function restoreToolbarPlacement() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(toolbarStorageKey()) || "null");
+      if (!saved || typeof saved !== "object") return;
+      if (saved.anchorH === "left" || saved.anchorH === "right") anchorH = saved.anchorH;
+      else anchorH = null;
+      placement = saved.placement === "top" ? "top" : "bottom";
+    } catch {}
+  }
+
+  function persistToolbarPlacement() {
+    try {
+      localStorage.setItem(
+        toolbarStorageKey(),
+        JSON.stringify({
+          anchorH: anchorH || "center",
+          placement: placement === "top" ? "top" : "bottom"
+        })
+      );
+    } catch {}
+  }
+
+  function toolbarStorageKey() {
+    return `unship:toolbar:${location.pathname}`;
+  }
+
   function restorePersistedSelection(groupIndex, label, options) {
     if (!persistLocal) return undefined;
     try {
@@ -912,6 +940,7 @@
     liveRegion.className = "sr";
 
     rescan();
+    syncViewportBounds();
     observer = new MutationObserver(queueRescan);
     observeDocument();
     if (useGlobalShortcuts) document.addEventListener("keydown", handleGlobalKeydown);

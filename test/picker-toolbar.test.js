@@ -274,6 +274,41 @@ test("dragging shows a snap-zone ghost that previews the landing spot and leaves
   }
 });
 
+test("toolbar remembers a dragged snap position across refresh", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    const html = `<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`;
+    await page.route("http://unship.test/position", (route) => route.fulfill({ contentType: "text/html", body: html }));
+    await page.goto("http://unship.test/position");
+
+    const label = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".label").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(label.x, label.y);
+    await page.mouse.down();
+    await page.mouse.move(700, 100, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    await page.reload();
+    await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+      Promise.all(host.shadowRoot.querySelector(".dock").getAnimations().map((animation) => animation.finished))
+    );
+
+    const dock = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
+      const element = host.shadowRoot.querySelector(".dock");
+      const rect = element.getBoundingClientRect();
+      return { className: element.className, right: rect.right, top: rect.top };
+    });
+    assert.match(dock.className, /top/);
+    assert.equal(Math.abs(dock.right - 790) < 2, true, `remembered dock should hug the right gutter at 790, got ${dock.right}`);
+    assert.equal(Math.abs(dock.top - 14) < 2, true, `remembered dock should hug the top band at 14, got ${dock.top}`);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("minimize and restore keep an edge-snapped dock anchored to its corner", async () => {
   const browser = await chromium.launch();
   try {

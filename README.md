@@ -10,7 +10,7 @@ Unship gives your coding agent a tiny local picker for comparing alternatives in
 
 > Early beta. Unship is local comparison tooling, not production experiment infrastructure.
 
-Unship does not send telemetry. No remote service. No session store. Picker selection does not save source, write files, or make product decisions. You choose by naming a visible option label in chat.
+Unship does not send telemetry. No remote service. No account or remote session store. Picker selection does not save source, write files, or make product decisions. The toolbar remembers its dragged position locally across refreshes; variant selection stays memory-only unless local persistence is explicitly enabled. You choose by naming a visible option label in chat.
 
 ## Install
 

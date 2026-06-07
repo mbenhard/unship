@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+- Remember the toolbar's dragged snap position locally across refreshes without persisting variant selection by default.
+
 ## 0.1.6 - 2026-06-05
 
 - Align the picker runtime API version with the package version and cover it with a release smoke test.
