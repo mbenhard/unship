@@ -132,14 +132,19 @@ export function scanExplorations(file, text) {
 const TWEAKS_ATTR = "data-unship-tweaks";
 const AS_ATTR = "data-unship-as";
 
-export function scanReadiness(file, text) {
+export function scanReadiness(file, rawText) {
+  // Comments and script bodies are never live markup; blanking preserves
+  // offsets and line numbers because only non-newline characters change.
+  const text = blankScriptBodies(blankHtmlComments(rawText));
   const lineStarts = lineStartOffsets(text);
+  const safe = blankJsxExpressions(text);
   const pickRegex = attributePresenceRegex(PICK_ATTR);
   const found = [];
   let match;
   while ((match = pickRegex.exec(text))) {
-    const element = elementForAttribute(text, match.index, lineStarts);
-    const range = findElementRange(text, lineStarts, element.startOffset, element.tag);
+    if (!isLiveAttribute(text, safe, match.index)) continue;
+    const element = elementForAttribute(text, match.index, lineStarts, safe);
+    const range = findElementRange(text, lineStarts, element.startOffset, element.tag, safe);
     found.push({ attrOffset: match.index, element, range });
   }
 
@@ -150,8 +155,13 @@ export function scanReadiness(file, text) {
     const pick = attributeValueAt(text, group.attrOffset, PICK_ATTR, index + 1)?.value || `Group ${index + 1}`;
     const startLine = lineIndexForOffset(lineStarts, group.element.startOffset) + 1;
     const findings = [];
-    const options = collectOptionDetails(text, lineStarts, group.element.startOffset, group.range.endOffset, nestedRanges);
+    const options = collectOptionDetails(text, safe, lineStarts, group.element.startOffset, group.range.endOffset, nestedRanges);
+    // Svelte/Angular template control flow governs visibility at runtime, so
+    // any block marker inside the group range forces the uncertain tier.
+    const rangeText = text.slice(group.element.startOffset, group.range.endOffset);
+    const templated = /\{[#:/@][A-Za-z]/.test(rangeText) || rangeText.includes("*ngIf");
     const certain =
+      !templated &&
       group.range.confidence === "high" &&
       options.length > 0 &&
       options.every((option) => option.certain && option.hidden.kind !== "dynamic");
@@ -201,6 +211,19 @@ export function scanReadiness(file, text) {
       line: startLine,
       findings
     });
+
+    const groupVars = new Set();
+    for (const axis of groupAxes) {
+      if (groupVars.has(axis.var)) {
+        findings.push({
+          level: "fail",
+          line: startLine,
+          code: "duplicate-var",
+          message: `Axis var "${axis.var}" is declared more than once in the group's shared axes.`
+        });
+      }
+      groupVars.add(axis.var);
+    }
 
     const optionAxes = options.map((option) => {
       const axes = readAxes({ tweaks: option.tweaks, style: option.style, line: option.line, findings });
@@ -258,7 +281,11 @@ export function scanReadiness(file, text) {
   });
 }
 
-function collectOptionDetails(text, lineStarts, startOffset, endOffset, nestedRanges) {
+// Vue/Alpine/Angular directives that control rendering or visibility at
+// runtime; their presence on an option tag makes static visibility unknowable.
+const DYNAMIC_VISIBILITY = /(?<=[\s<])(?:v-if|v-else-if|v-else|v-show|x-if|x-show)(?=[\s>/=]|$)/;
+
+function collectOptionDetails(text, safe, lineStarts, startOffset, endOffset, nestedRanges) {
   const details = [];
   let bareCount = 0;
   const optionRegex = attributePresenceRegex(OPTION_ATTR);
@@ -267,22 +294,55 @@ function collectOptionDetails(text, lineStarts, startOffset, endOffset, nestedRa
   let match;
   while ((match = optionRegex.exec(text)) && match.index < endOffset) {
     if (isInsideRange(match.index, nestedRanges)) continue;
+    if (!isLiveAttribute(text, safe, match.index)) continue;
 
     const value = attributeValueAt(text, match.index, OPTION_ATTR, bareCount + 1);
     if (!value) continue;
     if (value.bare) bareCount += 1;
-    const tag = openTagAt(text, match.index);
-    const depth = depthAtOffset(text, startOffset, match.index);
+    const tag = openTagAt(text, match.index, safe);
+    const depth = depthAtOffset(text, startOffset, match.index, safe);
+    const directiveControlled = tag ? DYNAMIC_VISIBILITY.test(tag.source) || tag.source.includes("*ngIf") : false;
     details.push({
       label: value.value,
       line: lineIndexForOffset(lineStarts, match.index) + 1,
       certain: value.kind === "literal" && depth === 1 && Boolean(tag),
-      hidden: tag ? readBooleanAttribute(tag.source, "hidden") : { kind: "dynamic", present: false },
+      hidden: tag && !directiveControlled ? readBooleanAttribute(tag.source, "hidden") : { kind: "dynamic", present: false },
       tweaks: tag ? readQuotedAttribute(tag.source, TWEAKS_ATTR) : null,
       style: tag ? readQuotedAttribute(tag.source, "style") : null
     });
   }
   return details;
+}
+
+// A match is a live attribute only when it sits inside an open tag's
+// attribute region, outside any quoted value, and is not the suffix of a
+// longer attribute name.
+function isLiveAttribute(text, safe, attrOffset) {
+  const before = text[attrOffset - 1];
+  if (before !== undefined && !/[\s<]/.test(before)) return false;
+  const tag = openTagAt(text, attrOffset, safe);
+  if (!tag) return false;
+  let quote = null;
+  for (let index = tag.start; index < attrOffset; index += 1) {
+    const char = text[index];
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === "\"" || char === "'" || char === "`") {
+      quote = char;
+    }
+  }
+  return quote === null;
+}
+
+function blankHtmlComments(text) {
+  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, (comment) => comment.replace(/[^\n\r]/g, " "));
+}
+
+function blankScriptBodies(text) {
+  return text.replace(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (whole, open, body, close) => `${open}${body.replace(/[^\n\r]/g, " ")}${close}`
+  );
 }
 
 // The open tag containing the attribute at attrOffset, or null when the tag
@@ -391,13 +451,24 @@ function readAxes({ tweaks, style, line, findings }) {
         code: "axis-default",
         message: `${label}: could not statically confirm an inline default for ${axis.var}.`
       });
-    } else if (!style || !style.value.includes(`${axis.var}:`)) {
-      findings.push({
-        level: "fail",
-        line,
-        code: "axis-default",
-        message: `${label}: declare an inline default for ${axis.var} in the element's style attribute.`
-      });
+    } else {
+      const declared = style?.kind === "literal" ? styleDeclaration(style.value, axis.var) : null;
+      const positions = axisPositions(axis);
+      if (declared === null || declared === "") {
+        findings.push({
+          level: "fail",
+          line,
+          code: "axis-default",
+          message: `${label}: declare an inline default for ${axis.var} in the element's style attribute.`
+        });
+      } else if (positions && !positions.includes(declared)) {
+        findings.push({
+          level: "fail",
+          line,
+          code: "axis-default",
+          message: `${label}: inline default "${declared}" for ${axis.var} does not match any ${axis.type} position.`
+        });
+      }
     }
     axes.push({ label, var: axis.var, type: axis.type });
   });
@@ -406,9 +477,13 @@ function readAxes({ tweaks, style, line, findings }) {
 
 function validAxisShape(axis) {
   if (axis.type === "slider") {
-    const stepped = Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(isLabeledValue);
-    const numeric = Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min;
-    return (stepped || numeric) && !(stepped && numeric);
+    // XOR on key presence, not key validity: declaring both forms is
+    // ambiguous even when one of them is malformed.
+    const hasSteps = axis.steps !== undefined;
+    const hasRange = axis.min !== undefined || axis.max !== undefined;
+    if (hasSteps === hasRange) return false;
+    if (hasSteps) return Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(isLabeledValue);
+    return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min;
   }
   if (axis.type === "segmented") {
     return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.length <= 4 && axis.options.every(isLabeledValue);
@@ -421,6 +496,23 @@ function validAxisShape(axis) {
 
 function isLabeledValue(entry) {
   return Boolean(entry) && typeof entry.label === "string" && typeof entry.value === "string";
+}
+
+// The declared value of a custom property in an inline style attribute, or
+// null when the property is not declared as its own anchored declaration.
+function styleDeclaration(styleValue, varName) {
+  const escaped = escapeRegExp(varName);
+  const match = new RegExp(`(?:^|[;\\s])${escaped}\\s*:\\s*([^;]*)`).exec(styleValue);
+  return match ? match[1].trim() : null;
+}
+
+// Enumerable control positions; null for numeric sliders, whose value space
+// cannot be checked by membership.
+function axisPositions(axis) {
+  if (axis.type === "toggle") return [axis.on, axis.off];
+  if (Array.isArray(axis.steps)) return axis.steps.map((step) => step.value);
+  if (Array.isArray(axis.options)) return axis.options.map((option) => option.value);
+  return null;
 }
 
 export function summarizeCleanup({ diagnostics = [], explorations = [] } = {}) {
@@ -443,8 +535,8 @@ function plural(word, count) {
   return count === 1 ? word : `${word}s`;
 }
 
-function elementForAttribute(text, attrOffset, lineStarts) {
-  const safeText = blankJsxExpressions(text);
+function elementForAttribute(text, attrOffset, lineStarts, safe) {
+  const safeText = safe ?? blankJsxExpressions(text);
   const tagStart = safeText.lastIndexOf("<", attrOffset);
   const tagEnd = safeText.lastIndexOf(">", attrOffset);
   if (tagStart !== -1 && tagStart > tagEnd) {
@@ -456,7 +548,7 @@ function elementForAttribute(text, attrOffset, lineStarts) {
   return { tag: null, startOffset: lineStarts[lineIndex] };
 }
 
-function findElementRange(text, lineStarts, startOffset, tag) {
+function findElementRange(text, lineStarts, startOffset, tag, safe) {
   const startLineIndex = lineIndexForOffset(lineStarts, startOffset);
   const fallbackLineIndex = Math.min(lineStarts.length - 1, startLineIndex + MAX_RANGE_LINES);
   const fallbackEndOffset = fallbackLineIndex + 1 < lineStarts.length ? lineStarts[fallbackLineIndex + 1] : text.length;
@@ -466,7 +558,7 @@ function findElementRange(text, lineStarts, startOffset, tag) {
   let opened = false;
   const escaped = escapeRegExp(tag);
   const token = new RegExp(`</?${escaped}\\b[^>]*>`, "gs");
-  const source = blankJsxExpressions(text.slice(startOffset, fallbackEndOffset));
+  const source = (safe ?? blankJsxExpressions(text)).slice(startOffset, fallbackEndOffset);
 
   for (const match of source.matchAll(token)) {
     const value = match[0];
@@ -520,11 +612,15 @@ function attributeValueAt(text, offset, attr, bareIndex = 1) {
   return { kind: "literal", value: `Option ${bareIndex}`, bare: true };
 }
 
-function depthAtOffset(text, startOffset, offset) {
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+
+function depthAtOffset(text, startOffset, offset, safe) {
   let depth = 0;
-  const token = /<\/?[A-Za-z][\w:.-]*\b[^>]*>/gs;
-  for (const match of blankJsxExpressions(text.slice(startOffset, offset)).matchAll(token)) {
+  const token = /<\/?([A-Za-z][\w:.-]*)\b[^>]*>/gs;
+  const source = safe ? safe.slice(startOffset, offset) : blankJsxExpressions(text.slice(startOffset, offset));
+  for (const match of source.matchAll(token)) {
     const value = match[0];
+    if (VOID_TAGS.has(match[1].toLowerCase())) continue;
     if (value.startsWith("</")) depth -= 1;
     else if (!value.endsWith("/>")) depth += 1;
   }

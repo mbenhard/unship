@@ -318,3 +318,203 @@ test("checkUnshipReadiness reports uncertain status without failing", async () =
   assert.equal(result.status, "uncertain");
   assert.equal(result.summary.uncertainCount, 1);
 });
+
+test("readiness ignores attribute-name suffix collisions", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<section data-unship-pick="Hero">',
+      '  <span x-data-unship-option="Ghost">z</span>',
+      '  <div data-unship-option="Current">a</div>',
+      '  <div data-unship-option="Alt" hidden>b</div>',
+      "</section>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].options, ["Current", "Alt"]);
+  assert.deepEqual(groups[0].findings, []);
+});
+
+test("readiness ignores phantom groups from suffixed pick attributes", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    '<section my-data-unship-pick="H"><div data-unship-option="C">a</div></section>'
+  );
+
+  assert.equal(groups.length, 0);
+});
+
+test("readiness ignores attribute names mentioned in text and attribute values", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Real">',
+      '  <div data-unship-option="mentions data-unship-pick as text">content</div>',
+      '  <p title="see data-unship-pick attribute in docs">explaining text with data-unship-pick inline</p>',
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].options, ["mentions data-unship-pick as text", "B"]);
+  assert.deepEqual(groups[0].findings, []);
+});
+
+test("readiness ignores options inside HTML comments", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Hero">',
+      '  <div data-unship-option="A">a</div>',
+      '  <!-- <div data-unship-option="Fake">x</div> -->',
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].options, ["A", "B"]);
+  assert.deepEqual(groups[0].findings, []);
+});
+
+test("readiness ignores fake markup inside script bodies", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Real">',
+      '  <div data-unship-option="A">a</div>',
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>",
+      "<script>",
+      '  const template = `<div data-unship-pick="Fake"><div data-unship-option="X">fake</div></div>`;',
+      "</script>"
+    ].join("\n")
+  );
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].pick, "Real");
+});
+
+test("readiness reports uncertain for Vue conditional directives", () => {
+  const groups = scanReadiness(
+    "src/Comp.vue",
+    [
+      "<template>",
+      '  <div data-unship-pick="hero">',
+      "    <div data-unship-option=\"A\" v-if=\"active === 'A'\">A</div>",
+      '    <div data-unship-option="B" v-else>B</div>',
+      "  </div>",
+      "</template>"
+    ].join("\n")
+  );
+
+  assert.equal(groups[0].visibleCount, null);
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["structure-uncertain"]);
+});
+
+test("readiness reports uncertain when directives coexist with hidden attributes", () => {
+  const groups = scanReadiness(
+    "src/Comp.vue",
+    [
+      '<div data-unship-pick="hero">',
+      '  <div data-unship-option="A" v-if="show">A</div>',
+      '  <div data-unship-option="B" v-if="!show" hidden>B</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.equal(groups[0].visibleCount, null);
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["structure-uncertain"]);
+});
+
+test("readiness reports uncertain for Svelte control-flow blocks", () => {
+  const groups = scanReadiness(
+    "src/Comp.svelte",
+    [
+      '<div data-unship-pick="hero">',
+      "  {#if show}",
+      '    <div data-unship-option="A">A</div>',
+      '    <div data-unship-option="B">B</div>',
+      "  {/if}",
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.equal(groups[0].visibleCount, null);
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["structure-uncertain"]);
+});
+
+test("readiness keeps certainty across void elements between options", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="g">',
+      '  <div data-unship-option="A">a</div>',
+      '  <img src="x.png">',
+      "  <br>",
+      '  <input type="text">',
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.equal(groups[0].visibleCount, 1);
+  assert.deepEqual(groups[0].findings, []);
+});
+
+test("readiness fails a slider declaring both range and steps keys", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Hero">',
+      "  <div data-unship-option=\"A\" style=\"--x: 0;\" data-unship-tweaks='[{\"type\":\"slider\",\"label\":\"X\",\"var\":\"--x\",\"min\":0,\"max\":10,\"steps\":[{\"label\":\"a\",\"value\":\"1\"}]}]'>a</div>",
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-shape"]);
+});
+
+test("readiness fails duplicate vars within shared group axes", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Hero" style="--gap: 8px;" data-unship-tweaks=\'[{"type":"slider","label":"A","var":"--gap","min":1,"max":9},{"type":"slider","label":"B","var":"--gap","min":2,"max":8}]\'>',
+      '  <div data-unship-option="A">a</div>',
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["duplicate-var"]);
+});
+
+test("readiness fails an inline default that matches no control position", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Hero">',
+      "  <div data-unship-option=\"A\" style=\"--eyebrow: inline;\" data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"Eyebrow\",\"var\":\"--eyebrow\",\"on\":\"block\",\"off\":\"none\"}]'>a</div>",
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-default"]);
+  assert.match(groups[0].findings[0].message, /does not match/);
+});
+
+test("readiness requires an anchored style declaration for defaults", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<div data-unship-pick="Hero">',
+      "  <div data-unship-option=\"A\" style=\"--label:x--g:y;\" data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"G\",\"var\":\"--g\",\"on\":\"1\",\"off\":\"0\"}]'>a</div>",
+      '  <div data-unship-option="B" hidden>b</div>',
+      "</div>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-default"]);
+});
