@@ -1265,8 +1265,9 @@
       .tweak-swatch{width:13px;height:13px;min-width:13px;border-radius:50%;background:var(--swatch);padding:0;transition:transform .12s ease}
       .tweak-swatch:hover{transform:scale(1.15)}
       .tweak-swatch.selected{box-shadow:0 0 0 2px #000,0 0 0 3.5px #fff}
-      .tune{position:relative;margin-left:3px}
-      .tune::before{content:"";position:absolute;left:-3.5px;top:8px;bottom:8px;width:1px;background:rgba(255,255,255,.16)}
+      .tune{position:relative}
+      .next+.tune{margin-left:3px}
+      .next+.tune::before{content:"";position:absolute;left:-3.5px;top:8px;bottom:8px;width:1px;background:rgba(255,255,255,.16)}
       .tune svg{display:block}
       .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
       .tuning .tune{background:rgba(255,255,255,.14)}
