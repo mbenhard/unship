@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { initTargetFiles } from "../agent-targets/index.js";
 import { getAgentTemplates } from "../agent/index.js";
-import { checkUnshipResidue } from "../check/index.js";
+import { checkUnshipReadiness, checkUnshipResidue } from "../check/index.js";
 import { applyInstallPlan, applyUninstallPlan, planInstall, planUninstall } from "../install/index.js";
 import { inspectProject, setupProject } from "../setup/index.js";
 import { checkForUpdates } from "../update/index.js";
@@ -57,7 +57,8 @@ try {
   } else if (command === "snippet") {
     await printSnippet(flags);
   } else if (command === "check") {
-    const result = await checkUnshipResidue({ root: flags.root || process.cwd(), includeBuild: Boolean(flags["include-build"]) });
+    const options = { root: flags.root || process.cwd(), includeBuild: Boolean(flags["include-build"]) };
+    const result = flags.readiness ? await checkUnshipReadiness(options) : await checkUnshipResidue(options);
     print(result, flags.json);
     if (!result.ok) process.exitCode = 1;
   } else if (command === "doctor") {
@@ -131,6 +132,7 @@ function parseFlags(items) {
     else if (item === "--all") parsed.all = true;
     else if (item === "--yes") parsed.yes = true;
     else if (item === "--repair") parsed.repair = true;
+    else if (item === "--readiness") parsed.readiness = true;
     else if (item === "--no-update-check") parsed["no-update-check"] = true;
     else if (item === "--no-project") parsed["no-project"] = true;
     else if (item === "--print-skill") parsed["print-skill"] = true;
@@ -251,6 +253,8 @@ function summarizeLabels(labels, limit = 3) {
 function print(value, json) {
   if (json) {
     console.log(JSON.stringify(value));
+  } else if (value.status && Array.isArray(value.findings)) {
+    printReadiness(value);
   } else if (Array.isArray(value.diagnostics)) {
     printCheck(value);
   } else if (value.picker && value.mount) {
@@ -369,6 +373,19 @@ function printSetup(result) {
   console.log(lines.join("\n"));
 }
 
+function printReadiness(result) {
+  const lines = [result.summary.message];
+  for (const group of result.groups) {
+    const labels = group.options.length ? `: ${group.options.join(", ")}` : "";
+    const visibility = group.visibleCount === null ? " (structure uncertain — verify manually)" : ` (${group.visibleCount} visible)`;
+    lines.push(`- ${group.pick} in ${group.file}${labels}${visibility}`);
+  }
+  for (const finding of result.findings) {
+    lines.push(`${finding.level.toUpperCase()} ${finding.file}:${finding.line} [${finding.group}] ${finding.message}`);
+  }
+  console.log(lines.join("\n"));
+}
+
 function printCheck(result) {
   if (result.ok) {
     console.log([
@@ -403,7 +420,7 @@ Iterate with your agent in the app, not in chat.
 Usage:
   unship install [--yes|--dry-run|--json]
   unship setup --json
-  unship check [--json]
+  unship check [--readiness] [--json]
   unship doctor [--json]
   unship snippet [--inline|--json]
   unship init [--target codex|claude|opencode|antigravity|all]
@@ -419,5 +436,6 @@ Workflow:
 
 Agent notes:
   setup returns a dev-only picker snippet when a local preview needs one.
-  check verifies that no Unship preview artifacts remain.`);
+  check verifies that no Unship preview artifacts remain.
+  check --readiness verifies comparison structure and axes before handoff.`);
 }

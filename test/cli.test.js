@@ -759,3 +759,47 @@ test("doctor plain output reports doctor details", () => {
   assert.equal(result.stdout.split("\n")[0], `@unship/cli ${PACKAGE_VERSION}`);
   assert.match(result.stdout, /local comparison tooling/);
 });
+
+test("check --readiness reports pass for a well-formed exploration", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-readiness-"));
+  await writeFixture(
+    join(cwd, "src", "App.html"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt" hidden>B</div></section>\n'
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--readiness", "--json"], { cwd, encoding: "utf8" });
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, "pass");
+});
+
+test("check --readiness exits non-zero on structural failures", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-readiness-"));
+  await writeFixture(
+    join(cwd, "src", "App.html"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt">B</div></section>\n'
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--readiness", "--json"], { cwd, encoding: "utf8" });
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 1);
+  assert.equal(parsed.status, "fail");
+  assert.equal(parsed.findings[0].code, "visible-count");
+});
+
+test("check --readiness prints human-readable findings without --json", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-readiness-"));
+  await writeFixture(
+    join(cwd, "src", "App.html"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt">B</div></section>\n'
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--readiness"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Readiness fail/);
+  assert.match(result.stdout, /FAIL src\/App\.html:1 \[Hero\] Expected exactly one visible option/);
+});
