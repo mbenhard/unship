@@ -161,12 +161,41 @@ export function scanReadiness(file, text) {
       });
     }
 
+    const groupTag = openTagAt(text, group.attrOffset);
+    const groupAxes = readAxes({
+      tweaks: groupTag ? readQuotedAttribute(groupTag.source, TWEAKS_ATTR) : null,
+      style: groupTag ? readQuotedAttribute(groupTag.source, "style") : null,
+      line: startLine,
+      findings
+    });
+
+    const optionAxes = options.map((option) => {
+      const axes = readAxes({ tweaks: option.tweaks, style: option.style, line: option.line, findings });
+      const vars = new Set(groupAxes.map((axis) => axis.var));
+      for (const axis of axes) {
+        if (vars.has(axis.var)) {
+          findings.push({
+            level: "fail",
+            line: option.line,
+            code: "duplicate-var",
+            message: `Axis var "${axis.var}" is declared more than once in the panel for option "${option.label}".`
+          });
+        }
+        vars.add(axis.var);
+      }
+      return axes;
+    });
+
     return {
       file,
       pick,
       startLine,
       options: options.map((option) => option.label),
       visibleCount: certain ? options.filter((option) => !option.hidden.present).length : null,
+      axes: [
+        ...groupAxes.map((axis) => ({ ...axis, on: "group" })),
+        ...optionAxes.flatMap((axes, optionIndex) => axes.map((axis) => ({ ...axis, on: options[optionIndex].label })))
+      ],
       findings
     };
   });
@@ -199,17 +228,38 @@ function collectOptionDetails(text, lineStarts, startOffset, endOffset, nestedRa
   return details;
 }
 
-// The open tag containing the attribute at attrOffset, or null. Heuristic:
-// a ">" inside a quoted attribute value ends the slice early; readiness
-// treats such elements as uncertain rather than parsing further.
+// The open tag containing the attribute at attrOffset, or null when the tag
+// boundary cannot be located. Quoted attribute values protect ">", "{", and
+// "<" from ending the scan, so JSON tweak payloads survive intact.
 function openTagAt(text, attrOffset) {
   const safe = blankJsxExpressions(text);
   const start = safe.lastIndexOf("<", attrOffset);
   const closeBefore = safe.lastIndexOf(">", attrOffset);
   if (start === -1 || closeBefore > start) return null;
-  const end = safe.indexOf(">", attrOffset);
+  const end = tagEndOffset(text, start);
   if (end === -1) return null;
   return { start, end: end + 1, source: text.slice(start, end + 1) };
+}
+
+function tagEndOffset(text, start) {
+  let quote = null;
+  let braceDepth = 0;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\" && braceDepth > 0) escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "\"" || char === "'" || (braceDepth > 0 && char === "`")) quote = char;
+    else if (char === "{") braceDepth += 1;
+    else if (char === "}") braceDepth = Math.max(0, braceDepth - 1);
+    else if (char === ">" && braceDepth === 0) return index;
+    else if (char === "<" && braceDepth === 0 && index > start) return -1;
+  }
+  return -1;
 }
 
 // Literal quoted attribute values only; JSX-brace values report "dynamic".
@@ -229,6 +279,91 @@ function readBooleanAttribute(tagSource, attr) {
   if (new RegExp(`(?<=[\\s<])${escaped}\\s*=\\s*\\{`).test(tagSource)) return { kind: "dynamic", present: false };
   if (new RegExp(`(?<=[\\s<])${escaped}(?=[\\s>/=]|$)`).test(tagSource)) return { kind: "literal", present: true };
   return { kind: "literal", present: false };
+}
+
+const KNOWN_AXIS_TYPES = new Set(["slider", "segmented", "toggle", "swatch"]);
+
+function readAxes({ tweaks, style, line, findings }) {
+  if (!tweaks) return [];
+  if (tweaks.kind !== "literal") {
+    findings.push({
+      level: "uncertain",
+      line,
+      code: "tweaks-dynamic",
+      message: "data-unship-tweaks value is dynamic; verify axes manually."
+    });
+    return [];
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(tweaks.value);
+  } catch {
+    findings.push({ level: "fail", line, code: "tweaks-json", message: "data-unship-tweaks is not valid JSON." });
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    findings.push({ level: "fail", line, code: "tweaks-json", message: "data-unship-tweaks must be a JSON array of axes." });
+    return [];
+  }
+
+  const axes = [];
+  parsed.forEach((axis, index) => {
+    const label = typeof axis?.label === "string" && axis.label.trim() ? axis.label : `axis ${index + 1}`;
+    if (!axis || typeof axis !== "object" || !KNOWN_AXIS_TYPES.has(axis.type)) {
+      findings.push({
+        level: "fail",
+        line,
+        code: "axis-type",
+        message: `${label}: unknown control type "${axis?.type}". Known types: slider, segmented, toggle, swatch.`
+      });
+      return;
+    }
+    if (typeof axis.var !== "string" || !axis.var.startsWith("--")) {
+      findings.push({ level: "fail", line, code: "axis-var", message: `${label}: every axis must name a CSS custom property in "var".` });
+      return;
+    }
+    if (!validAxisShape(axis)) {
+      findings.push({ level: "fail", line, code: "axis-shape", message: `${label}: invalid fields for control type "${axis.type}".` });
+      return;
+    }
+    if (style?.kind === "dynamic") {
+      findings.push({
+        level: "uncertain",
+        line,
+        code: "axis-default",
+        message: `${label}: could not statically confirm an inline default for ${axis.var}.`
+      });
+    } else if (!style || !style.value.includes(`${axis.var}:`)) {
+      findings.push({
+        level: "fail",
+        line,
+        code: "axis-default",
+        message: `${label}: declare an inline default for ${axis.var} in the element's style attribute.`
+      });
+    }
+    axes.push({ label, var: axis.var, type: axis.type });
+  });
+  return axes;
+}
+
+function validAxisShape(axis) {
+  if (axis.type === "slider") {
+    const stepped = Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(isLabeledValue);
+    const numeric = Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min;
+    return (stepped || numeric) && !(stepped && numeric);
+  }
+  if (axis.type === "segmented") {
+    return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.length <= 4 && axis.options.every(isLabeledValue);
+  }
+  if (axis.type === "swatch") {
+    return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.every(isLabeledValue);
+  }
+  return typeof axis.on === "string" && typeof axis.off === "string";
+}
+
+function isLabeledValue(entry) {
+  return Boolean(entry) && typeof entry.label === "string" && typeof entry.value === "string";
 }
 
 export function summarizeCleanup({ diagnostics = [], explorations = [] } = {}) {
