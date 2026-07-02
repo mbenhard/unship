@@ -238,20 +238,11 @@
       newItem.dataset.action = "toggle-menu";
       delete newItem.dataset.index;
       newItem.setAttribute("aria-label", `Active group ${group.displayLabel}`);
-      newItem.innerHTML = `<span class="menu-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group)}`;
+      newItem.innerHTML = `<span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span>`;
 
-      const labelMain = dock.querySelector(".label-main");
-      if (labelMain) labelMain.textContent = option.label;
-      dock
-        .querySelector(".label")
-        ?.setAttribute(
-          "aria-label",
-          `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move`
-        );
-      // Patch the tune surface for the incoming group so the fast-path DOM
-      // matches the next render exactly; the panel is closed while the menu
-      // is open, so swapping its contents is invisible and the collapse
-      // morph is preserved.
+      // Rebuild the closed panel and the nav row for the incoming group so
+      // the fast-path DOM matches the next render exactly; neither is part
+      // of the menu collapse morph, so swapping them is invisible.
       panelOpen = false;
       panelAxes = axesForGroup(group);
       const panelNode = dock.querySelector(".panel");
@@ -259,11 +250,11 @@
       if (panelNode && panelHtml) panelNode.outerHTML = panelHtml;
       else if (panelNode) panelNode.remove();
       else if (panelHtml) dock.querySelector(".row")?.insertAdjacentHTML("beforebegin", panelHtml);
-      const tuneNode = dock.querySelector(".tune");
-      const tuneHtml = panelAxes.length ? tuneButton(group) : "";
-      if (tuneNode && tuneHtml) tuneNode.outerHTML = tuneHtml;
-      else if (tuneNode) tuneNode.remove();
-      else if (tuneHtml) dock.querySelector(".next")?.insertAdjacentHTML("beforebegin", tuneHtml);
+      const rowNode = dock.querySelector(".row");
+      if (rowNode) {
+        const activeOption = group.options[clamp(group.activeOptionIndex, group.options.length)];
+        rowNode.innerHTML = rowMarkup(group, activeOption);
+      }
       closeMenu();
     } else {
       menuOpen = false;
@@ -346,16 +337,41 @@
       ${groups.length > 1 ? menu(swapClass) : ""}
       ${panel(group, swapClass)}
       <div class="row">
-        <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
-        <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize">
-          <span class="label-main${swapClass}">${copied === "ok" ? "✓ Copied" : copied === "fail" ? "Couldn't copy. Try again" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
-          ${groups.length === 1 && !copied ? counterMarkup("option-count", group, swapClass) : ""}
-        </button>
-        ${panelAxes.length ? tuneButton(group) : ""}
-        <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
+        ${rowMarkup(group, option, swapClass)}
       </div>
     </div>`);
     morphPanelHeight(previousPanelHeight);
+  }
+
+  // Capability slots: chevrons and the counter exist only when there is more
+  // than one option to compare; the tune button only when axes exist. The
+  // label is the one universal element (keep, drag, minimize).
+  function rowMarkup(group, option, swapClass = "") {
+    const comparable = group.options.length > 1;
+    const title =
+      copied === "ok"
+        ? "✓ Copied"
+        : copied === "fail"
+          ? "Couldn't copy. Try again"
+          : escapeHtml(
+              !comparable
+                ? groups.length === 1
+                  ? group.displayLabel
+                  : option.label
+                : groups.length === 1
+                  ? `${group.displayLabel}: ${option.label}`
+                  : option.label
+            );
+    const ariaLabel = comparable
+      ? `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`
+      : `${escapeHtml(group.displayLabel)}. Hold to keep these values, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
+    return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
+        <button class="label" type="button" aria-label="${ariaLabel}">
+          <span class="label-main${swapClass}">${title}</span>
+          ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
+        </button>
+        ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}
+        ${panelAxes.length ? tuneButton(group) : ""}`;
   }
 
   function morphPanelHeight(previousHeight) {
@@ -433,7 +449,7 @@
       .map((group, index) => {
         const current = index === activeGroupIndex;
         if (current) {
-          return `<button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span>${counterMarkup("group-count", group, swapClass)}</button>`;
+          return `<button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span></button>`;
         }
         const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
         return `<button class="menuitem" type="button" role="menuitem" data-action="pick-group" data-index="${index}" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-option">${escapeHtml(option.label)}</span></button>`;
@@ -826,7 +842,10 @@
 
   function announce(group) {
     const option = group.options[group.activeOptionIndex];
-    liveRegion.textContent = `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`;
+    liveRegion.textContent =
+      group.options.length > 1
+        ? `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`
+        : `${group.displayLabel}, tune values with the tune button`;
   }
 
   // Copy a ready-to-paste keep instruction for the agent. Only claims success
@@ -1214,6 +1233,8 @@
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-1px,-1px);margin-left:auto;opacity:.65;transition:transform var(--dur) var(--ease)}
+      .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-2px,-2px)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap)}

@@ -100,12 +100,12 @@ test("toolbar animates only the changing counter number", async () => {
     const counter = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
       const root = host.shadowRoot;
       return {
-        text: root.querySelector(".group-count").textContent.trim(),
-        currentText: root.querySelector(".group-count-current").textContent.trim(),
-        totalText: root.querySelector(".group-count-total").textContent.trim(),
-        currentAnimates: root.querySelector(".group-count-current").classList.contains("swap"),
-        totalAnimates: root.querySelector(".group-count-total").classList.contains("swap"),
-        nextDy: getComputedStyle(root.querySelector(".group-count-current")).getPropertyValue("--dy").trim()
+        text: root.querySelector(".option-count").textContent.trim(),
+        currentText: root.querySelector(".option-count-current").textContent.trim(),
+        totalText: root.querySelector(".option-count-total").textContent.trim(),
+        currentAnimates: root.querySelector(".option-count-current").classList.contains("swap"),
+        totalAnimates: root.querySelector(".option-count-total").classList.contains("swap"),
+        nextDy: getComputedStyle(root.querySelector(".option-count-current")).getPropertyValue("--dy").trim()
       };
     });
 
@@ -118,7 +118,7 @@ test("toolbar animates only the changing counter number", async () => {
 
     await page.getByRole("button", { name: /previous option/i }).click();
     const previousDy = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
-      getComputedStyle(host.shadowRoot.querySelector(".group-count-current")).getPropertyValue("--dy").trim()
+      getComputedStyle(host.shadowRoot.querySelector(".option-count-current")).getPropertyValue("--dy").trim()
     );
     assert.equal(previousDy, "-8px");
   } finally {

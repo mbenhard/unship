@@ -240,7 +240,7 @@ test("picker group menu lists all groups in page order with the active group mar
       }))
     );
     assert.deepEqual(menu, [
-      { text: "Hero1/2", current: true },
+      { text: "Hero", current: true },
       { text: "PricingSimple", current: false },
       { text: "FooterShort", current: false }
     ]);
