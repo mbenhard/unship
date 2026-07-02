@@ -210,16 +210,6 @@
     const group = groups[activeGroupIndex];
     const dock = root?.querySelector(".dock");
 
-    // The in-place menu surgery below cannot refresh the tune icon or panel,
-    // so groups with axes take the full render path.
-    if (panelAxes.length || axesForGroup(group).length) {
-      menuOpen = false;
-      render();
-      announce(group);
-      scrollToGroup(group);
-      return;
-    }
-
     const items = dock ? Array.from(dock.querySelectorAll(".menu .menuitem")) : [];
     const oldItem = dock?.querySelector(".menuitem.current");
     const newItem = items.find((item) => Number(item.dataset.index) === index);
@@ -258,6 +248,22 @@
           "aria-label",
           `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move`
         );
+      // Patch the tune surface for the incoming group so the fast-path DOM
+      // matches the next render exactly; the panel is closed while the menu
+      // is open, so swapping its contents is invisible and the collapse
+      // morph is preserved.
+      panelOpen = false;
+      panelAxes = axesForGroup(group);
+      const panelNode = dock.querySelector(".panel");
+      const panelHtml = panel(group);
+      if (panelNode && panelHtml) panelNode.outerHTML = panelHtml;
+      else if (panelNode) panelNode.remove();
+      else if (panelHtml) dock.querySelector(".row")?.insertAdjacentHTML("beforebegin", panelHtml);
+      const tuneNode = dock.querySelector(".tune");
+      const tuneHtml = panelAxes.length ? tuneButton(group) : "";
+      if (tuneNode && tuneHtml) tuneNode.outerHTML = tuneHtml;
+      else if (tuneNode) tuneNode.remove();
+      else if (tuneHtml) dock.querySelector(".next")?.insertAdjacentHTML("beforebegin", tuneHtml);
       closeMenu();
     } else {
       menuOpen = false;
@@ -335,7 +341,7 @@
     const swapClass = switchDir ? " swap" : "";
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu(swapClass) : ""}
-      ${panel(group)}
+      ${panel(group, swapClass)}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize">
@@ -524,13 +530,13 @@
     return `<button class="tune nav${modified ? " modified" : ""}" type="button" data-action="toggle-panel" aria-haspopup="true" aria-expanded="${panelOpen}" aria-label="Tune ${escapeHtml(group.displayLabel)}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="11" x2="14" y2="11"/><circle cx="10" cy="5" r="2.2" fill="#000"/><circle cx="6" cy="11" r="2.2" fill="#000"/></svg></button>`;
   }
 
-  function panel(group) {
+  function panel(group, swapClass = "") {
     if (!panelAxes.length) return "";
     const firstShared = panelAxes.findIndex((axis) => axis.scope === "");
     const rows = panelAxes
       .map((axis, index) => {
         const value = axisValue(group, axis);
-        const shared = axis.scope === "" && firstShared === index && firstShared > 0 ? " shared" : "";
+        const shared = (axis.scope === "" && firstShared === index && firstShared > 0 ? " shared" : "") + swapClass;
         const readout =
           axis.type === "slider"
             ? `<button class="tweak-value" type="button" data-action="reset-axis" data-axis="${index}" title="Reset to default" aria-label="Reset ${escapeHtml(axis.label || axis.var)} to default">${escapeHtml(axisDisplay(axis, value))}</button>`
@@ -1218,10 +1224,10 @@
       .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       @keyframes holdFill{to{transform:none}}
       .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease),left .3s var(--ease)}
-      .boxing .menu,.boxing .row{opacity:0;transition:opacity .12s ease}
-      .boxing.unboxing .menu,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
+      .boxing .menu,.boxing .panel,.boxing .row{opacity:0;transition:opacity .12s ease}
+      .boxing.unboxing .menu,.boxing.unboxing .panel,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
       .dock.preboxed{overflow:hidden;transition:none}
-      .preboxed .menu,.preboxed .row{opacity:0;transition:none}
+      .preboxed .menu,.preboxed .panel,.preboxed .row{opacity:0;transition:none}
       .minimized{position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;width:${MINI_SIZE_PX}px;height:${MINI_SIZE_PX}px;padding:0;border-radius:50%;background:#000;cursor:pointer;display:grid;place-items:center;transition:transform .2s cubic-bezier(.32,.72,0,1),opacity .14s ease;animation:miniIn .14s cubic-bezier(0,0,.2,1)}
       @keyframes miniIn{from{transform:translateX(-50%) scale(1.06)}to{transform:translateX(-50%)}}
       .minimized::before{content:"";width:6px;height:6px;border:1.5px solid #fff;transform:rotate(45deg)}
@@ -1249,6 +1255,7 @@
       .dock[data-dir="prev"] .group-count-current,.dock[data-dir="prev"] .option-count-current{--dx:0px;--dy:-8px}
       .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
       .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
+      .tweak.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
   }

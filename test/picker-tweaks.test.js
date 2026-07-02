@@ -176,6 +176,60 @@ test("keep instruction carries all current axis values", async () => {
   });
 });
 
+test("picking a group from the open menu keeps the collapse morph and refreshes the tune surface", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`
+<section data-unship-pick="Hero" style="--hero-pad: 60px;" data-unship-tweaks='[{"type":"slider","label":"Padding","var":"--hero-pad","min":40,"max":140,"step":10,"unit":"px"}]'>
+  <div data-unship-option="Essential" style="--gap: 24px;" data-unship-tweaks='[{"type":"slider","label":"Gap","var":"--gap","min":8,"max":48,"step":4,"unit":"px"}]'>A</div>
+  <div data-unship-option="Warm" hidden>B</div>
+</section>
+<section data-unship-pick="CTA" style="--cta-pad: 56px;" data-unship-tweaks='[{"type":"slider","label":"CTA padding","var":"--cta-pad","min":32,"max":96,"step":8,"unit":"px"}]'>
+  <div data-unship-option="Banner" style="--radius: 28px;" data-unship-tweaks='[{"type":"slider","label":"Radius","var":"--radius","min":0,"max":28,"step":4,"unit":"px"}]'>C</div>
+  <div data-unship-option="Quiet" hidden>D</div>
+</section>
+<script>${picker}</script>`);
+    await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot?.querySelector(".dock"));
+    const host = page.locator("css=[data-unship-toolbar]");
+
+    await host.evaluate((h) => h.shadowRoot.querySelector(".menuitem.current").click());
+    const menuBefore = await host.evaluate((h) => h.shadowRoot.querySelector(".menu"));
+    await host.evaluate((h) => h.shadowRoot.querySelector('.menuitem[data-action="pick-group"]').click());
+
+    const state = await host.evaluate((h) => {
+      const root = h.shadowRoot;
+      return {
+        open: root.querySelector(".dock").classList.contains("open"),
+        currentMenuLabel: root.querySelector(".menuitem.current .menu-name").textContent,
+        label: root.querySelector(".label-main").textContent,
+        tuneExists: Boolean(root.querySelector(".tune")),
+        panelRows: Array.from(root.querySelectorAll(".tweak-name")).map((name) => name.textContent),
+        menuSurvived: Boolean(root.querySelector(".menu"))
+      };
+    });
+    assert.equal(state.open, false);
+    assert.equal(state.currentMenuLabel, "CTA");
+    assert.equal(state.label, "Banner");
+    assert.equal(state.tuneExists, true);
+    assert.deepEqual(state.panelRows, ["Radius", "CTA padding"]);
+    assert.equal(state.menuSurvived, true);
+
+    await host.evaluate((h) => h.shadowRoot.querySelector(".tune").click());
+    await host.evaluate((h) => {
+      const input = h.shadowRoot.querySelector(".tweak-range");
+      input.value = "12";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const applied = await page.evaluate(() =>
+      document.querySelector('[data-unship-option="Banner"]').style.getPropertyValue("--radius")
+    );
+    assert.equal(applied, "12px");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("malformed tweaks JSON fails soft without breaking the toolbar", async () => {
   const browser = await chromium.launch();
   try {
