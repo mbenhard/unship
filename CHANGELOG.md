@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## Unreleased
 
+- Add `unship check --readiness`: best-effort static verification of Unship comparison structure and tweak-axis declarations (`data-unship-tweaks`), with `pass`/`fail`/`uncertain` status so templated markup degrades to manual verification instead of false verdicts.
+- Make `unship check` detect `data-unship-tweaks` and `data-unship-as` attributes as cleanup residue.
 - Add native Claude Code plugin packaging: a self-hosted marketplace manifest plus a dependency-free `plugin/` directory so `/plugin marketplace add mbenhard/unship` installs only the manifest and skill, with tests keeping manifest versions package-synced, the plugin skill copy byte-identical, and everything out of the npm tarball.
 - Document the cross-agent skills CLI install path (`npx skills add mbenhard/unship`) in the README.
 

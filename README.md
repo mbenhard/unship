@@ -116,9 +116,12 @@ npx @unship/cli@latest install
 npx @unship/cli@latest doctor --json
 npx @unship/cli@latest setup --json
 npx @unship/cli@latest check --json
+npx @unship/cli@latest check --readiness --json
 ```
 
-`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release.
+`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including `data-unship-tweaks` and `data-unship-as` attributes.
+
+`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and tweak-axis declarations, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup is reported as `uncertain` and should be verified manually.
 
 The npm package is `@unship/cli`. The binary is `unship`, so local installs can run:
 
