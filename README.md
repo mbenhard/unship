@@ -121,7 +121,7 @@ npx @unship/cli@latest check --readiness --json
 
 `setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including `data-unship-tweaks` and `data-unship-as` attributes.
 
-`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and tweak-axis declarations, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup is reported as `uncertain` and should be verified manually.
+`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and tweak-axis declarations, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored. Axis declarations with literal values are validated even in templated files, since the attribute value itself is statically certain.
 
 The npm package is `@unship/cli`. The binary is `unship`, so local installs can run:
 

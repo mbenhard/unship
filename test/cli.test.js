@@ -803,3 +803,18 @@ test("check --readiness prints human-readable findings without --json", async ()
   assert.match(result.stdout, /Readiness fail/);
   assert.match(result.stdout, /FAIL src\/App\.html:1 \[Hero\] Expected exactly one visible option/);
 });
+
+test("check --readiness exits zero for uncertain-only results", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-readiness-"));
+  await writeFixture(
+    join(cwd, "src", "App.jsx"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt" hidden={x}>B</div></section>\n'
+  );
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--readiness", "--json"], { cwd, encoding: "utf8" });
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, "uncertain");
+});

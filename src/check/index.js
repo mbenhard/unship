@@ -93,13 +93,14 @@ export function scanText(file, text) {
 
 export function scanExplorations(file, text) {
   const lineStarts = lineStartOffsets(text);
+  const safe = blankJsxExpressions(text);
   const groups = [];
   const pickRegex = attributePresenceRegex(PICK_ATTR);
   let match;
 
   while ((match = pickRegex.exec(text))) {
-    const element = elementForAttribute(text, match.index, lineStarts);
-    const range = findElementRange(text, lineStarts, element.startOffset, element.tag);
+    const element = elementForAttribute(text, match.index, lineStarts, safe);
+    const range = findElementRange(text, lineStarts, element.startOffset, element.tag, safe);
     groups.push({
       pick: attributeValueAt(text, match.index, PICK_ATTR, groups.length + 1)?.value || `Group ${groups.length + 1}`,
       file,
@@ -204,7 +205,7 @@ export function scanReadiness(file, rawText) {
       });
     }
 
-    const groupTag = openTagAt(text, group.attrOffset);
+    const groupTag = openTagAt(text, group.attrOffset, safe);
     const groupAxes = readAxes({
       tweaks: groupTag ? readQuotedAttribute(groupTag.source, TWEAKS_ATTR) : null,
       style: groupTag ? readQuotedAttribute(groupTag.source, "style") : null,
@@ -270,6 +271,7 @@ export function scanReadiness(file, rawText) {
       file,
       pick,
       startLine,
+      ...(group.range.endLine ? { endLine: group.range.endLine } : {}),
       options: options.map((option) => option.label),
       visibleCount: certain ? options.filter((option) => !option.hidden.present).length : null,
       axes: [
@@ -348,11 +350,24 @@ function blankScriptBodies(text) {
 // The open tag containing the attribute at attrOffset, or null when the tag
 // boundary cannot be located. Quoted attribute values protect ">", "{", and
 // "<" from ending the scan, so JSON tweak payloads survive intact.
-function openTagAt(text, attrOffset) {
-  const safe = blankJsxExpressions(text);
-  const start = safe.lastIndexOf("<", attrOffset);
-  const closeBefore = safe.lastIndexOf(">", attrOffset);
-  if (start === -1 || closeBefore > start) return null;
+// Open tags larger than this are assumed corrupt (e.g. a degraded blanker on
+// adversarial input); bounding the scans keeps the pass linear and degrades
+// such elements to the uncertain tier instead of hanging.
+const MAX_TAG_SCAN = 16384;
+
+function openTagAt(text, attrOffset, precomputedSafe) {
+  const safe = precomputedSafe ?? blankJsxExpressions(text);
+  const stop = Math.max(0, attrOffset - MAX_TAG_SCAN);
+  let start = -1;
+  for (let index = attrOffset; index >= stop; index -= 1) {
+    const char = safe[index];
+    if (char === ">") return null;
+    if (char === "<") {
+      start = index;
+      break;
+    }
+  }
+  if (start === -1) return null;
   const end = tagEndOffset(text, start);
   if (end === -1) return null;
   return { start, end: end + 1, source: text.slice(start, end + 1) };
@@ -362,7 +377,8 @@ function tagEndOffset(text, start) {
   let quote = null;
   let braceDepth = 0;
   let escaped = false;
-  for (let index = start; index < text.length; index += 1) {
+  const scanEnd = Math.min(text.length, start + MAX_TAG_SCAN);
+  for (let index = start; index < scanEnd; index += 1) {
     const char = text[index];
     if (quote) {
       if (escaped) escaped = false;

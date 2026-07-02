@@ -518,3 +518,52 @@ test("readiness requires an anchored style declaration for defaults", () => {
 
   assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-default"]);
 });
+
+test("readiness reports the group end line in its inventory", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<section data-unship-pick="Hero">',
+      '  <div data-unship-option="Current">A</div>',
+      '  <div data-unship-option="Alt" hidden>B</div>',
+      "</section>"
+    ].join("\n")
+  );
+
+  assert.equal(groups[0].startLine, 1);
+  assert.equal(groups[0].endLine, 4);
+});
+
+test("readiness scans many instrumented groups in bounded time", () => {
+  const parts = [];
+  for (let i = 0; i < 2000; i += 1) {
+    parts.push(
+      `<div data-unship-pick="G${i}" data-unship-tweaks='[{"type":"toggle","label":"A","var":"--a${i}","on":"1","off":"0"}]' style="--a${i}: 0;"><div data-unship-option="Only">x</div></div>`
+    );
+  }
+  const started = Date.now();
+  const groups = scanReadiness("src/big.html", parts.join("\n"));
+  const elapsed = Date.now() - started;
+
+  assert.equal(groups.length, 2000);
+  assert.ok(elapsed < 3000, `scan took ${elapsed}ms`);
+});
+
+test("checkUnshipReadiness keeps pass status when only notes are present", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-readiness-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  const spans = ["A", "B", "C", "D", "E"]
+    .map((label, index) => `<span data-unship-option="${label}"${index ? " hidden" : ""}>x</span>`)
+    .join("");
+  await writeFile(
+    join(root, "src", "App.html"),
+    `<h1 data-unship-pick="Headline" data-unship-as="segmented">${spans}</h1>\n`,
+    "utf8"
+  );
+
+  const result = await checkUnshipReadiness({ root });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "pass");
+  assert.equal(result.summary.noteCount, 1);
+});
