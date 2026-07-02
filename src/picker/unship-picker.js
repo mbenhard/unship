@@ -1205,12 +1205,11 @@
       .tweak-swatch:hover{transform:scale(1.15)}
       .tweak-swatch.selected{box-shadow:0 0 0 2px #000,0 0 0 3.5px #fff}
       .tune{position:relative}
-      .tune::before{content:none}
       .tune svg{display:block}
       .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
       .tuning .tune{background:rgba(255,255,255,.14)}
       .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
-      .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
+      .prev::before,.next::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
       .next::before{transform:rotate(45deg) translate(-1px,1px)}
       .nav:hover{background:rgba(255,255,255,.12)}
