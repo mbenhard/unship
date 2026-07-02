@@ -85,6 +85,23 @@ npx skills add mbenhard/unship
 
 The picker switches direct child options. It does not reload the app, swap source, save state, or add a production dependency by default.
 
+### Tuning
+
+Options (or the group itself) can also declare tunable axes with `data-unship-tweaks` — a JSON array of controls bound to CSS custom properties. The picker renders them in a tune panel: sliders (numeric or token-stepped), toggles, segmented controls, and color swatches. Every axis needs an inline default in the same element's `style` attribute, and its var must be used by the option's CSS.
+
+```html
+<div data-unship-option="Proof-led" hidden
+     style="--hero-gap: 24px; --accent: #0071e3;"
+     data-unship-tweaks='[
+       {"type":"slider","label":"Density","var":"--hero-gap","min":8,"max":48,"step":4,"unit":"px"},
+       {"type":"swatch","label":"Accent","var":"--accent","options":[
+         {"label":"Sky","value":"#0071e3"},{"label":"Ember","value":"#f56300"}
+       ]}
+     ]'>
+```
+
+Tuned values are remembered per option while comparing, clicking a slider's readout resets that axis, and holding the label copies a keep instruction that includes every current value so the agent can bake them into source. A group with a single option becomes a tweak-only exploration: no variants, just calibration of existing UI.
+
 ## Good For
 
 - UI section variants
