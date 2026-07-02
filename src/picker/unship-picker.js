@@ -1233,7 +1233,7 @@
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-.5px,-.5px);margin-left:auto;margin-right:2px;opacity:.65;transition:transform var(--dur) var(--ease)}
+      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-.5px,-.5px);margin-left:auto;margin-right:3px;opacity:.65;transition:transform var(--dur) var(--ease)}
       .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-1.5px,-1.5px)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
