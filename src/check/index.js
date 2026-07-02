@@ -37,6 +37,39 @@ export async function checkUnshipResidue({ root = process.cwd(), includeBuild = 
   };
 }
 
+export async function checkUnshipReadiness({ root = process.cwd(), includeBuild = false } = {}) {
+  const groups = [];
+  for await (const { file, rel } of walkProjectFiles({ root, extensions: EXTENSIONS, includeBuild, strict: true })) {
+    if (isAllowedInstructionFile(rel)) continue;
+    const text = await readFile(file, "utf8");
+    groups.push(...scanReadiness(rel, sourceForScanning(rel, text)));
+  }
+
+  const findings = groups.flatMap((group) =>
+    group.findings.map((finding) => ({ ...finding, file: group.file, group: group.pick }))
+  );
+  const count = (level) => findings.filter((finding) => finding.level === level).length;
+  const failCount = count("fail");
+  const uncertainCount = count("uncertain");
+  const status = failCount ? "fail" : uncertainCount ? "uncertain" : "pass";
+
+  return {
+    ok: failCount === 0,
+    status,
+    groups,
+    findings,
+    summary: {
+      groupCount: groups.length,
+      failCount,
+      uncertainCount,
+      noteCount: count("note"),
+      message: groups.length === 0
+        ? "No Unship explorations found."
+        : `Readiness ${status}: ${groups.length} ${plural("group", groups.length)}, ${failCount} ${plural("failure", failCount)}, ${uncertainCount} uncertain.`
+    }
+  };
+}
+
 export function scanText(file, text) {
   const diagnostics = [];
   const lines = text.split(/\r?\n/);

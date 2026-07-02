@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
-import { scanReadiness } from "../src/check/index.js";
+import { checkUnshipReadiness, scanReadiness } from "../src/check/index.js";
 
 test("readiness passes a plain HTML group with exactly one visible option", () => {
   const groups = scanReadiness(
@@ -263,4 +266,55 @@ test("readiness ignores options belonging to a nested group", () => {
   assert.equal(groups.length, 2);
   assert.deepEqual(groups[0].options, ["Current", "Alt"]);
   assert.deepEqual(groups[1].options, ["Claim", "Question"]);
+});
+
+test("checkUnshipReadiness aggregates groups and reports pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-readiness-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "App.html"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt" hidden>B</div></section>\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipReadiness({ root });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "pass");
+  assert.equal(result.summary.groupCount, 1);
+  assert.deepEqual(result.findings, []);
+});
+
+test("checkUnshipReadiness fails on structural problems and carries file context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-readiness-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "App.html"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt">B</div></section>\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipReadiness({ root });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "fail");
+  assert.equal(result.findings[0].file, "src/App.html");
+  assert.equal(result.findings[0].group, "Hero");
+  assert.equal(result.findings[0].code, "visible-count");
+});
+
+test("checkUnshipReadiness reports uncertain status without failing", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-readiness-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "App.jsx"),
+    '<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Alt" hidden={x}>B</div></section>\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipReadiness({ root });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "uncertain");
+  assert.equal(result.summary.uncertainCount, 1);
 });
