@@ -67,6 +67,8 @@ test("dragging a slider writes the CSS variable and updates the readout", async 
     assert.equal(applied, "40px");
     const readout = await shadow(page).evaluate((host) => host.shadowRoot.querySelector(".tweak-value").textContent);
     assert.equal(readout, "40px");
+    const fill = await shadow(page).evaluate((host) => host.shadowRoot.querySelector(".tweak-range").style.getPropertyValue("--fill"));
+    assert.equal(fill, "80%");
   });
 });
 

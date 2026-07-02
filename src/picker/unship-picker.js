@@ -339,6 +339,9 @@
     }
 
     const swapClass = switchDir ? " swap" : "";
+    // Panel content can change size across options/groups; capture the open
+    // panel's height before the rebuild so it can morph instead of snapping.
+    const previousPanelHeight = root.querySelector(".dock.tuning .panel")?.offsetHeight ?? null;
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu(swapClass) : ""}
       ${panel(group, swapClass)}
@@ -352,6 +355,23 @@
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
     </div>`);
+    morphPanelHeight(previousPanelHeight);
+  }
+
+  function morphPanelHeight(previousHeight) {
+    if (previousHeight === null || !panelOpen) return;
+    const panelNode = root.querySelector(".dock.tuning .panel");
+    if (!panelNode) return;
+    const nextHeight = panelNode.offsetHeight;
+    if (!nextHeight || nextHeight === previousHeight) return;
+    panelNode.classList.add("morphing");
+    panelNode.style.height = `${previousHeight}px`;
+    void panelNode.offsetHeight;
+    panelNode.style.height = `${nextHeight}px`;
+    setTimeout(() => {
+      panelNode.classList.remove("morphing");
+      panelNode.style.height = "";
+    }, 300);
   }
 
   function renderPreservingLabelFocus() {
@@ -551,12 +571,16 @@
     const label = escapeHtml(axis.label || axis.var);
     if (axis.type === "slider" && Array.isArray(axis.steps)) {
       const current = Math.max(0, axis.steps.findIndex((step) => step.value === value));
-      return `<input class="tweak-range" type="range" min="0" max="${axis.steps.length - 1}" step="1" value="${current}" data-axis="${index}" aria-label="${label}">`;
+      const fill = axis.steps.length > 1 ? (current / (axis.steps.length - 1)) * 100 : 0;
+      return `<input class="tweak-range" type="range" min="0" max="${axis.steps.length - 1}" step="1" value="${current}" data-axis="${index}" style="--fill:${fill}%" aria-label="${label}">`;
     }
     if (axis.type === "slider") {
       const number = parseFloat(value);
       const min = Number(axis.min) || 0;
-      return `<input class="tweak-range" type="range" min="${min}" max="${Number(axis.max) || 100}" step="${Number(axis.step) || 1}" value="${Number.isFinite(number) ? number : min}" data-axis="${index}" aria-label="${label}">`;
+      const max = Number(axis.max) || 100;
+      const current = Number.isFinite(number) ? number : min;
+      const fill = max > min ? ((current - min) / (max - min)) * 100 : 0;
+      return `<input class="tweak-range" type="range" min="${min}" max="${max}" step="${Number(axis.step) || 1}" value="${current}" data-axis="${index}" style="--fill:${fill}%" aria-label="${label}">`;
     }
     if (axis.type === "toggle") {
       const on = value === axis.on;
@@ -623,6 +647,9 @@
     if (!group || !axis) return;
     const value = Array.isArray(axis.steps) ? axis.steps[Number(input.value)]?.value : `${input.value}${axis.unit || ""}`;
     if (value === undefined) return;
+    const min = Number(input.min);
+    const max = Number(input.max);
+    if (max > min) input.style.setProperty("--fill", `${((Number(input.value) - min) / (max - min)) * 100}%`);
     setAxisValue(group, axis, value);
     const readout = input.parentElement?.querySelector(".tweak-value");
     if (readout) readout.textContent = axisDisplay(axis, value);
@@ -1192,10 +1219,17 @@
       .open .row{margin-top:var(--gap)}
       .panel{max-height:0;overflow:hidden;opacity:0;margin-bottom:0;transition:max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
       .tuning .panel{max-height:min(232px,calc(100vh - 168px));overflow-y:auto;opacity:1;margin-bottom:var(--gap);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+      .tuning .panel.morphing{overflow:hidden;transition:height var(--dur) var(--ease),max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
       .tweak{display:flex;align-items:center;gap:.7em;min-height:30px;padding:0 .55em 0 .95em}
       .tweak.shared{border-top:.5px solid rgba(255,255,255,.14);margin-top:4px;padding-top:4px}
       .tweak-name{opacity:.85;min-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .tweak-range{flex:1;min-width:0;accent-color:#fff;height:4px;margin:0;background:transparent}
+      .tweak-range{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:16px;margin:0;background:transparent;cursor:pointer}
+      .tweak-range::-webkit-slider-runnable-track{height:3px;border-radius:999px;background:linear-gradient(to right,#f5f5f5 var(--fill,0%),rgba(255,255,255,.22) var(--fill,0%))}
+      .tweak-range::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;margin-top:-5px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+      .tweak-range::-moz-range-track{height:3px;border-radius:999px;background:linear-gradient(to right,#f5f5f5 var(--fill,0%),rgba(255,255,255,.22) var(--fill,0%))}
+      .tweak-range::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#fff}
+      .tweak-range:focus-visible{outline:0}
+      .tweak-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(255,255,255,.35)}
       .tweak-value{min-width:44px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums;padding:2px 5px;border-radius:6px;white-space:nowrap}
       .tweak-value:hover{opacity:1;background:rgba(255,255,255,.12)}
       .tweak-switch{width:28px;height:16px;min-width:28px;border-radius:999px;background:rgba(255,255,255,.25);position:relative;margin-left:auto;padding:0;transition:background .15s ease}
