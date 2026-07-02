@@ -186,6 +186,30 @@ export function scanReadiness(file, text) {
       return axes;
     });
 
+    const asHint = groupTag ? readQuotedAttribute(groupTag.source, AS_ATTR) : null;
+    if (asHint?.kind === "dynamic") {
+      findings.push({
+        level: "uncertain",
+        line: startLine,
+        code: "as-dynamic",
+        message: "data-unship-as value is dynamic; verify the inline-group hint manually."
+      });
+    } else if (asHint && asHint.value !== "segmented" && asHint.value !== "toggle") {
+      findings.push({
+        level: "fail",
+        line: startLine,
+        code: "as-value",
+        message: `data-unship-as must be "segmented" or "toggle", found "${asHint.value}".`
+      });
+    } else if (asHint && certain && options.length > 4) {
+      findings.push({
+        level: "note",
+        line: startLine,
+        code: "as-overflow",
+        message: "data-unship-as is ignored for groups with more than 4 options; this group renders as a full dock group."
+      });
+    }
+
     return {
       file,
       pick,

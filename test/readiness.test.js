@@ -203,6 +203,47 @@ test("readiness fails duplicate vars across option and shared group axes", () =>
   assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["duplicate-var"]);
 });
 
+test("readiness accepts a valid inline-group hint", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<h1 data-unship-pick="Headline" data-unship-as="segmented">',
+      '  <span data-unship-option="Claim">A</span>',
+      '  <span data-unship-option="Question" hidden>B</span>',
+      "</h1>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings, []);
+});
+
+test("readiness fails an invalid data-unship-as value", () => {
+  const groups = scanReadiness(
+    "src/App.html",
+    [
+      '<h1 data-unship-pick="Headline" data-unship-as="dropdown">',
+      '  <span data-unship-option="Claim">A</span>',
+      '  <span data-unship-option="Question" hidden>B</span>',
+      "</h1>"
+    ].join("\n")
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["as-value"]);
+  assert.equal(groups[0].findings[0].level, "fail");
+});
+
+test("readiness notes an ignored hint on groups with more than 4 options", () => {
+  const spans = ["A", "B", "C", "D", "E"]
+    .map((label, index) => `  <span data-unship-option="${label}"${index ? " hidden" : ""}>x</span>`)
+    .join("\n");
+  const groups = scanReadiness(
+    "src/App.html",
+    `<h1 data-unship-pick="Headline" data-unship-as="segmented">\n${spans}\n</h1>`
+  );
+
+  assert.deepEqual(groups[0].findings.map((finding) => `${finding.level}:${finding.code}`), ["note:as-overflow"]);
+});
+
 test("readiness ignores options belonging to a nested group", () => {
   const groups = scanReadiness(
     "src/App.html",
