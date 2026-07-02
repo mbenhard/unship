@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { walkProjectFiles } from "../project-files/index.js";
 
 const EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".astro", ".md", ".mdx", ".liquid", ".hbs", ".handlebars", ".njk", ".ejs"]);
-const PATTERNS = ["data-unship-pick", "data-unship-option", "unship-picker", "<!-- unship"];
+const PATTERNS = ["data-unship-pick", "data-unship-option", "data-unship-tweaks", "data-unship-as", "unship-picker", "<!-- unship"];
 const PICK_ATTR = "data-unship-pick";
 const OPTION_ATTR = "data-unship-option";
 const MAX_RANGE_LINES = 200;

@@ -329,6 +329,24 @@ test("check ignores nested JSX props before the pick attribute", async () => {
   });
 });
 
+test("check reports orphaned tweak and presentation-hint attributes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "unship-check-"));
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(
+    join(root, "src", "Hero.html"),
+    '<section data-unship-tweaks=\'[{"type":"toggle"}]\'>\n<h1 data-unship-as="segmented">A</h1>\n</section>\n',
+    "utf8"
+  );
+
+  const result = await checkUnshipResidue({ root });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.diagnostics.map((item) => item.pattern).sort(),
+    ["data-unship-as", "data-unship-tweaks"]
+  );
+});
+
 test("check bounds multiline JSX pick ranges to their element", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
   await mkdir(join(root, "src"), { recursive: true });
