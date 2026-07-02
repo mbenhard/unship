@@ -1233,8 +1233,8 @@
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-1px,-1px);margin-left:auto;opacity:.65;transition:transform var(--dur) var(--ease)}
-      .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-2px,-2px)}
+      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-.5px,-.5px);margin-left:auto;margin-right:2px;opacity:.65;transition:transform var(--dur) var(--ease)}
+      .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-1.5px,-1.5px)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap)}
@@ -1266,8 +1266,7 @@
       .tweak-swatch:hover{transform:scale(1.15)}
       .tweak-swatch.selected{box-shadow:0 0 0 2px #000,0 0 0 3.5px #fff}
       .tune{position:relative}
-      .next+.tune{margin-left:3px}
-      .next+.tune::before{content:"";position:absolute;left:-3.5px;top:8px;bottom:8px;width:1px;background:rgba(255,255,255,.16)}
+      .next+.tune{margin-left:9px}
       .tune svg{display:block}
       .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
       .tuning .tune{background:rgba(255,255,255,.14)}
