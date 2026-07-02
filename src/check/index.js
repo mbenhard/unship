@@ -96,6 +96,141 @@ export function scanExplorations(file, text) {
   });
 }
 
+const TWEAKS_ATTR = "data-unship-tweaks";
+const AS_ATTR = "data-unship-as";
+
+export function scanReadiness(file, text) {
+  const lineStarts = lineStartOffsets(text);
+  const pickRegex = attributePresenceRegex(PICK_ATTR);
+  const found = [];
+  let match;
+  while ((match = pickRegex.exec(text))) {
+    const element = elementForAttribute(text, match.index, lineStarts);
+    const range = findElementRange(text, lineStarts, element.startOffset, element.tag);
+    found.push({ attrOffset: match.index, element, range });
+  }
+
+  return found.map((group, index) => {
+    const nestedRanges = found
+      .filter((candidate) => candidate.element.startOffset > group.element.startOffset && candidate.range.endOffset <= group.range.endOffset)
+      .map((candidate) => [candidate.element.startOffset, candidate.range.endOffset]);
+    const pick = attributeValueAt(text, group.attrOffset, PICK_ATTR, index + 1)?.value || `Group ${index + 1}`;
+    const startLine = lineIndexForOffset(lineStarts, group.element.startOffset) + 1;
+    const findings = [];
+    const options = collectOptionDetails(text, lineStarts, group.element.startOffset, group.range.endOffset, nestedRanges);
+    const certain =
+      group.range.confidence === "high" &&
+      options.length > 0 &&
+      options.every((option) => option.certain && option.hidden.kind !== "dynamic");
+
+    if (!options.length) {
+      findings.push({
+        level: group.range.confidence === "high" ? "fail" : "uncertain",
+        line: startLine,
+        code: "no-options",
+        message: "No data-unship-option children found for this group."
+      });
+    } else if (certain) {
+      const visible = options.filter((option) => !option.hidden.present);
+      if (visible.length !== 1) {
+        findings.push({
+          level: "fail",
+          line: startLine,
+          code: "visible-count",
+          message: `Expected exactly one visible option, found ${visible.length}.`
+        });
+      }
+      const seen = new Set();
+      for (const option of options) {
+        if (seen.has(option.label)) {
+          findings.push({
+            level: "fail",
+            line: option.line,
+            code: "duplicate-label",
+            message: `Option label "${option.label}" appears more than once in this group.`
+          });
+        }
+        seen.add(option.label);
+      }
+    } else {
+      findings.push({
+        level: "uncertain",
+        line: startLine,
+        code: "structure-uncertain",
+        message: "Group structure could not be statically verified (templated or dynamic markup). Verify readiness manually."
+      });
+    }
+
+    return {
+      file,
+      pick,
+      startLine,
+      options: options.map((option) => option.label),
+      visibleCount: certain ? options.filter((option) => !option.hidden.present).length : null,
+      findings
+    };
+  });
+}
+
+function collectOptionDetails(text, lineStarts, startOffset, endOffset, nestedRanges) {
+  const details = [];
+  let bareCount = 0;
+  const optionRegex = attributePresenceRegex(OPTION_ATTR);
+  optionRegex.lastIndex = startOffset;
+
+  let match;
+  while ((match = optionRegex.exec(text)) && match.index < endOffset) {
+    if (isInsideRange(match.index, nestedRanges)) continue;
+
+    const value = attributeValueAt(text, match.index, OPTION_ATTR, bareCount + 1);
+    if (!value) continue;
+    if (value.bare) bareCount += 1;
+    const tag = openTagAt(text, match.index);
+    const depth = depthAtOffset(text, startOffset, match.index);
+    details.push({
+      label: value.value,
+      line: lineIndexForOffset(lineStarts, match.index) + 1,
+      certain: value.kind === "literal" && depth === 1 && Boolean(tag),
+      hidden: tag ? readBooleanAttribute(tag.source, "hidden") : { kind: "dynamic", present: false },
+      tweaks: tag ? readQuotedAttribute(tag.source, TWEAKS_ATTR) : null,
+      style: tag ? readQuotedAttribute(tag.source, "style") : null
+    });
+  }
+  return details;
+}
+
+// The open tag containing the attribute at attrOffset, or null. Heuristic:
+// a ">" inside a quoted attribute value ends the slice early; readiness
+// treats such elements as uncertain rather than parsing further.
+function openTagAt(text, attrOffset) {
+  const safe = blankJsxExpressions(text);
+  const start = safe.lastIndexOf("<", attrOffset);
+  const closeBefore = safe.lastIndexOf(">", attrOffset);
+  if (start === -1 || closeBefore > start) return null;
+  const end = safe.indexOf(">", attrOffset);
+  if (end === -1) return null;
+  return { start, end: end + 1, source: text.slice(start, end + 1) };
+}
+
+// Literal quoted attribute values only; JSX-brace values report "dynamic".
+// Unlike attributeValueAt, the quoted form runs to the matching quote, so
+// JSON payloads full of braces survive intact.
+function readQuotedAttribute(tagSource, attr) {
+  const escaped = escapeRegExp(attr);
+  const literal = new RegExp(`(?<=[\\s<])${escaped}\\s*=\\s*("([^"]*)"|'([^']*)')`, "s").exec(tagSource);
+  if (literal) return { kind: "literal", value: literal[2] ?? literal[3] };
+  if (new RegExp(`(?<=[\\s<])${escaped}\\s*=\\s*\\{`).test(tagSource)) return { kind: "dynamic", value: null };
+  if (new RegExp(`(?<=[\\s<])${escaped}(?=[\\s>/]|$)`).test(tagSource)) return { kind: "literal", value: "" };
+  return null;
+}
+
+function readBooleanAttribute(tagSource, attr) {
+  const escaped = escapeRegExp(attr);
+  if (new RegExp(`(?<=[\\s<])${escaped}\\s*=\\s*\\{`).test(tagSource)) return { kind: "dynamic", present: false };
+  if (new RegExp(`(?<=[\\s<])${escaped}(?=[\\s>/=]|$)`).test(tagSource)) return { kind: "literal", present: true };
+  return { kind: "literal", present: false };
+}
+
 export function summarizeCleanup({ diagnostics = [], explorations = [] } = {}) {
   const files = [...new Set(diagnostics.map((item) => item.file))].sort();
   const artifactCount = diagnostics.length;
