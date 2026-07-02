@@ -43,6 +43,13 @@
   let gesturePointerId = null;
   let gestureCleanup = null;
   let ghost = null;
+  // Tune panel state: axes declared via data-unship-tweaks bind to CSS custom
+  // properties. Defaults are captured once per element (first touch), values
+  // are remembered per group/option so comparing tuned options round-trips.
+  let panelOpen = false;
+  let panelAxes = [];
+  const tweakDefaultsByElement = new WeakMap();
+  const tweakValuesByKey = new Map();
 
   const api = {
     version: "0.1.7",
@@ -76,7 +83,15 @@
         label: group.label,
         displayLabel: group.displayLabel,
         activeOptionIndex: group.activeOptionIndex,
-        options: group.options.map((option) => option.label)
+        options: group.options.map((option) => option.label),
+        tweaks: axesForGroup(group).map((axis) => ({
+          label: axis.label || axis.var,
+          var: axis.var,
+          type: axis.type,
+          scope: axis.scope,
+          value: axisValue(group, axis),
+          default: axisDefault(axis)
+        }))
       })),
       activeGroupIndex,
       toolbarMode: groups.length === 0 ? "none" : groups.length === 1 ? "single" : "multi"
@@ -138,6 +153,7 @@
         else hideOption(option.element);
       });
       selectedIndexByGroup.set(group.element, group.activeOptionIndex);
+      applyTweaks(group);
     });
   }
 
@@ -194,6 +210,16 @@
     const group = groups[activeGroupIndex];
     const dock = root?.querySelector(".dock");
 
+    // The in-place menu surgery below cannot refresh the tune icon or panel,
+    // so groups with axes take the full render path.
+    if (panelAxes.length || axesForGroup(group).length) {
+      menuOpen = false;
+      render();
+      announce(group);
+      scrollToGroup(group);
+      return;
+    }
+
     const items = dock ? Array.from(dock.querySelectorAll(".menu .menuitem")) : [];
     const oldItem = dock?.querySelector(".menuitem.current");
     const newItem = items.find((item) => Number(item.dataset.index) === index);
@@ -244,6 +270,7 @@
   function openMenu() {
     if (menuOpen) return;
     menuOpen = true;
+    panelOpen = false;
 
     const dock = root?.querySelector(".dock");
     if (!dock) {
@@ -253,6 +280,8 @@
 
     // Class toggle instead of a re-render so the rows transition into place
     // and the active row is pushed down into its list position by layout.
+    dock.classList.remove("tuning");
+    dock.querySelector(".tune")?.setAttribute("aria-expanded", "false");
     dock.classList.add("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "true");
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
@@ -289,6 +318,8 @@
 
     group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
     const option = group.options[group.activeOptionIndex];
+    panelAxes = axesForGroup(group);
+    if (!panelAxes.length) panelOpen = false;
     const mode = groups.length === 1 ? "single" : "multi";
     const nextSignature = renderSignature(mode);
     if (nextSignature === renderedSignature) return;
@@ -302,14 +333,16 @@
     }
 
     const swapClass = switchDir ? " swap" : "";
-    setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
+    setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu(swapClass) : ""}
+      ${panel(group)}
       <div class="row">
         <button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>
         <button class="label" type="button" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize">
           <span class="label-main${swapClass}">${copied === "ok" ? "✓ Copied" : copied === "fail" ? "Couldn't copy. Try again" : escapeHtml(groups.length === 1 ? `${group.displayLabel}: ${option.label}` : option.label)}</span>
           ${groups.length === 1 && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
+        ${panelAxes.length ? tuneButton(group) : ""}
         <button class="next nav" type="button" data-action="next" aria-label="Next option"></button>
       </div>
     </div>`);
@@ -337,9 +370,14 @@
   }
 
   function renderSignature(mode) {
+    // Live axis values stay out of the signature on purpose: slider drags
+    // write vars and readouts directly, so re-rendering mid-gesture would
+    // destroy the control under the pointer.
     return JSON.stringify({
       activeGroupIndex,
       menuOpen,
+      panelOpen,
+      panelAxes: panelAxes.map((axis) => `${axis.scope}|${axis.type}|${axis.var}`),
       mode,
       placement,
       minimized,
@@ -379,6 +417,212 @@
     return `<div class="menu" role="menu">${items}</div>`;
   }
 
+  // Axes bind controls to CSS custom properties. Invalid JSON or unknown
+  // control types fail soft: the axis is skipped, the toolbar never breaks.
+  function parseAxes(element) {
+    const raw = element?.getAttribute?.("data-unship-tweaks");
+    if (!raw) return [];
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.warn("unship: ignoring invalid data-unship-tweaks JSON", element);
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (axis) =>
+        axis &&
+        typeof axis === "object" &&
+        typeof axis.var === "string" &&
+        axis.var.startsWith("--") &&
+        ["slider", "segmented", "toggle", "swatch"].includes(axis.type)
+    );
+  }
+
+  // Option axes first, shared group axes below — the panel mirrors this order.
+  function axesForGroup(group) {
+    const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
+    return [
+      ...parseAxes(option?.element).map((axis) => ({ ...axis, host: option.element, scope: option.label })),
+      ...parseAxes(group.element).map((axis) => ({ ...axis, host: group.element, scope: "" }))
+    ];
+  }
+
+  function axisDefault(axis) {
+    let defaults = tweakDefaultsByElement.get(axis.host);
+    if (!defaults) {
+      defaults = {};
+      tweakDefaultsByElement.set(axis.host, defaults);
+    }
+    if (!(axis.var in defaults)) {
+      defaults[axis.var] =
+        axis.host.style.getPropertyValue(axis.var).trim() || getComputedStyle(axis.host).getPropertyValue(axis.var).trim();
+    }
+    return defaults[axis.var];
+  }
+
+  function tweakKey(group, axis) {
+    return `${group.index}:${group.label}:${axis.scope}`;
+  }
+
+  function axisValue(group, axis) {
+    const stored = tweakValuesByKey.get(tweakKey(group, axis))?.[axis.var];
+    return stored !== undefined ? stored : axisDefault(axis);
+  }
+
+  function setAxisValue(group, axis, value) {
+    axisDefault(axis);
+    const key = tweakKey(group, axis);
+    const bucket = tweakValuesByKey.get(key) || {};
+    bucket[axis.var] = value;
+    tweakValuesByKey.set(key, bucket);
+    axis.host.style.setProperty(axis.var, value);
+  }
+
+  function resetAxis(group, axis) {
+    const fallback = axisDefault(axis);
+    const bucket = tweakValuesByKey.get(tweakKey(group, axis));
+    if (bucket) delete bucket[axis.var];
+    if (fallback) axis.host.style.setProperty(axis.var, fallback);
+    else axis.host.style.removeProperty(axis.var);
+  }
+
+  // Re-apply remembered values after visibility switches and framework
+  // re-renders; capture defaults before any write so reset stays truthful.
+  function applyTweaks(group) {
+    for (const axis of axesForGroup(group)) {
+      axisDefault(axis);
+      const stored = tweakValuesByKey.get(tweakKey(group, axis))?.[axis.var];
+      if (stored !== undefined) axis.host.style.setProperty(axis.var, stored);
+    }
+  }
+
+  function axisDisplay(axis, value) {
+    if (axis.type === "toggle") return value === axis.on ? "on" : "off";
+    if (axis.type === "segmented" || axis.type === "swatch") {
+      const match = (axis.options || []).find((option) => option.value === value);
+      return match ? match.label : value;
+    }
+    if (Array.isArray(axis.steps)) {
+      const match = axis.steps.find((step) => step.value === value);
+      return match ? match.label : value;
+    }
+    return value;
+  }
+
+  function axisModified(group, axis) {
+    return axisValue(group, axis) !== axisDefault(axis);
+  }
+
+  function anyAxisModified(group) {
+    return panelAxes.some((axis) => axisModified(group, axis));
+  }
+
+  function tuneButton(group) {
+    const modified = anyAxisModified(group);
+    return `<button class="tune nav${modified ? " modified" : ""}" type="button" data-action="toggle-panel" aria-haspopup="true" aria-expanded="${panelOpen}" aria-label="Tune ${escapeHtml(group.displayLabel)}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="11" x2="14" y2="11"/><circle cx="10" cy="5" r="2.2" fill="#000"/><circle cx="6" cy="11" r="2.2" fill="#000"/></svg></button>`;
+  }
+
+  function panel(group) {
+    if (!panelAxes.length) return "";
+    const firstShared = panelAxes.findIndex((axis) => axis.scope === "");
+    const rows = panelAxes
+      .map((axis, index) => {
+        const value = axisValue(group, axis);
+        const shared = axis.scope === "" && firstShared === index && firstShared > 0 ? " shared" : "";
+        const readout =
+          axis.type === "slider"
+            ? `<button class="tweak-value" type="button" data-action="reset-axis" data-axis="${index}" title="Reset to default" aria-label="Reset ${escapeHtml(axis.label || axis.var)} to default">${escapeHtml(axisDisplay(axis, value))}</button>`
+            : "";
+        return `<div class="tweak${shared}"><span class="tweak-name">${escapeHtml(axis.label || axis.var)}</span>${axisControl(axis, index, value)}${readout}</div>`;
+      })
+      .join("");
+    return `<div class="panel" role="group" aria-label="Tune ${escapeHtml(group.displayLabel)}">${rows}</div>`;
+  }
+
+  function axisControl(axis, index, value) {
+    const label = escapeHtml(axis.label || axis.var);
+    if (axis.type === "slider" && Array.isArray(axis.steps)) {
+      const current = Math.max(0, axis.steps.findIndex((step) => step.value === value));
+      return `<input class="tweak-range" type="range" min="0" max="${axis.steps.length - 1}" step="1" value="${current}" data-axis="${index}" aria-label="${label}">`;
+    }
+    if (axis.type === "slider") {
+      const number = parseFloat(value);
+      const min = Number(axis.min) || 0;
+      return `<input class="tweak-range" type="range" min="${min}" max="${Number(axis.max) || 100}" step="${Number(axis.step) || 1}" value="${Number.isFinite(number) ? number : min}" data-axis="${index}" aria-label="${label}">`;
+    }
+    if (axis.type === "toggle") {
+      const on = value === axis.on;
+      return `<button class="tweak-switch${on ? " on" : ""}" type="button" role="switch" aria-checked="${on}" data-action="toggle-axis" data-axis="${index}" aria-label="${label}"></button>`;
+    }
+    if (axis.type === "swatch") {
+      return `<span class="tweak-swatches">${(axis.options || [])
+        .map(
+          (option, optionIndex) =>
+            `<button class="tweak-swatch${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" style="--swatch:${escapeHtml(option.value)}" aria-label="${label}: ${escapeHtml(option.label)}"></button>`
+        )
+        .join("")}</span>`;
+    }
+    return `<span class="tweak-seg">${(axis.options || [])
+      .map(
+        (option, optionIndex) =>
+          `<button class="tweak-seg-item${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}">${escapeHtml(option.label)}</button>`
+      )
+      .join("")}</span>`;
+  }
+
+  // The menu and the tune panel share the dock's expand slot; opening one
+  // closes the other so the dock never stacks two drawers.
+  function openPanel() {
+    if (panelOpen || !panelAxes.length) return;
+    panelOpen = true;
+    menuOpen = false;
+    const dock = root?.querySelector(".dock");
+    if (!dock) {
+      render();
+      return;
+    }
+    dock.classList.remove("open");
+    dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
+    dock.classList.add("tuning");
+    dock.querySelector(".tune")?.setAttribute("aria-expanded", "true");
+    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
+  }
+
+  function closePanel() {
+    if (!panelOpen) return;
+    panelOpen = false;
+    const dock = root?.querySelector(".dock");
+    if (!dock) {
+      render();
+      return;
+    }
+    dock.classList.remove("tuning");
+    dock.querySelector(".tune")?.setAttribute("aria-expanded", "false");
+    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
+  }
+
+  function refreshTuneIndicator() {
+    const group = groups[activeGroupIndex];
+    if (!group) return;
+    root?.querySelector(".tune")?.classList.toggle("modified", anyAxisModified(group));
+  }
+
+  function handlePanelInput(event) {
+    const input = event.target;
+    if (!input.classList?.contains("tweak-range")) return;
+    const group = groups[activeGroupIndex];
+    const axis = panelAxes[Number(input.dataset.axis)];
+    if (!group || !axis) return;
+    const value = Array.isArray(axis.steps) ? axis.steps[Number(input.value)]?.value : `${input.value}${axis.unit || ""}`;
+    if (value === undefined) return;
+    setAxisValue(group, axis, value);
+    const readout = input.parentElement?.querySelector(".tweak-value");
+    if (readout) readout.textContent = axisDisplay(axis, value);
+    refreshTuneIndicator();
+  }
+
   function handleToolbarClick(event) {
     const button = event.target.closest?.("[data-action]");
     if (!button) return;
@@ -389,6 +633,35 @@
     else if (action === "toggle-menu") {
       if (menuOpen) closeMenu();
       else openMenu();
+    } else if (action === "toggle-panel") {
+      if (panelOpen) closePanel();
+      else openPanel();
+    } else if (action === "toggle-axis") {
+      const group = groups[activeGroupIndex];
+      const axis = panelAxes[Number(button.dataset.axis)];
+      if (!group || !axis) return;
+      const next = axisValue(group, axis) === axis.on ? axis.off : axis.on;
+      setAxisValue(group, axis, next);
+      button.classList.toggle("on", next === axis.on);
+      button.setAttribute("aria-checked", String(next === axis.on));
+      refreshTuneIndicator();
+    } else if (action === "pick-axis") {
+      const group = groups[activeGroupIndex];
+      const axis = panelAxes[Number(button.dataset.axis)];
+      const choice = axis?.options?.[Number(button.dataset.option)];
+      if (!group || !axis || !choice) return;
+      setAxisValue(group, axis, choice.value);
+      button.parentElement?.querySelectorAll(".selected").forEach((item) => item.classList.remove("selected"));
+      button.classList.add("selected");
+      refreshTuneIndicator();
+    } else if (action === "reset-axis") {
+      const group = groups[activeGroupIndex];
+      const axis = panelAxes[Number(button.dataset.axis)];
+      if (!group || !axis) return;
+      resetAxis(group, axis);
+      renderedSignature = "";
+      render();
+      root.querySelector(".tune")?.focus({ preventScroll: true });
     } else if (action === "restore") {
       const square = root.querySelector(".minimized");
       if (square && !square.classList.contains("fading")) {
@@ -439,6 +712,16 @@
   }
 
   function handleToolbarKeydown(event) {
+    // Focused tune controls own their keys (arrows adjust sliders, Space
+    // flips switches); only Escape falls through to close the panel.
+    if (event.target.closest?.(".panel")) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePanel();
+        root.querySelector(".tune")?.focus({ preventScroll: true });
+      }
+      return;
+    }
     if ((event.key === "Enter" || event.key === " ") && event.target.closest?.(".label")) {
       // Keyboard parity for the pointer-only label gestures: Enter/Space keeps
       // the current option, Shift+Enter minimizes.
@@ -458,6 +741,11 @@
       event.preventDefault();
       switchGroup(1);
     } else if (event.key === "Escape") {
+      if (panelOpen) {
+        event.preventDefault();
+        closePanel();
+        return;
+      }
       if (!menuOpen) {
         document.activeElement?.blur();
         return;
@@ -514,7 +802,14 @@
     const group = groups[activeGroupIndex];
     if (!group) return;
     const option = group.options[group.activeOptionIndex];
-    const ok = await copyText(`Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`);
+    const axes = axesForGroup(group);
+    const values = axes.map((axis) => `${axis.label || axis.var} ${axisDisplay(axis, axisValue(group, axis))}`).join(", ");
+    const instruction = !axes.length
+      ? `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`
+      : group.options.length === 1
+        ? `Keep "${group.displayLabel}" with ${values}; bake these values in and remove the unship markup.`
+        : `Keep "${option.label}" for "${group.displayLabel}" with ${values}; bake these values in and remove the other unship options in that group.`;
+    const ok = await copyText(instruction);
     copied = ok ? "ok" : "fail";
     renderPreservingLabelFocus();
     liveRegion.textContent = ok ? "Copied. Paste the keep instruction to your agent" : "Copy failed";
@@ -741,7 +1036,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-unship-pick", OPTION_ATTR, "hidden"]
+      attributeFilter: ["data-unship-pick", OPTION_ATTR, "data-unship-tweaks", "hidden"]
     });
   }
 
@@ -889,6 +1184,31 @@
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
       .open .row{margin-top:var(--gap)}
+      .panel{max-height:0;overflow:hidden;opacity:0;margin-bottom:0;transition:max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
+      .tuning .panel{max-height:min(232px,calc(100vh - 168px));overflow-y:auto;opacity:1;margin-bottom:var(--gap);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+      .tweak{display:flex;align-items:center;gap:.7em;min-height:30px;padding:0 .55em 0 .95em}
+      .tweak.shared{border-top:.5px solid rgba(255,255,255,.14);margin-top:4px;padding-top:4px}
+      .tweak-name{opacity:.85;min-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .tweak-range{flex:1;min-width:0;accent-color:#fff;height:4px;margin:0;background:transparent}
+      .tweak-value{min-width:44px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums;padding:2px 5px;border-radius:6px;white-space:nowrap}
+      .tweak-value:hover{opacity:1;background:rgba(255,255,255,.12)}
+      .tweak-switch{width:28px;height:16px;min-width:28px;border-radius:999px;background:rgba(255,255,255,.25);position:relative;margin-left:auto;padding:0;transition:background .15s ease}
+      .tweak-switch::after{content:"";position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .15s ease,background .15s ease}
+      .tweak-switch.on{background:#f5f5f5}
+      .tweak-switch.on::after{transform:translateX(12px);background:#000}
+      .tweak-seg{margin-left:auto;display:inline-flex;background:rgba(255,255,255,.12);border-radius:999px;padding:2px;gap:2px;font-size:11px}
+      .tweak-seg-item{padding:2px 9px;border-radius:999px;transition:background .12s ease,color .12s ease}
+      .tweak-seg-item:hover{background:rgba(255,255,255,.12)}
+      .tweak-seg-item.selected{background:#f5f5f5;color:#000}
+      .tweak-swatches{margin-left:auto;display:inline-flex;gap:8px;align-items:center;padding-right:4px}
+      .tweak-swatch{width:13px;height:13px;min-width:13px;border-radius:50%;background:var(--swatch);padding:0;transition:transform .12s ease}
+      .tweak-swatch:hover{transform:scale(1.15)}
+      .tweak-swatch.selected{box-shadow:0 0 0 2px #000,0 0 0 3.5px #fff}
+      .tune{position:relative}
+      .tune::before{content:none}
+      .tune svg{display:block}
+      .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
+      .tuning .tune{background:rgba(255,255,255,.14)}
       .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .nav::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
@@ -945,6 +1265,7 @@
 
     root = host.attachShadow({ mode: "open" });
     root.addEventListener("click", handleToolbarClick);
+    root.addEventListener("input", handlePanelInput);
     root.addEventListener("mousedown", handleToolbarMouseDown);
     root.addEventListener("keydown", handleToolbarKeydown);
     root.addEventListener("dblclick", handleLabelDblclick);
