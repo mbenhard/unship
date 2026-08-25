@@ -26,6 +26,7 @@
   let groups = [];
   let activeGroupIndex = 0;
   let menuOpen = false;
+  let menuCloseTimer = null;
   let placement = "bottom";
   let rescanQueued = false;
   let renderedSignature = "";
@@ -69,6 +70,7 @@
 
   function destroy() {
     gestureCleanup?.();
+    clearTimeout(menuCloseTimer);
     observer?.disconnect();
     document.removeEventListener("keydown", handleGlobalKeydown);
     window.visualViewport?.removeEventListener("resize", syncViewportBounds);
@@ -191,6 +193,14 @@
     announce(group);
   }
 
+  function navigateOption(delta) {
+    if (menuOpen) {
+      closeMenu(() => switchOption(delta));
+      return;
+    }
+    switchOption(delta);
+  }
+
   function switchGroup(delta) {
     if (groups.length < 2) return;
 
@@ -208,56 +218,13 @@
     clearCopiedStatus();
     activeGroupIndex = index;
     const group = groups[activeGroupIndex];
-    const dock = root?.querySelector(".dock");
-
-    const items = dock ? Array.from(dock.querySelectorAll(".menu .menuitem")) : [];
-    const oldItem = dock?.querySelector(".menuitem.current");
-    const newItem = items.find((item) => Number(item.dataset.index) === index);
-
-    if (menuOpen && dock && oldItem && newItem && oldItem !== newItem) {
-      // Swap the two rows' roles in place, then contract. The collapse pushes
-      // the newly current row up into the header position — the reverse of the
-      // open morph. The DOM is updated to exactly match the next render.
-      const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
-      const oldIndex = items.indexOf(oldItem);
-      const oldGroup = groups[oldIndex];
-      const oldOption = oldGroup.options[clamp(oldGroup.activeOptionIndex, oldGroup.options.length)];
-
-      oldItem.classList.remove("current");
-      oldItem.removeAttribute("aria-current");
-      oldItem.removeAttribute("aria-haspopup");
-      oldItem.removeAttribute("aria-expanded");
-      oldItem.dataset.action = "pick-group";
-      oldItem.dataset.index = String(oldIndex);
-      oldItem.setAttribute("aria-label", `${oldGroup.displayLabel}, ${oldOption.label}`);
-      oldItem.innerHTML = `<span class="menu-name">${escapeHtml(oldGroup.displayLabel)}</span><span class="menu-option">${escapeHtml(oldOption.label)}</span>`;
-
-      newItem.classList.add("current");
-      newItem.setAttribute("aria-current", "true");
-      newItem.setAttribute("aria-haspopup", "menu");
-      newItem.dataset.action = "toggle-menu";
-      delete newItem.dataset.index;
-      newItem.setAttribute("aria-label", `Active group ${group.displayLabel}`);
-      newItem.innerHTML = `<span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span>`;
-
-      // Rebuild the closed panel and the nav row for the incoming group so
-      // the fast-path DOM matches the next render exactly; neither is part
-      // of the menu collapse morph, so swapping them is invisible.
-      panelOpen = false;
-      panelAxes = axesForGroup(group);
-      const panelNode = dock.querySelector(".panel");
-      const panelHtml = panel(group);
-      if (panelNode && panelHtml) panelNode.outerHTML = panelHtml;
-      else if (panelNode) panelNode.remove();
-      else if (panelHtml) dock.querySelector(".row")?.insertAdjacentHTML("beforebegin", panelHtml);
-      const rowNode = dock.querySelector(".row");
-      if (rowNode) {
-        const activeOption = group.options[clamp(group.activeOptionIndex, group.options.length)];
-        rowNode.innerHTML = rowMarkup(group, activeOption);
-      }
-      closeMenu();
+    panelOpen = false;
+    if (menuOpen) {
+      closeMenu(() => {
+        renderedSignature = "";
+        render();
+      });
     } else {
-      menuOpen = false;
       render();
     }
     announce(group);
@@ -268,6 +235,7 @@
     if (menuOpen) return;
     menuOpen = true;
     panelOpen = false;
+    clearTimeout(menuCloseTimer);
 
     const dock = root?.querySelector(".dock");
     if (!dock) {
@@ -275,27 +243,37 @@
       return;
     }
 
-    // Class toggle instead of a re-render so the rows transition into place
-    // and the active row is pushed down into its list position by layout.
     dock.classList.remove("tuning");
     dock.querySelector(".tune")?.setAttribute("aria-expanded", "false");
+    const list = dock.querySelector(".menu-list");
+    if (list) {
+      const viewportLimit = Math.max(0, Math.min(224, window.innerHeight - 208));
+      list.style.setProperty("--menu-list-height", `${Math.min(list.scrollHeight, viewportLimit)}px`);
+    }
     dock.classList.add("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "true");
+    requestAnimationFrame(syncMenuOverflow);
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
-  function closeMenu() {
+  function closeMenu(afterClose) {
     if (!menuOpen) return;
     menuOpen = false;
 
     const dock = root?.querySelector(".dock");
     if (!dock) {
       render();
+      afterClose?.();
       return;
     }
 
     dock.classList.remove("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
+    clearTimeout(menuCloseTimer);
+    if (afterClose) {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) afterClose();
+      else menuCloseTimer = setTimeout(afterClose, 290);
+    }
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
@@ -334,7 +312,7 @@
     // panel's height before the rebuild so it can morph instead of snapping.
     const previousPanelHeight = root.querySelector(".dock.tuning .panel")?.offsetHeight ?? null;
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
-      ${groups.length > 1 ? menu(swapClass) : ""}
+      ${groups.length > 1 ? menu() : ""}
       ${panel(group, swapClass)}
       <div class="row">
         ${rowMarkup(group, option, swapClass)}
@@ -440,23 +418,42 @@
     return `<span class="${className}"><span class="${className}-current${swapClass}">${group.activeOptionIndex + 1}</span><span class="${className}-slash">/</span><span class="${className}-total">${group.options.length}</span></span>`;
   }
 
-  // One list, two roles: the active row doubles as the closed-state header.
-  // Closed, only the active row is visible; opening expands the other rows in
-  // document order around it, so the header visually morphs into its place in
-  // the list (and back on close) purely through layout.
-  function menu(swapClass = "") {
+  // The active group stays pinned as the menu header. Other groups live in a
+  // separate scroll region so a long list never moves the user's anchor away.
+  function menu() {
+    const current = groups[activeGroupIndex];
     const items = groups
       .map((group, index) => {
-        const current = index === activeGroupIndex;
-        if (current) {
-          return `<button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(group.displayLabel)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span></button>`;
-        }
+        if (index === activeGroupIndex) return "";
         const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
         return `<button class="menuitem" type="button" role="menuitem" data-action="pick-group" data-index="${index}" aria-label="${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}"><span class="menu-name">${escapeHtml(group.displayLabel)}</span><span class="menu-option">${escapeHtml(option.label)}</span></button>`;
       })
       .join("");
 
-    return `<div class="menu" role="menu">${items}</div>`;
+    return `<div class="menu" role="menu"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span></button><div class="menu-list" role="none">${items}</div></div>`;
+  }
+
+  function syncMenuOverflow() {
+    const list = root?.querySelector(".menu-list");
+    if (!list) return;
+    list.classList.toggle("overflow-above", list.scrollTop > 1);
+    list.classList.toggle("overflow-below", list.scrollTop + list.clientHeight < list.scrollHeight - 1);
+  }
+
+  function handleMenuScroll(event) {
+    if (event.target.classList?.contains("menu-list")) syncMenuOverflow();
+  }
+
+  function handleMenuWheel(event) {
+    if (!menuOpen) return;
+    const list = root?.querySelector(".menu-list");
+    if (!list || list.scrollHeight <= list.clientHeight) return;
+    const before = list.scrollTop;
+    list.scrollTop += event.deltaY;
+    if (list.scrollTop !== before) {
+      event.preventDefault();
+      syncMenuOverflow();
+    }
   }
 
   // Axes bind controls to CSS custom properties. Invalid JSON or unknown
@@ -677,8 +674,8 @@
     if (!button) return;
 
     const action = button.dataset.action;
-    if (action === "previous") switchOption(-1);
-    else if (action === "next") switchOption(1);
+    if (action === "previous") navigateOption(-1);
+    else if (action === "next") navigateOption(1);
     else if (action === "toggle-menu") {
       if (menuOpen) closeMenu();
       else openMenu();
@@ -1223,11 +1220,16 @@
       .group-count,.option-count{display:inline-flex;align-items:baseline}
       .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
       .menu{display:block;margin-bottom:var(--gap)}
-      .open .menu{max-height:min(264px,calc(100vh - 168px));overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
-      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:max-height var(--dur) var(--ease),min-height var(--dur) var(--ease),margin var(--dur) var(--ease),opacity .2s ease .07s,background .15s ease,color .15s ease}
+      .menu-list{display:block;position:relative;height:0;margin-top:0;overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.34) transparent;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
+      .open .menu-list{height:var(--menu-list-height,0px);margin-top:var(--gap);opacity:1;visibility:visible;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .16s ease .04s,visibility 0s}
+      .open .menu-list::before,.open .menu-list::after{content:"";position:sticky;z-index:2;display:block;height:12px;margin-bottom:-12px;pointer-events:none;opacity:0;transition:opacity .15s ease}
+      .open .menu-list::before{top:0;background:linear-gradient(#000,transparent)}
+      .open .menu-list::after{bottom:0;margin-top:-12px;margin-bottom:0;background:linear-gradient(transparent,#000)}
+      .open .menu-list.overflow-above::before,.open .menu-list.overflow-below::after{opacity:1}
+      .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
       .menuitem:first-child{margin-top:0}
+      .menu-list .menuitem:first-child{margin-top:0}
       .menuitem:hover{background:rgba(255,255,255,.12)}
-      .dock:not(.open) .menuitem:not(.current){max-height:0;min-height:0;margin-top:0;opacity:0;visibility:hidden;transition:max-height var(--dur) var(--ease),min-height var(--dur) var(--ease),margin var(--dur) var(--ease),opacity .15s ease,visibility 0s linear var(--dur),background .15s ease,color .15s ease}
       .dock:not(.open) .menuitem.current{margin-top:0;background:rgba(255,255,255,.12)}
       .dock:not(.open) .menuitem.current:hover{background:rgba(255,255,255,.17)}
       .open .menuitem.current{background:#f5f5f5;color:#000}
@@ -1236,8 +1238,7 @@
       .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-.5px,-.5px);margin-left:auto;margin-right:3px;opacity:.65;transition:transform var(--dur) var(--ease)}
       .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-1.5px,-1.5px)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
-      .row{display:flex;align-items:center;gap:.3em;transition:margin-top var(--dur) var(--ease)}
-      .open .row{margin-top:var(--gap)}
+      .row{display:flex;align-items:center;gap:.3em}
       .panel{max-height:0;overflow:hidden;opacity:0;margin-bottom:0;transition:max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
       .tuning .panel{max-height:min(232px,calc(100vh - 168px));overflow-y:auto;opacity:1;margin-bottom:var(--gap);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
       .tuning .panel.morphing{overflow:hidden;transition:height var(--dur) var(--ease),max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
@@ -1328,6 +1329,8 @@
     root = host.attachShadow({ mode: "open" });
     root.addEventListener("click", handleToolbarClick);
     root.addEventListener("input", handlePanelInput);
+    root.addEventListener("scroll", handleMenuScroll, true);
+    root.addEventListener("wheel", handleMenuWheel, { passive: false });
     root.addEventListener("mousedown", handleToolbarMouseDown);
     root.addEventListener("keydown", handleToolbarKeydown);
     root.addEventListener("dblclick", handleLabelDblclick);

@@ -172,6 +172,46 @@ test("arrow buttons clear hold-to-copy status immediately", async () => {
   }
 });
 
+test("arrow navigation closes an expanded group menu before switching options", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Editorial">A</div><div data-unship-option="Split story" hidden>B</div></section><section data-unship-pick="Details"><div data-unship-option="Current">C</div></section><script>${picker}</script>`);
+    const host = page.locator("[data-unship-toolbar]");
+
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
+    await page.waitForTimeout(320);
+    await page.getByRole("button", { name: /next option/i }).click();
+
+    const duringClose = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        option: root.querySelector(".label-main").textContent,
+        expanded: root.querySelector(".menuitem.current").getAttribute("aria-expanded"),
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
+        closing: root.querySelector(".menu-list").getAnimations().some((animation) => animation.playState === "running")
+      };
+    });
+    assert.equal(duringClose.option, "Editorial");
+    assert.equal(duringClose.expanded, "false");
+    assert.equal(duringClose.listHeight > 0, true);
+    assert.equal(duringClose.closing, true);
+
+    await page.waitForTimeout(320);
+    const after = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        option: root.querySelector(".label-main").textContent,
+        expanded: root.querySelector(".menuitem.current").getAttribute("aria-expanded"),
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height
+      };
+    });
+    assert.deepEqual(after, { option: "Split story", expanded: "false", listHeight: 0 });
+  } finally {
+    await browser.close();
+  }
+});
+
 test("keyboard focus shows a visible ring on the label", async () => {
   const browser = await chromium.launch();
   try {
@@ -448,7 +488,7 @@ test("switching groups scrolls the page to the chosen group", async () => {
   }
 });
 
-test("group switcher keeps page order after picking a group", async () => {
+test("group switcher pins the active group above the remaining page-ordered groups", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
@@ -468,9 +508,165 @@ test("group switcher keeps page order after picking a group", async () => {
       }))
     );
     assert.deepEqual(menu, [
-      { name: "Hero", current: false },
-      { name: "Pricing", current: true }
+      { name: "Pricing", current: true },
+      { name: "Hero", current: false }
     ]);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("long group menus scroll immediately while the active header stays pinned", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    const groups = Array.from(
+      { length: 14 },
+      (_, index) => `<section data-unship-pick="Group ${index + 1}"><div data-unship-option="Current">${index}</div></section>`
+    ).join("");
+    await page.setContent(`${groups}<script>${picker}</script>`);
+
+    await page.getByRole("menuitem", { name: /Active group Group 1/ }).click();
+    const before = await page.locator("[data-unship-toolbar]").evaluate((host) => {
+      const root = host.shadowRoot;
+      const header = root.querySelector(".menuitem.current").getBoundingClientRect();
+      const list = root.querySelector(".menu-list");
+      return {
+        headerTop: header.top,
+        scrollTop: list.scrollTop,
+        scrollable: list.scrollHeight > list.clientHeight,
+        overflowBelow: list.classList.contains("overflow-below")
+      };
+    });
+    const listCenter = await page.locator("[data-unship-toolbar]").evaluate((host) => {
+      const rect = host.shadowRoot.querySelector(".menu-list").getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.move(listCenter.x, listCenter.y);
+    await page.mouse.wheel(0, 500);
+    await page.waitForFunction(() => {
+      const list = document.querySelector("[data-unship-toolbar]")?.shadowRoot?.querySelector(".menu-list");
+      return list?.scrollTop > 0;
+    });
+    const after = await page.locator("[data-unship-toolbar]").evaluate((host) => {
+      const root = host.shadowRoot;
+      const header = root.querySelector(".menuitem.current").getBoundingClientRect();
+      const list = root.querySelector(".menu-list");
+      return {
+        headerTop: header.top,
+        scrollTop: list.scrollTop,
+        overflowAbove: list.classList.contains("overflow-above")
+      };
+    });
+
+    assert.equal(before.scrollTop, 0);
+    assert.equal(before.scrollable, true);
+    assert.equal(before.overflowBelow, true);
+    assert.equal(after.scrollTop > 0, true);
+    assert.equal(after.headerTop, before.headerTop);
+    assert.equal(after.overflowAbove, true);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("group menu animates only its middle slot while header and controls stay coherent", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    const groups = Array.from(
+      { length: 10 },
+      (_, index) => `<section data-unship-pick="Group ${index + 1}"><div data-unship-option="Current">${index}</div></section>`
+    ).join("");
+    await page.setContent(`${groups}<script>${picker}</script>`);
+    const host = page.locator("[data-unship-toolbar]");
+    await page.waitForTimeout(220);
+    const closed = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
+        headerBackground: getComputedStyle(root.querySelector(".menuitem.current")).backgroundColor
+      };
+    });
+
+    await page.getByRole("menuitem", { name: /Active group Group 1/ }).click();
+    const opening = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      const list = root.querySelector(".menu-list");
+      return {
+        scrollable: list.scrollHeight > list.clientHeight,
+        animating: list.getAnimations().some((animation) => animation.playState === "running"),
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+      };
+    });
+    assert.deepEqual(opening, {
+      scrollable: true,
+      animating: true,
+      rowBottom: closed.rowBottom,
+      controlsVisible: true
+    });
+
+    await host.evaluate((element) =>
+      element.shadowRoot.querySelector(".label").dispatchEvent(
+        new WheelEvent("wheel", { deltaY: 120, bubbles: true, composed: true, cancelable: true })
+      )
+    );
+    assert.equal(
+      await host.evaluate((element) => element.shadowRoot.querySelector(".menu-list").scrollTop > 0),
+      true,
+      "wheel input over the visible header should reach the list during the opening morph"
+    );
+
+    await page.waitForTimeout(120);
+    const openingMid = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        headerBackground: getComputedStyle(root.querySelector(".menuitem.current")).backgroundColor
+      };
+    });
+    assert.equal(openingMid.listHeight > 0 && openingMid.listHeight < 224, true);
+    assert.equal(openingMid.rowBottom, closed.rowBottom);
+    assert.notEqual(openingMid.headerBackground, closed.headerBackground);
+
+    await page.waitForTimeout(220);
+    await page.getByRole("menuitem", { name: /Active group Group 1/ }).click();
+    const closing = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        animating: root.querySelector(".menu-list").getAnimations().some((animation) => animation.playState === "running"),
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+      };
+    });
+    assert.deepEqual(closing, { animating: true, rowBottom: closed.rowBottom, controlsVisible: true });
+
+    await page.waitForTimeout(120);
+    const closingMid = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        headerBackground: getComputedStyle(root.querySelector(".menuitem.current")).backgroundColor
+      };
+    });
+    assert.equal(closingMid.listHeight > 0 && closingMid.listHeight < 224, true);
+    assert.equal(closingMid.rowBottom, closed.rowBottom);
+    assert.notEqual(closingMid.headerBackground, closed.headerBackground);
+
+    await page.waitForTimeout(220);
+    const closedAgain = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
+        rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
+        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+      };
+    });
+    assert.deepEqual(closedAgain, { listHeight: 0, rowBottom: closed.rowBottom, controlsVisible: true });
   } finally {
     await browser.close();
   }
