@@ -27,6 +27,7 @@
   let activeGroupIndex = 0;
   let menuOpen = false;
   let menuCloseTimer = null;
+  let menuCloseAction = null;
   let placement = "bottom";
   let rescanQueued = false;
   let renderedSignature = "";
@@ -71,6 +72,7 @@
   function destroy() {
     gestureCleanup?.();
     clearTimeout(menuCloseTimer);
+    menuCloseAction = null;
     observer?.disconnect();
     document.removeEventListener("keydown", handleGlobalKeydown);
     window.visualViewport?.removeEventListener("resize", syncViewportBounds);
@@ -194,11 +196,7 @@
   }
 
   function navigateOption(delta) {
-    if (menuOpen) {
-      closeMenu(() => switchOption(delta));
-      return;
-    }
-    switchOption(delta);
+    afterMenuClose(() => switchOption(delta));
   }
 
   function switchGroup(delta) {
@@ -212,30 +210,57 @@
     scrollToGroup(groups[activeGroupIndex]);
   }
 
+  function navigateGroup(delta) {
+    afterMenuClose(() => switchGroup(delta));
+  }
+
   function pickGroup(index) {
     if (!Number.isInteger(index) || !groups[index]) return;
 
-    clearCopiedStatus();
-    activeGroupIndex = index;
-    const group = groups[activeGroupIndex];
-    panelOpen = false;
-    if (menuOpen) {
-      closeMenu(() => {
-        renderedSignature = "";
-        render();
-      });
-    } else {
+    afterMenuClose(() => {
+      clearCopiedStatus();
+      activeGroupIndex = index;
+      const group = groups[activeGroupIndex];
+      panelOpen = false;
+      renderedSignature = "";
       render();
+      announce(group);
+      scrollToGroup(group);
+    });
+  }
+
+  function finishMenuClose() {
+    clearTimeout(menuCloseTimer);
+    menuCloseTimer = null;
+    const action = menuCloseAction;
+    menuCloseAction = null;
+    action?.();
+  }
+
+  function afterMenuClose(action) {
+    if (menuOpen) {
+      closeMenu(action);
+      return;
     }
-    announce(group);
-    scrollToGroup(group);
+    if (menuCloseTimer) {
+      const previous = menuCloseAction;
+      menuCloseAction = () => {
+        previous?.();
+        action();
+      };
+      return;
+    }
+    action();
   }
 
   function openMenu() {
     if (menuOpen) return;
+    if (menuCloseTimer) finishMenuClose();
     menuOpen = true;
     panelOpen = false;
     clearTimeout(menuCloseTimer);
+    menuCloseTimer = null;
+    menuCloseAction = null;
 
     const dock = root?.querySelector(".dock");
     if (!dock) {
@@ -270,10 +295,9 @@
     dock.classList.remove("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
     clearTimeout(menuCloseTimer);
-    if (afterClose) {
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) afterClose();
-      else menuCloseTimer = setTimeout(afterClose, 290);
-    }
+    menuCloseAction = afterClose || null;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) finishMenuClose();
+    else menuCloseTimer = setTimeout(finishMenuClose, 290);
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
@@ -619,6 +643,10 @@
   // closes the other so the dock never stacks two drawers.
   function openPanel() {
     if (panelOpen || !panelAxes.length) return;
+    if (menuOpen || menuCloseTimer) {
+      afterMenuClose(openPanel);
+      return;
+    }
     panelOpen = true;
     menuOpen = false;
     const dock = root?.querySelector(".dock");
@@ -776,16 +804,16 @@
       else keepCurrent();
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
-      switchOption(-1);
+      navigateOption(-1);
     } else if (event.key === "ArrowRight") {
       event.preventDefault();
-      switchOption(1);
+      navigateOption(1);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      switchGroup(-1);
+      navigateGroup(-1);
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
-      switchGroup(1);
+      navigateGroup(1);
     } else if (event.key === "Escape") {
       if (panelOpen) {
         event.preventDefault();
@@ -804,10 +832,10 @@
   function handleGlobalKeydown(event) {
     if (event.defaultPrevented || event.composedPath?.().includes(host) || root?.activeElement || isTypingTarget(event.target)) return;
 
-    if (event.key === "ArrowLeft") switchOption(-1);
-    else if (event.key === "ArrowRight") switchOption(1);
-    else if (event.key === "ArrowUp") switchGroup(-1);
-    else if (event.key === "ArrowDown") switchGroup(1);
+    if (event.key === "ArrowLeft") navigateOption(-1);
+    else if (event.key === "ArrowRight") navigateOption(1);
+    else if (event.key === "ArrowUp") navigateGroup(-1);
+    else if (event.key === "ArrowDown") navigateGroup(1);
   }
 
   function isTypingTarget(target) {
@@ -914,6 +942,10 @@
   // geometry, so the corners stay correct throughout.
   function handleLabelDblclick(event) {
     if (!event.target.closest?.(".label") || minimized) return;
+    if (menuOpen || menuCloseTimer) {
+      afterMenuClose(() => handleLabelDblclick(event));
+      return;
+    }
     clearTimeout(holdTimer);
     menuOpen = false;
 

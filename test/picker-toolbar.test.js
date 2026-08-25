@@ -212,6 +212,42 @@ test("arrow navigation closes an expanded group menu before switching options", 
   }
 });
 
+test("menu-close transition serializes rapid and keyboard navigation", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="One">A</div><div data-unship-option="Two" hidden>B</div><div data-unship-option="Three" hidden>C</div></section><section data-unship-pick="Details"><div data-unship-option="Current">D</div></section><script>${picker}</script>`);
+    const host = page.locator("[data-unship-toolbar]");
+
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
+    await page.waitForTimeout(320);
+    await page.getByRole("button", { name: /next option/i }).click();
+    await page.getByRole("button", { name: /next option/i }).click();
+    await page.waitForTimeout(320);
+    assert.equal(await host.evaluate((element) => element.shadowRoot.querySelector(".label-main").textContent), "Three");
+
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
+    await page.waitForTimeout(320);
+    await host.evaluate((element) => {
+      const label = element.shadowRoot.querySelector(".label");
+      label.focus();
+      label.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, composed: true, cancelable: true }));
+    });
+    await page.waitForTimeout(320);
+    const afterGroupKey = await host.evaluate((element) => {
+      const root = element.shadowRoot;
+      return {
+        group: root.querySelector(".menu-name").textContent,
+        open: root.querySelector(".dock").classList.contains("open"),
+        listHeight: root.querySelector(".menu-list").getBoundingClientRect().height
+      };
+    });
+    assert.deepEqual(afterGroupKey, { group: "Details", open: false, listHeight: 0 });
+  } finally {
+    await browser.close();
+  }
+});
+
 test("keyboard focus shows a visible ring on the label", async () => {
   const browser = await chromium.launch();
   try {
