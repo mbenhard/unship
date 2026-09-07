@@ -20,7 +20,7 @@ const PAGE = `
   <header class="header" data-unship-pick="Header" data-unship-canvas="stack">
     <div data-unship-option="A">Header A</div><div data-unship-option="B" hidden>Header B</div>
   </header>
-  <section class="hero" data-unship-pick="Hero" data-unship-canvas="matrix" style="--gap:32px" data-unship-tweaks='[{"type":"slider","label":"Gap","var":"--gap","min":16,"max":64,"step":8,"unit":"px"}]'>
+  <section class="hero" data-unship-pick="Hero" data-unship-canvas="matrix" style="--gap:32px">
     <div data-unship-option="Proof">Proof</div><div data-unship-option="Direct" hidden>Direct</div>
   </section>
   <section class="cards" data-unship-pick="Cards" data-unship-canvas="grid">
@@ -111,10 +111,10 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
         overflow: document.documentElement.style.overflow
       };
     });
-    assert.deepEqual(preparing, { open: false, label: "", ariaLabel: "Preparing Canvas", spinner: true, width: 59, opacity: "0", pointerEvents: "none", overflow: "" });
+    assert.deepEqual(preparing, { open: false, label: "", ariaLabel: "Preparing Canvas", spinner: true, width: 90, opacity: "0", pointerEvents: "none", overflow: "" });
 
     releaseImages();
-    await page.getByRole("button", { name: "Close Canvas" }).waitFor();
+    await page.getByRole("button", { name: "Back to page" }).waitFor();
     await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelector(".canvas-shell.content-visible"));
     assert.equal(await page.evaluate(() => window.__unshipPicker.getState().canvas.open), true);
     assert.equal(await page.evaluate(() => document.documentElement.style.overflow), "hidden");
@@ -342,38 +342,26 @@ test("Canvas entry remains available in a narrow desktop preview", async () => {
     const entry = page.getByRole("button", { name: "Open Canvas" });
     assert.equal(await entry.isVisible(), true);
     await entry.click();
-    await page.getByRole("button", { name: "Close Canvas" }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "Back to page" }).waitFor({ state: "visible" });
     await page.setViewportSize({ width: 320, height: 700 });
-    await page.getByRole("button", { name: "Close Canvas" }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "Back to page" }).waitFor({ state: "visible" });
     assert.equal(await page.getByRole("button", { name: "Zoom in" }).isVisible(), true);
     assert.equal(await page.getByRole("button", { name: /Canvas theme/ }).isVisible(), true);
     const dock = await page.locator("[data-unship-toolbar]").evaluate((node) => node.shadowRoot.querySelector(".canvas-dock").getBoundingClientRect().toJSON());
     assert.equal(dock.left >= 0 && dock.right <= 320, true);
+    const rightInset = await page.locator("[data-unship-toolbar]").evaluate((node) => {
+      const root = node.shadowRoot;
+      return root.querySelector(".canvas-dock").getBoundingClientRect().right - root.querySelector(".canvas-close").getBoundingClientRect().right;
+    });
+    assert.ok(rightInset <= 8, "Canvas pill should hug Close at narrow widths");
   } finally {
     await browser.close();
   }
 });
 
-test("Canvas reuses tuning and keeps a warm prepared session across close and reopen", async () => {
+test("Canvas keeps a warm prepared session across close and reopen", async () => {
   await withCanvas(async (page) => {
     const host = page.locator("[data-unship-toolbar]");
-    const heroFrame = host.locator('.canvas-frame[data-group="1"][data-option="0"]').first();
-    await heroFrame.press("T");
-    assert.equal(await page.getByRole("slider", { name: "Gap" }).isVisible(), true);
-    await host.evaluate((node) => {
-      const input = node.shadowRoot.querySelector(".tweak-range");
-      input.value = "64";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await page.waitForTimeout(50);
-    const values = await host.evaluate((node) => {
-      const root = node.shadowRoot;
-      return Array.from(root.querySelectorAll('.canvas-iframe[data-group="1"][data-option="0"]')).map((frame) =>
-        frame.contentDocument.querySelectorAll("[data-unship-pick]")[1].style.getPropertyValue("--gap")
-      );
-    });
-    assert.deepEqual(values, ["64px", "64px", "64px"]);
-
     const dockIdentity = await host.evaluate((node) => {
       const dock = node.shadowRoot.querySelector(".canvas-dock");
       window.__unshipCanvasDock = dock;
@@ -398,7 +386,7 @@ test("Canvas reuses tuning and keeps a warm prepared session across close and re
       return root.querySelector(".canvas-world").style.transform;
     });
 
-    await page.getByRole("button", { name: "Close Canvas" }).click();
+    await page.getByRole("button", { name: "Back to page" }).click();
     await page.waitForTimeout(220);
     const closed = await host.evaluate((node) => {
       const shell = node.shadowRoot.querySelector(".canvas-shell");
@@ -446,13 +434,13 @@ test("Canvas Keep actions accumulate one choice per Group", async () => {
     });
     const copied = await page.evaluate(() => window.__copied.at(-1));
     assert.match(copied, /Keep "B" for "Header"/);
-    assert.match(copied, /Keep "Direct" for "Hero" with Gap 32px/);
+    assert.match(copied, /Keep "Direct" for "Hero"/);
     const kept = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll(".canvas-frame.kept")).map((frame) => `${frame.dataset.group}:${frame.dataset.option}`));
     assert.deepEqual(kept, ["0:1", "1:1", "1:1", "1:1"]);
   });
 });
 
-test("Canvas keeps an explicit choice even when a different option is tuned later", async () => {
+test("Canvas keeps an explicit choice even when source selection changes later", async () => {
   await withCanvas(async (page) => {
     await page.evaluate(() => {
       window.__copied = [];
@@ -466,7 +454,11 @@ test("Canvas keeps an explicit choice even when a different option is tuned late
     }, { group, option, action });
     await act(1, 1, "keep");
     await page.waitForFunction(() => window.__copied.length === 1);
-    await act(1, 0, "tune");
+    await page.evaluate(() => {
+      const group = document.querySelector('[data-unship-pick="Hero"]');
+      group.children[0].hidden = false;
+      group.children[1].hidden = true;
+    });
     await act(0, 1, "keep");
     await page.waitForFunction(() => window.__copied.length === 2);
     const text = await page.evaluate(() => window.__copied.at(-1));
@@ -491,7 +483,7 @@ test("Canvas does not mark failed copies as kept", async () => {
 
 test("Canvas rebuilds cached frames after in-place source edits", async () => {
   await withCanvas(async (page) => {
-    await page.getByRole("button", { name: "Close Canvas" }).click();
+    await page.getByRole("button", { name: "Back to page" }).click();
     await page.getByRole("button", { name: "Open Canvas" }).waitFor();
     await page.evaluate(() => {
       const option = document.querySelector('.hero [data-unship-option="Proof"]');
@@ -520,12 +512,14 @@ test("Canvas resolves valid groups after an empty group", async () => {
     await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('.canvas-frame.ready').length === 10);
     const frame = page.locator('[data-unship-toolbar] .canvas-frame[data-group="1"]').first();
     await frame.focus();
-    await page.keyboard.press("t");
-    await page.getByRole("slider", { name: "Gap" }).waitFor();
+    await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async text => { window.__copied = text; } } }));
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => Boolean(window.__copied));
+    assert.match(await page.evaluate(() => window.__copied), /Keep "Proof" for "Hero"/);
   } finally { await browser.close(); }
 });
 
-test("Canvas contains keyboard focus and Escape closes tuning before Canvas", async () => {
+test("Canvas contains keyboard focus and Escape returns to the page", async () => {
   await withCanvas(async (page) => {
     const host = page.locator('[data-unship-toolbar]');
     await page.getByRole('button', {name:'Use dark Canvas theme'}).focus();
@@ -533,11 +527,6 @@ test("Canvas contains keyboard focus and Escape closes tuning before Canvas", as
     assert.equal(await host.evaluate(h => document.activeElement === h && Boolean(h.shadowRoot.activeElement)), true);
     const frame = host.locator('.canvas-frame[data-group="1"]').first();
     await frame.focus();
-    await page.keyboard.press('t');
-    await page.getByRole('slider', {name:'Gap'}).waitFor();
-    await page.keyboard.press('Escape');
-    assert.equal(await page.evaluate(() => window.__unshipPicker.getState().canvas.open), true);
-    assert.equal(await host.locator('.dock.tuning').count(), 0);
     await page.keyboard.press('Escape');
     assert.equal(await page.evaluate(() => window.__unshipPicker.getState().canvas.open), false);
     assert.equal(await host.getAttribute('aria-modal'), null);

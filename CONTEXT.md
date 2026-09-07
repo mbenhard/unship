@@ -21,7 +21,7 @@ A candidate direction within a visual comparison.
 _Avoid_: Version, variation
 
 **Keep action**:
-A deliberate action that copies an instruction identifying the Option and tuned values to retain. It does not itself change source or persist a product decision.
+A deliberate action that copies an instruction identifying the Option to retain. It does not itself change source or persist a product decision.
 _Avoid_: Save, commit
 
 **Arrangement**:
@@ -34,7 +34,3 @@ A Canvas presentation that renders Options at multiple target viewport sizes for
 **Frame**:
 An isolated Canvas rendering of one Option at one target viewport width.
 _Avoid_: Card, artboard
-
-**Tuning**:
-Temporary adjustment of declared visual axes while comparing an Option.
-_Avoid_: Editing

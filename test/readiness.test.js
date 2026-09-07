@@ -102,110 +102,6 @@ test("readiness reports uncertain when the group range has low confidence", () =
   assert.equal(groups[0].findings[0].level, "uncertain");
 });
 
-const VALID_AXES =
-  '[{"type":"slider","label":"Density","var":"--gap","min":8,"max":48,"step":4,"unit":"px"},' +
-  '{"type":"toggle","label":"Eyebrow","var":"--eyebrow","on":"block","off":"none"}]';
-
-test("readiness records valid axes and their placement", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<section data-unship-pick="Hero" style="--pad: 48px;" data-unship-tweaks=\'[{"type":"slider","label":"Padding","var":"--pad","min":24,"max":96}]\'>',
-      `  <div data-unship-option="Current" style="--gap: 24px; --eyebrow: block;" data-unship-tweaks='${VALID_AXES}'>A</div>`,
-      '  <div data-unship-option="Alt" hidden>B</div>',
-      "</section>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings, []);
-  assert.deepEqual(
-    groups[0].axes.map((axis) => `${axis.on}:${axis.var}`),
-    ["group:--pad", "Current:--gap", "Current:--eyebrow"]
-  );
-});
-
-test("readiness fails malformed tweaks JSON without dropping the group", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<section data-unship-pick="Hero">',
-      "  <div data-unship-option=\"Current\" data-unship-tweaks='[{oops'>A</div>",
-      '  <div data-unship-option="Alt" hidden>B</div>',
-      "</section>"
-    ].join("\n")
-  );
-
-  const tweaksFinding = groups[0].findings.find((finding) => finding.code === "tweaks-json");
-  assert.equal(tweaksFinding?.level, "fail");
-  assert.deepEqual(groups[0].options, ["Current", "Alt"]);
-});
-
-test("readiness fails unknown control types, missing vars, and bad shapes", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<section data-unship-pick="Hero">',
-      "  <div data-unship-option=\"Current\" style=\"--a: 1; --b: 1; --c: 1;\" data-unship-tweaks='[",
-      '    {"type":"dial","label":"Nope","var":"--a"},',
-      '    {"type":"slider","label":"NoVar","min":1,"max":2},',
-      '    {"type":"slider","label":"BothForms","var":"--b","min":1,"max":2,"steps":[{"label":"a","value":"1"},{"label":"b","value":"2"}]},',
-      '    {"type":"segmented","label":"TooMany","var":"--c","options":[{"label":"1","value":"1"},{"label":"2","value":"2"},{"label":"3","value":"3"},{"label":"4","value":"4"},{"label":"5","value":"5"}]}',
-      "  ]'>A</div>",
-      '  <div data-unship-option="Alt" hidden>B</div>',
-      "</section>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(
-    groups[0].findings.map((finding) => finding.code).sort(),
-    ["axis-shape", "axis-shape", "axis-type", "axis-var"]
-  );
-});
-
-test("readiness fails a missing inline default and reports uncertain for dynamic style", () => {
-  const groups = scanReadiness(
-    "src/App.jsx",
-    [
-      '<section data-unship-pick="Hero">',
-      "  <div data-unship-option=\"Current\" data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"T\",\"var\":\"--t\",\"on\":\"1\",\"off\":\"0\"}]'>A</div>",
-      "  <div data-unship-option=\"Alt\" hidden style={styles} data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"U\",\"var\":\"--u\",\"on\":\"1\",\"off\":\"0\"}]'>B</div>",
-      "</section>"
-    ].join("\n")
-  );
-
-  const codes = groups[0].findings.map((finding) => `${finding.level}:${finding.code}`);
-  assert.ok(codes.includes("fail:axis-default"));
-  assert.ok(codes.includes("uncertain:axis-default"));
-});
-
-test("readiness reports dynamic tweaks values as uncertain", () => {
-  const groups = scanReadiness(
-    "src/App.jsx",
-    [
-      '<section data-unship-pick="Hero">',
-      '  <div data-unship-option="Current" data-unship-tweaks={axes}>A</div>',
-      '  <div data-unship-option="Alt" hidden>B</div>',
-      "</section>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => `${finding.level}:${finding.code}`), ["uncertain:tweaks-dynamic"]);
-});
-
-test("readiness fails duplicate vars across option and shared group axes", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<section data-unship-pick="Hero" style="--gap: 8px;" data-unship-tweaks=\'[{"type":"slider","label":"Pad","var":"--gap","min":1,"max":9}]\'>',
-      "  <div data-unship-option=\"Current\" style=\"--gap: 24px;\" data-unship-tweaks='[{\"type\":\"slider\",\"label\":\"Gap\",\"var\":\"--gap\",\"min\":8,\"max\":48}]'>A</div>",
-      '  <div data-unship-option="Alt" hidden>B</div>',
-      "</section>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["duplicate-var"]);
-});
-
 test("readiness accepts a valid inline-group hint", () => {
   const groups = scanReadiness(
     "src/App.html",
@@ -478,63 +374,6 @@ test("readiness keeps certainty across void elements between options", () => {
   assert.deepEqual(groups[0].findings, []);
 });
 
-test("readiness fails a slider declaring both range and steps keys", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<div data-unship-pick="Hero">',
-      "  <div data-unship-option=\"A\" style=\"--x: 0;\" data-unship-tweaks='[{\"type\":\"slider\",\"label\":\"X\",\"var\":\"--x\",\"min\":0,\"max\":10,\"steps\":[{\"label\":\"a\",\"value\":\"1\"}]}]'>a</div>",
-      '  <div data-unship-option="B" hidden>b</div>',
-      "</div>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-shape"]);
-});
-
-test("readiness fails duplicate vars within shared group axes", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<div data-unship-pick="Hero" style="--gap: 8px;" data-unship-tweaks=\'[{"type":"slider","label":"A","var":"--gap","min":1,"max":9},{"type":"slider","label":"B","var":"--gap","min":2,"max":8}]\'>',
-      '  <div data-unship-option="A">a</div>',
-      '  <div data-unship-option="B" hidden>b</div>',
-      "</div>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["duplicate-var"]);
-});
-
-test("readiness fails an inline default that matches no control position", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<div data-unship-pick="Hero">',
-      "  <div data-unship-option=\"A\" style=\"--eyebrow: inline;\" data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"Eyebrow\",\"var\":\"--eyebrow\",\"on\":\"block\",\"off\":\"none\"}]'>a</div>",
-      '  <div data-unship-option="B" hidden>b</div>',
-      "</div>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-default"]);
-  assert.match(groups[0].findings[0].message, /does not match/);
-});
-
-test("readiness requires an anchored style declaration for defaults", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<div data-unship-pick="Hero">',
-      "  <div data-unship-option=\"A\" style=\"--label:x--g:y;\" data-unship-tweaks='[{\"type\":\"toggle\",\"label\":\"G\",\"var\":\"--g\",\"on\":\"1\",\"off\":\"0\"}]'>a</div>",
-      '  <div data-unship-option="B" hidden>b</div>',
-      "</div>"
-    ].join("\n")
-  );
-
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-default"]);
-});
-
 test("readiness reports the group end line in its inventory", () => {
   const groups = scanReadiness(
     "src/App.html",
@@ -554,7 +393,7 @@ test("readiness scans many instrumented groups in bounded time", () => {
   const parts = [];
   for (let i = 0; i < 2000; i += 1) {
     parts.push(
-      `<div data-unship-pick="G${i}" data-unship-tweaks='[{"type":"toggle","label":"A","var":"--a${i}","on":"1","off":"0"}]' style="--a${i}: 0;"><div data-unship-option="Only">x</div></div>`
+      `<div data-unship-pick="G${i}" style="--a${i}: 0;"><div data-unship-option="Only">x</div></div>`
     );
   }
   const started = Date.now();
@@ -584,10 +423,10 @@ test("checkUnshipReadiness keeps pass status when only notes are present", async
   assert.equal(result.summary.noteCount, 1);
 });
 
-test("readiness rejects unusable numeric slider steps and units", () => {
-  for (const extra of [{ step: 0 }, { step: -1 }, { step: "2" }, { unit: {} }]) {
-    const axis = { type: "slider", label: "Offset", var: "--offset", min: -20, max: 0, ...extra };
-    const groups = scanReadiness("preview.html", `<section data-unship-pick="Offset"><div data-unship-option="Current" style="--offset: -8px;" data-unship-tweaks='${JSON.stringify([axis])}'>Card</div></section>`);
-    assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-shape"]);
-  }
+
+test("readiness rejects retired control markup without interpreting its payload", () => {
+  const groups = scanReadiness("index.html", `<section data-unship-pick="Hero" data-unship-tweaks='not JSON'><div data-unship-option="A" data-unship-tweaks='[]'>A</div></section>`);
+  assert.deepEqual(groups[0].findings.map(({code,level}) => ({code,level})), [
+    { code: "retired-attribute", level: "fail" }, { code: "retired-attribute", level: "fail" }
+  ]);
 });

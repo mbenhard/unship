@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { walkProjectFiles } from "../project-files/index.js";
 
 const EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".astro", ".md", ".mdx", ".liquid", ".hbs", ".handlebars", ".njk", ".ejs"]);
+// Retired attributes remain detectable so cleanup can remove older previews.
 const PATTERNS = ["data-unship-pick", "data-unship-option", "data-unship-tweaks", "data-unship-as", "data-unship-canvas", "unship-picker", "<!-- unship"];
 const PICK_ATTR = "data-unship-pick";
 const OPTION_ATTR = "data-unship-option";
@@ -141,7 +142,6 @@ export function scanExplorations(file, text) {
   });
 }
 
-const TWEAKS_ATTR = "data-unship-tweaks";
 const AS_ATTR = "data-unship-as";
 const CANVAS_ATTR = "data-unship-canvas";
 
@@ -168,6 +168,18 @@ export function scanReadiness(file, rawText) {
     const pick = attributeValueAt(text, group.attrOffset, PICK_ATTR, index + 1)?.value || `Group ${index + 1}`;
     const startLine = lineIndexForOffset(lineStarts, group.element.startOffset) + 1;
     const findings = [];
+    const retired = attributePresenceRegex("data-unship-tweaks");
+    retired.lastIndex = group.element.startOffset;
+    let retiredMatch;
+    while ((retiredMatch = retired.exec(text)) && retiredMatch.index < group.range.endOffset) {
+      if (isInsideRange(retiredMatch.index, nestedRanges) || !isLiveAttribute(text, safe, retiredMatch.index)) continue;
+      findings.push({
+        level: "fail",
+        line: lineIndexForOffset(lineStarts, retiredMatch.index) + 1,
+        code: "retired-attribute",
+        message: "Remove retired data-unship-tweaks markup; make design adjustments directly in source."
+      });
+    }
     const options = collectOptionDetails(text, safe, lineStarts, group.element.startOffset, group.range.endOffset, nestedRanges);
     // Svelte/Angular template control flow governs visibility at runtime, so
     // any block marker inside the group range forces the uncertain tier.
@@ -218,43 +230,6 @@ export function scanReadiness(file, rawText) {
     }
 
     const groupTag = openTagAt(text, group.attrOffset, safe);
-    const groupAxes = readAxes({
-      tweaks: groupTag ? readQuotedAttribute(groupTag.source, TWEAKS_ATTR) : null,
-      style: groupTag ? readQuotedAttribute(groupTag.source, "style") : null,
-      line: startLine,
-      findings
-    });
-
-    const groupVars = new Set();
-    for (const axis of groupAxes) {
-      if (groupVars.has(axis.var)) {
-        findings.push({
-          level: "fail",
-          line: startLine,
-          code: "duplicate-var",
-          message: `Axis var "${axis.var}" is declared more than once in the group's shared axes.`
-        });
-      }
-      groupVars.add(axis.var);
-    }
-
-    const optionAxes = options.map((option) => {
-      const axes = readAxes({ tweaks: option.tweaks, style: option.style, line: option.line, findings });
-      const vars = new Set(groupAxes.map((axis) => axis.var));
-      for (const axis of axes) {
-        if (vars.has(axis.var)) {
-          findings.push({
-            level: "fail",
-            line: option.line,
-            code: "duplicate-var",
-            message: `Axis var "${axis.var}" is declared more than once in the panel for option "${option.label}".`
-          });
-        }
-        vars.add(axis.var);
-      }
-      return axes;
-    });
-
     const asHint = groupTag ? readQuotedAttribute(groupTag.source, AS_ATTR) : null;
     if (asHint?.kind === "dynamic") {
       findings.push({
@@ -303,10 +278,6 @@ export function scanReadiness(file, rawText) {
       ...(group.range.endLine ? { endLine: group.range.endLine } : {}),
       options: options.map((option) => option.label),
       visibleCount: certain ? options.filter((option) => !option.hidden.present).length : null,
-      axes: [
-        ...groupAxes.map((axis) => ({ ...axis, on: "group" })),
-        ...optionAxes.flatMap((axes, optionIndex) => axes.map((axis) => ({ ...axis, on: options[optionIndex].label })))
-      ],
       findings
     };
   });
@@ -337,9 +308,7 @@ function collectOptionDetails(text, safe, lineStarts, startOffset, endOffset, ne
       label: value.value,
       line: lineIndexForOffset(lineStarts, match.index) + 1,
       certain: value.kind === "literal" && depth === 1 && Boolean(tag),
-      hidden: tag && !directiveControlled ? readBooleanAttribute(tag.source, "hidden") : { kind: "dynamic", present: false },
-      tweaks: tag ? readQuotedAttribute(tag.source, TWEAKS_ATTR) : null,
-      style: tag ? readQuotedAttribute(tag.source, "style") : null
+      hidden: tag && !directiveControlled ? readBooleanAttribute(tag.source, "hidden") : { kind: "dynamic", present: false }
     });
   }
   return details;
@@ -378,7 +347,7 @@ function blankScriptBodies(text) {
 
 // The open tag containing the attribute at attrOffset, or null when the tag
 // boundary cannot be located. Quoted attribute values protect ">", "{", and
-// "<" from ending the scan, so JSON tweak payloads survive intact.
+// "<" from ending the scan, so quoted attribute values survive intact.
 // Open tags larger than this are assumed corrupt (e.g. a degraded blanker on
 // adversarial input); bounding the scans keeps the pass linear and degrades
 // such elements to the uncertain tier instead of hanging.
@@ -441,125 +410,6 @@ function readBooleanAttribute(tagSource, attr) {
   if (new RegExp(`(?<=[\\s<])${escaped}\\s*=\\s*\\{`).test(tagSource)) return { kind: "dynamic", present: false };
   if (new RegExp(`(?<=[\\s<])${escaped}(?=[\\s>/=]|$)`).test(tagSource)) return { kind: "literal", present: true };
   return { kind: "literal", present: false };
-}
-
-const KNOWN_AXIS_TYPES = new Set(["slider", "segmented", "toggle", "swatch"]);
-
-function readAxes({ tweaks, style, line, findings }) {
-  if (!tweaks) return [];
-  if (tweaks.kind !== "literal") {
-    findings.push({
-      level: "uncertain",
-      line,
-      code: "tweaks-dynamic",
-      message: "data-unship-tweaks value is dynamic; verify axes manually."
-    });
-    return [];
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(tweaks.value);
-  } catch {
-    findings.push({ level: "fail", line, code: "tweaks-json", message: "data-unship-tweaks is not valid JSON." });
-    return [];
-  }
-  if (!Array.isArray(parsed)) {
-    findings.push({ level: "fail", line, code: "tweaks-json", message: "data-unship-tweaks must be a JSON array of axes." });
-    return [];
-  }
-
-  const axes = [];
-  parsed.forEach((axis, index) => {
-    const label = typeof axis?.label === "string" && axis.label.trim() ? axis.label : `axis ${index + 1}`;
-    if (!axis || typeof axis !== "object" || !KNOWN_AXIS_TYPES.has(axis.type)) {
-      findings.push({
-        level: "fail",
-        line,
-        code: "axis-type",
-        message: `${label}: unknown control type "${axis?.type}". Known types: slider, segmented, toggle, swatch.`
-      });
-      return;
-    }
-    if (typeof axis.var !== "string" || !axis.var.startsWith("--")) {
-      findings.push({ level: "fail", line, code: "axis-var", message: `${label}: every axis must name a CSS custom property in "var".` });
-      return;
-    }
-    if (!validAxisShape(axis)) {
-      findings.push({ level: "fail", line, code: "axis-shape", message: `${label}: invalid fields for control type "${axis.type}".` });
-      return;
-    }
-    if (style?.kind === "dynamic") {
-      findings.push({
-        level: "uncertain",
-        line,
-        code: "axis-default",
-        message: `${label}: could not statically confirm an inline default for ${axis.var}.`
-      });
-    } else {
-      const declared = style?.kind === "literal" ? styleDeclaration(style.value, axis.var) : null;
-      const positions = axisPositions(axis);
-      if (declared === null || declared === "") {
-        findings.push({
-          level: "fail",
-          line,
-          code: "axis-default",
-          message: `${label}: declare an inline default for ${axis.var} in the element's style attribute.`
-        });
-      } else if (positions && !positions.includes(declared)) {
-        findings.push({
-          level: "fail",
-          line,
-          code: "axis-default",
-          message: `${label}: inline default "${declared}" for ${axis.var} does not match any ${axis.type} position.`
-        });
-      }
-    }
-    axes.push({ label, var: axis.var, type: axis.type });
-  });
-  return axes;
-}
-
-function validAxisShape(axis) {
-  if (axis.type === "slider") {
-    // XOR on key presence, not key validity: declaring both forms is
-    // ambiguous even when one of them is malformed.
-    const hasSteps = axis.steps !== undefined;
-    const hasRange = axis.min !== undefined || axis.max !== undefined;
-    if (hasSteps === hasRange) return false;
-    if (hasSteps) return Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(isLabeledValue);
-    return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min &&
-      (axis.step === undefined || (Number.isFinite(axis.step) && axis.step > 0)) &&
-      (axis.unit === undefined || typeof axis.unit === "string");
-  }
-  if (axis.type === "segmented") {
-    return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.length <= 4 && axis.options.every(isLabeledValue);
-  }
-  if (axis.type === "swatch") {
-    return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.every(isLabeledValue);
-  }
-  return typeof axis.on === "string" && typeof axis.off === "string";
-}
-
-function isLabeledValue(entry) {
-  return Boolean(entry) && typeof entry.label === "string" && typeof entry.value === "string";
-}
-
-// The declared value of a custom property in an inline style attribute, or
-// null when the property is not declared as its own anchored declaration.
-function styleDeclaration(styleValue, varName) {
-  const escaped = escapeRegExp(varName);
-  const match = new RegExp(`(?:^|[;\\s])${escaped}\\s*:\\s*([^;]*)`).exec(styleValue);
-  return match ? match[1].trim() : null;
-}
-
-// Enumerable control positions; null for numeric sliders, whose value space
-// cannot be checked by membership.
-function axisPositions(axis) {
-  if (axis.type === "toggle") return [axis.on, axis.off];
-  if (Array.isArray(axis.steps)) return axis.steps.map((step) => step.value);
-  if (Array.isArray(axis.options)) return axis.options.map((option) => option.value);
-  return null;
 }
 
 export function summarizeCleanup({ diagnostics = [], explorations = [] } = {}) {

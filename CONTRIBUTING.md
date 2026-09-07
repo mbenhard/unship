@@ -16,7 +16,7 @@ Unship is intentionally small. Prefer direct code, no runtime dependencies, and 
 
 Run `npm run demo` and open `http://127.0.0.1:4173`. Set `PORT` to use a different port. The server binds to loopback only and serves the current checkout's picker without caching; refresh after edits.
 
-The mock Fieldwork workspace covers three Welcome variants, Activity states, and a single-option Note card with all tuning control types across the page. Compare, tune, reset, switch groups, copy a keep instruction, drag, and minimize. The textarea lets you inspect clipboard output without sending anything. Reload resets choices and tuning, while toolbar placement remains local.
+The mock Fieldwork workspace covers Welcome variants, Activity states, and a single-option Note card. Compare options, switch groups, open Canvas, copy a keep instruction, drag, and minimize. The textarea lets you inspect clipboard output. Reload resets choices, while toolbar placement remains local.
 
 Open Canvas from the picker to compare all directions at once. Welcome uses a responsive matrix; Activity and Note card use grids. The focused Canvas fixture is available at `/canvas`.
 

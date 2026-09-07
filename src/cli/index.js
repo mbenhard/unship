@@ -459,5 +459,5 @@ Workflow:
 Agent notes:
   setup returns a dev-only picker snippet when a local preview needs one.
   check verifies that no Unship preview artifacts remain.
-  check --readiness verifies comparison structure and axes before handoff.`);
+  check --readiness verifies comparison structure and presentation hints before handoff.`);
 }

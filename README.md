@@ -93,23 +93,6 @@ npx skills add mbenhard/unship
 
 The picker switches direct child options. It does not reload the app, swap source, save state, or add a production dependency by default.
 
-### Tuning
-
-Options (or the group itself) can also declare tunable axes with `data-unship-tweaks` — a JSON array of controls bound to CSS custom properties. The picker renders them in a tune panel: sliders (numeric or token-stepped), toggles, segmented controls, and color swatches. Every axis needs an inline default in the same element's `style` attribute, and its var must be used by the option's CSS.
-
-```html
-<div data-unship-option="Proof-led" hidden
-     style="--hero-gap: 24px; --accent: #0071e3;"
-     data-unship-tweaks='[
-       {"type":"slider","label":"Density","var":"--hero-gap","min":8,"max":48,"step":4,"unit":"px"},
-       {"type":"swatch","label":"Accent","var":"--accent","options":[
-         {"label":"Sky","value":"#0071e3"},{"label":"Ember","value":"#f56300"}
-       ]}
-     ]'>
-```
-
-Tuned values are remembered per option while comparing, clicking a slider's readout resets that axis, and holding the label copies a keep instruction that includes every current value so the agent can bake them into source. A group with a single option becomes a tweak-only exploration: no variants, just calibration of existing UI.
-
 ### Canvas
 
 Ask for Canvas when switching one Option at a time is not enough:
@@ -127,7 +110,7 @@ Canvas presents every opted-in Group and Option on one bounded, zoomable surface
 <section data-unship-pick="Hero" data-unship-canvas="matrix">…</section>
 ```
 
-`stack` is for wide sections, `grid` is for compact components, and `matrix` renders every Option at 1280, 768, and 390 pixel viewport widths. Matrix Groups open with Desktop previews only; one responsive toggle reveals Tablet and Mobile together without moving or zooming the Canvas, while Fit explicitly reframes everything. Canvas prepares visible Frames before its short reveal, switches light/dark in place, and uses native CSS transforms for pointer drag, two-finger trackpad panning, and cursor-relative pinch zoom. It reuses the standard Unship dock, tuning axes, and hold-to-Keep workflow; it does not add annotations, sharing, saved boards, or layout controls.
+`stack` compares wide sections, `grid` compact components, and `matrix` every Option at 1280, 768, and 390 pixels. Open Canvas with the overlapping-frames icon. Matrix starts at Desktop; the responsive toggle reveals Tablet and Mobile without changing the camera. Fit reframes everything. Canvas prepares previews before revealing them and supports light/dark themes, pointer drag, trackpad pan, and cursor-relative pinch zoom with native CSS transforms. Hold-to-Keep copies the selected option for the agent to settle in source.
 
 ## Good For
 
@@ -163,9 +146,9 @@ npx @unship/cli@latest check --json
 npx @unship/cli@latest check --readiness --json
 ```
 
-`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including `data-unship-tweaks`, `data-unship-as`, and `data-unship-canvas` attributes.
+`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including presentation attributes and retired preview markup.
 
-`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and tweak-axis declarations, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored. Axis declarations with literal values are validated even in templated files, since the attribute value itself is statically certain.
+`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and presentation hints, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored.
 
 The npm package is `@unship/cli`. The binary is `unship`, so local installs can run:
 

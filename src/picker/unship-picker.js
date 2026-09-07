@@ -8,7 +8,8 @@
   const MATRIX_WIDTHS = [1280, 768, 390];
   const CANVAS_ICONS = {
     desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>',
-    responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="13" height="10" rx="1.8"></rect><path d="M6 18h5.5M9 15v3"></path><rect x="16.5" y="8" width="5" height="11" rx="1.5"></rect></svg>',
+    frames: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5"/><rect x="10" y="11" width="11" height="9" rx="2"/></svg>',
+    responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 15.5H4.5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2V9M10 15.5v4m-4 0h6"/><rect x="13" y="9" width="8.5" height="12" rx="2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>',
     moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z"></path></svg>'
   };
@@ -58,13 +59,6 @@
   let gesturePointerId = null;
   let gestureCleanup = null;
   let ghost = null;
-  // Tune panel state: axes declared via data-unship-tweaks bind to CSS custom
-  // properties. Defaults are captured once per element (first touch), values
-  // are remembered per group/option so comparing tuned options round-trips.
-  let panelOpen = false;
-  let panelAxes = [];
-  const tweakDefaultsByElement = new WeakMap();
-  const tweakValuesByKey = new Map();
   let canvasOpen = false;
   let canvasPreparing = false;
   let canvasShell = null;
@@ -134,15 +128,7 @@
         label: group.label,
         displayLabel: group.displayLabel,
         activeOptionIndex: group.activeOptionIndex,
-        options: group.options.map((option) => option.label),
-        tweaks: axesForGroup(group).map((axis) => ({
-          label: axis.label || axis.var,
-          var: axis.var,
-          type: axis.type,
-          scope: axis.scope,
-          value: axisValue(group, axis),
-          default: axisDefault(axis)
-        }))
+        options: group.options.map((option) => option.label)
       })),
       activeGroupIndex,
       toolbarMode: groups.length === 0 ? "none" : groups.length === 1 ? "single" : "multi",
@@ -216,7 +202,6 @@
         else hideOption(option.element);
       });
       selectedIndexByGroup.set(group.element, group.activeOptionIndex);
-      applyTweaks(group);
     });
   }
 
@@ -280,7 +265,6 @@
       clearCopiedStatus();
       activeGroupIndex = index;
       const group = groups[activeGroupIndex];
-      panelOpen = false;
       renderedSignature = "";
       render();
       announce(group);
@@ -316,7 +300,6 @@
     if (menuOpen) return;
     if (menuCloseTimer) finishMenuClose();
     menuOpen = true;
-    panelOpen = false;
     clearTimeout(menuCloseTimer);
     menuCloseTimer = null;
     menuCloseAction = null;
@@ -327,8 +310,6 @@
       return;
     }
 
-    dock.classList.remove("tuning");
-    dock.querySelector(".tune")?.setAttribute("aria-expanded", "false");
     const list = dock.querySelector(".menu-list");
     if (list) {
       const viewportLimit = Math.max(0, Math.min(224, window.innerHeight - 208));
@@ -385,23 +366,15 @@
 
     group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
     const option = group.options[group.activeOptionIndex];
-    panelAxes = axesForGroup(group);
-    if (!panelAxes.length) panelOpen = false;
     const mode = canvasOpen ? "canvas" : groups.length === 1 ? "single" : "multi";
     const nextSignature = renderSignature(mode);
     if (nextSignature === renderedSignature) return;
     const entering = renderedSignature === "" || renderedSignature === "none";
     renderedSignature = nextSignature;
-    // Panel content can change size across options/groups; capture the open
-    // panel's height before the rebuild so it can morph instead of snapping.
-    const previousPanelHeight = root.querySelector(".dock.tuning .panel")?.offsetHeight ?? null;
-
     if (canvasOpen) {
-      setToolbarHtml(`<div class="dock canvas-dock bottom${panelOpen ? " tuning" : ""}${canvasDockEntering ? " enter" : ""}" role="group" aria-label="Unship Canvas controls">
-        ${panel(group)}
+      setToolbarHtml(`<div class="dock canvas-dock bottom${canvasDockEntering ? " enter" : ""}" role="group" aria-label="Unship Canvas controls">
         <div class="row canvas-row">${canvasRowMarkup()}</div>
       </div>`);
-      morphPanelHeight(previousPanelHeight);
       return;
     }
 
@@ -412,19 +385,16 @@
     }
 
     const swapClass = switchDir ? " swap" : "";
-    setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
+    setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu() : ""}
-      ${panel(group, swapClass)}
       <div class="row">
         ${rowMarkup(group, option, swapClass)}
       </div>
     </div>`);
-    morphPanelHeight(previousPanelHeight);
   }
 
   // Capability slots: chevrons and the counter exist only when there is more
-  // than one option to compare; the tune button only when axes exist. The
-  // label is the one universal element (keep, drag, minimize).
+  // than one option to compare. The label supports keep, drag and minimize.
   function rowMarkup(group, option, swapClass = "") {
     const comparable = group.options.length > 1;
     const title =
@@ -443,36 +413,35 @@
             );
     const ariaLabel = comparable
       ? `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`
-      : `${escapeHtml(group.displayLabel)}. Hold to keep these values, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
+      : `${escapeHtml(group.displayLabel)}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
     return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
         <button class="label" type="button" aria-label="${ariaLabel}">
           <span class="label-main${swapClass}">${title}</span>
           ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}
-        ${panelAxes.length ? tuneButton(group) : ""}
-        ${canvasGroups().length ? canvasButton() : ""}`;
+        ${groups.length === 1 && canvasGroups().length ? canvasButton() : ""}`;
   }
 
   function canvasGroups() {
     return groups.filter((group) => group.canvasLayout);
   }
 
-  function canvasButton() {
-    return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas">Canvas</button>`;
+  function canvasButton(attached = false) {
+    return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas" title="Open Canvas">${attached ? "<span>Canvas</span>" : ""}${CANVAS_ICONS.frames}</button>`;
   }
 
   function canvasRowMarkup() {
     const percent = Math.round(canvasZoom * 100);
     const responsive = canvasResponsiveMarkup();
-    return `<button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Close Canvas"></button>
-      <i class="canvas-divider" aria-hidden="true"></i>
-      <button class="canvas-zoom nav" type="button" data-action="canvas-zoom-out" aria-label="Zoom out"></button>
+    return `<button class="canvas-zoom nav" type="button" data-action="canvas-zoom-out" aria-label="Zoom out"></button>
       <span class="canvas-zoom-value" aria-label="Canvas zoom ${percent}%">${percent}%</span>
       <button class="canvas-zoom canvas-zoom-in nav" type="button" data-action="canvas-zoom-in" aria-label="Zoom in"></button>
       <button class="canvas-fit" type="button" data-action="canvas-fit" aria-label="Fit Canvas">Fit</button>
       ${responsive ? `<i class="canvas-divider" aria-hidden="true"></i>${responsive}` : ""}
-      ${canvasThemeMarkup()}`;
+      ${canvasThemeMarkup()}
+      <i class="canvas-divider" aria-hidden="true"></i>
+      <button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Back to page" title="Back to page"></button>`;
   }
 
   function canvasResponsiveMarkup() {
@@ -508,7 +477,6 @@
     canvasPreparing = true;
     minimized = false;
     menuOpen = false;
-    panelOpen = false;
     canvasKeeps.clear();
     canvasSnapshot = snapshotDocument();
     canvasDirty = false;
@@ -599,7 +567,6 @@
     const wasPreparing = canvasPreparing;
     canvasOpen = false;
     canvasPreparing = false;
-    panelOpen = false;
     clearTimeout(canvasRevealTimer);
     clearTimeout(canvasContentTimer);
     clearTimeout(canvasCacheTimer);
@@ -669,7 +636,6 @@
       <div class="canvas-frame-toolbar" role="toolbar" aria-label="Canvas Frame actions" aria-hidden="true" inert>
         <span class="canvas-option-name"></span>
         <span class="canvas-frame-width"></span>
-        <button type="button" data-action="canvas-tune">Tune</button>
         <button class="canvas-keep" type="button" data-action="canvas-keep">Hold to keep</button>
       </div>`;
     const world = shell.querySelector(".canvas-world");
@@ -716,7 +682,7 @@
     }
     frame.style.width = `${width}px`;
     frame.tabIndex = 0;
-    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press T to tune or Enter to keep`);
+    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press Enter to keep`);
     const iframe = document.createElement("iframe");
     iframe.className = "canvas-iframe";
     iframe.title = `${group.displayLabel}: ${option.label} at ${width} pixels`;
@@ -767,7 +733,6 @@
     doc.documentElement.style.setProperty("background", "transparent", "important");
     doc.body.style.setProperty("background", "transparent", "important");
     option.querySelectorAll("img").forEach((image) => { image.loading = "eager"; });
-    syncFrameTweaks(iframe);
 
     let assetsReady = false;
     const measure = () => {
@@ -792,28 +757,6 @@
       assetsReady = true;
       requestAnimationFrame(() => requestAnimationFrame(measure));
     });
-  }
-
-  function syncFrameTweaks(iframe) {
-    const group = groups[Number(iframe.dataset.group)];
-    const doc = iframe.contentDocument;
-    const snapshotGroup = doc?.querySelectorAll(GROUP_SELECTOR)[group?.sourceIndex];
-    const snapshotOptions = snapshotGroup ? Array.from(snapshotGroup.children).filter((child) => child.hasAttribute(OPTION_ATTR)) : [];
-    const snapshotOption = snapshotOptions[Number(iframe.dataset.option)];
-    if (!group || !snapshotGroup || !snapshotOption) return;
-    const previous = group.activeOptionIndex;
-    group.activeOptionIndex = Number(iframe.dataset.option);
-    for (const axis of axesForGroup(group)) {
-      const target = axis.scope ? snapshotOption : snapshotGroup;
-      target.style.setProperty(axis.var, axisValue(group, axis));
-    }
-    group.activeOptionIndex = previous;
-    requestAnimationFrame(() => iframe.__unshipMeasure?.());
-  }
-
-  function syncCanvasTweaks(group) {
-    if (!canvasShell) return;
-    canvasShell.querySelectorAll(`.canvas-iframe[data-group="${group.index}"]`).forEach(syncFrameTweaks);
   }
 
   function toggleCanvasResponsive() {
@@ -864,16 +807,7 @@
     group.activeOptionIndex = optionIndex;
     applyGroupVisibility(group);
     persistSelection(group);
-    panelAxes = axesForGroup(group);
     return group;
-  }
-
-  function tuneCanvasOption(groupIndex, optionIndex) {
-    const group = activateCanvasOption(groupIndex, optionIndex);
-    if (!group || !panelAxes.length) return;
-    panelOpen = true;
-    renderedSignature = "";
-    render();
   }
 
   function keepCanvasOption(groupIndex, optionIndex) {
@@ -882,7 +816,7 @@
     const instruction = keepInstruction(group);
     const shell = canvasShell;
     // Serialize clipboard writes and capture the deliberate choice now.
-    // Tuning another option later must not change a previous Keep action.
+    // Later navigation must not change a previous Keep action.
     canvasKeepQueue = canvasKeepQueue.then(async () => {
       if (shell !== canvasShell || !canvasOpen) return;
       const choices = new Map(canvasKeeps).set(groupIndex, instruction);
@@ -1252,22 +1186,6 @@
     smoothCanvasZoom(base * Math.exp(-Math.sign(delta) * strength), focal);
   }
 
-  function morphPanelHeight(previousHeight) {
-    if (previousHeight === null || !panelOpen) return;
-    const panelNode = root.querySelector(".dock.tuning .panel");
-    if (!panelNode) return;
-    const nextHeight = panelNode.offsetHeight;
-    if (!nextHeight || nextHeight === previousHeight) return;
-    panelNode.classList.add("morphing");
-    panelNode.style.height = `${previousHeight}px`;
-    void panelNode.offsetHeight;
-    panelNode.style.height = `${nextHeight}px`;
-    setTimeout(() => {
-      panelNode.classList.remove("morphing");
-      panelNode.style.height = "";
-    }, 300);
-  }
-
   function renderPreservingLabelFocus() {
     const restoreLabelFocus = root?.activeElement?.classList?.contains("label");
     render();
@@ -1296,8 +1214,6 @@
     return JSON.stringify({
       activeGroupIndex,
       menuOpen,
-      panelOpen,
-      panelAxes: panelAxes.map((axis) => `${axis.scope}|${axis.type}|${axis.var}`),
       mode,
       placement,
       minimized,
@@ -1334,7 +1250,7 @@
       })
       .join("");
 
-    return `<div class="menu" role="menu"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><span class="menu-caret" aria-hidden="true"></span></button><div class="menu-list" role="none">${items}</div></div>`;
+    return `<div class="menu" role="menu"><div class="menu-header${canvasGroups().length ? " has-canvas" : ""}" role="none"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><svg class="menu-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/><path d="M6 12h12"/><path d="M6 12h12"/></svg></button>${canvasGroups().length ? canvasButton(true) : ""}</div><div class="menu-list" role="none">${items}</div></div>`;
   }
 
   function syncMenuOverflow() {
@@ -1360,244 +1276,6 @@
     }
   }
 
-  // Axes bind controls to CSS custom properties. Invalid JSON or unknown
-  // control types fail soft: the axis is skipped, the toolbar never breaks.
-  function parseAxes(element) {
-    const raw = element?.getAttribute?.("data-unship-tweaks");
-    if (!raw) return [];
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      console.warn("unship: ignoring invalid data-unship-tweaks JSON", element);
-      return [];
-    }
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (axis) =>
-        axis &&
-        typeof axis === "object" &&
-        typeof axis.var === "string" &&
-        axis.var.startsWith("--") &&
-        validAxisShape(axis)
-    );
-  }
-
-  function validAxisShape(axis) {
-    const labeled = (entry) => entry && typeof entry.label === "string" && typeof entry.value === "string";
-    if (axis.type === "slider") {
-      const hasSteps = axis.steps !== undefined;
-      const hasRange = axis.min !== undefined || axis.max !== undefined;
-      if (hasSteps === hasRange) return false;
-      if (hasSteps) return Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(labeled);
-      return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min &&
-        (axis.step === undefined || (Number.isFinite(axis.step) && axis.step > 0)) &&
-        (axis.unit === undefined || typeof axis.unit === "string");
-    }
-    if (axis.type === "segmented" || axis.type === "swatch") {
-      return Array.isArray(axis.options) && axis.options.length >= 2 &&
-        (axis.type !== "segmented" || axis.options.length <= 4) && axis.options.every(labeled);
-    }
-    return axis.type === "toggle" && typeof axis.on === "string" && typeof axis.off === "string";
-  }
-
-  // Option axes first, shared group axes below — the panel mirrors this order.
-  function axesForGroup(group) {
-    const option = group.options[clamp(group.activeOptionIndex, group.options.length)];
-    return [
-      ...parseAxes(option?.element).map((axis) => ({ ...axis, host: option.element, scope: option.label })),
-      ...parseAxes(group.element).map((axis) => ({ ...axis, host: group.element, scope: "" }))
-    ];
-  }
-
-  function axisDefault(axis) {
-    let defaults = tweakDefaultsByElement.get(axis.host);
-    if (!defaults) {
-      defaults = {};
-      tweakDefaultsByElement.set(axis.host, defaults);
-    }
-    if (!(axis.var in defaults)) {
-      defaults[axis.var] =
-        axis.host.style.getPropertyValue(axis.var).trim() || getComputedStyle(axis.host).getPropertyValue(axis.var).trim();
-    }
-    return defaults[axis.var];
-  }
-
-  function tweakKey(group, axis) {
-    return `${group.index}:${group.label}:${axis.scope}`;
-  }
-
-  function axisValue(group, axis) {
-    const stored = tweakValuesByKey.get(tweakKey(group, axis))?.[axis.var];
-    return stored !== undefined ? stored : axisDefault(axis);
-  }
-
-  function setAxisValue(group, axis, value) {
-    axisDefault(axis);
-    const key = tweakKey(group, axis);
-    const bucket = tweakValuesByKey.get(key) || {};
-    bucket[axis.var] = value;
-    tweakValuesByKey.set(key, bucket);
-    pauseObserver(() => axis.host.style.setProperty(axis.var, value));
-  }
-
-  function resetAxis(group, axis) {
-    const fallback = axisDefault(axis);
-    const bucket = tweakValuesByKey.get(tweakKey(group, axis));
-    if (bucket) delete bucket[axis.var];
-    pauseObserver(() => {
-      if (fallback) axis.host.style.setProperty(axis.var, fallback);
-      else axis.host.style.removeProperty(axis.var);
-    });
-  }
-
-  // Re-apply remembered values after visibility switches and framework
-  // re-renders; capture defaults before any write so reset stays truthful.
-  function applyTweaks(group) {
-    for (const axis of axesForGroup(group)) {
-      axisDefault(axis);
-      const stored = tweakValuesByKey.get(tweakKey(group, axis))?.[axis.var];
-      if (stored !== undefined) axis.host.style.setProperty(axis.var, stored);
-    }
-  }
-
-  function axisDisplay(axis, value) {
-    if (axis.type === "toggle") return value === axis.on ? "on" : "off";
-    if (axis.type === "segmented" || axis.type === "swatch") {
-      const match = (axis.options || []).find((option) => option.value === value);
-      return match ? match.label : value;
-    }
-    if (Array.isArray(axis.steps)) {
-      const match = axis.steps.find((step) => step.value === value);
-      return match ? match.label : value;
-    }
-    return value;
-  }
-
-  function axisModified(group, axis) {
-    return axisValue(group, axis) !== axisDefault(axis);
-  }
-
-  function anyAxisModified(group) {
-    return panelAxes.some((axis) => axisModified(group, axis));
-  }
-
-  function tuneButton(group) {
-    const modified = anyAxisModified(group);
-    return `<button class="tune nav${modified ? " modified" : ""}" type="button" data-action="toggle-panel" aria-haspopup="true" aria-expanded="${panelOpen}" aria-label="Tune ${escapeHtml(group.displayLabel)}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="11" x2="14" y2="11"/><circle cx="10" cy="5" r="2.2" fill="#000"/><circle cx="6" cy="11" r="2.2" fill="#000"/></svg></button>`;
-  }
-
-  function panel(group, swapClass = "") {
-    if (!panelAxes.length) return "";
-    const firstShared = panelAxes.findIndex((axis) => axis.scope === "");
-    const rows = panelAxes
-      .map((axis, index) => {
-        const value = axisValue(group, axis);
-        const shared = (axis.scope === "" && firstShared === index && firstShared > 0 ? " shared" : "") + swapClass;
-        const readout =
-          axis.type === "slider"
-            ? `<button class="tweak-value" type="button" data-action="reset-axis" data-axis="${index}" title="Reset to default" aria-label="Reset ${escapeHtml(axis.label || axis.var)} to default">${escapeHtml(axisDisplay(axis, value))}</button>`
-            : "";
-        return `<div class="tweak${shared}"><span class="tweak-name">${escapeHtml(axis.label || axis.var)}</span>${axisControl(axis, index, value)}${readout}</div>`;
-      })
-      .join("");
-    return `<div class="panel" role="group" aria-label="Tune ${escapeHtml(group.displayLabel)}">${rows}</div>`;
-  }
-
-  function axisControl(axis, index, value) {
-    const label = escapeHtml(axis.label || axis.var);
-    if (axis.type === "slider" && Array.isArray(axis.steps)) {
-      const current = Math.max(0, axis.steps.findIndex((step) => step.value === value));
-      const fill = axis.steps.length > 1 ? (current / (axis.steps.length - 1)) * 100 : 0;
-      return `<input class="tweak-range" type="range" min="0" max="${axis.steps.length - 1}" step="1" value="${current}" data-axis="${index}" style="--fill:${fill}%" aria-label="${label}">`;
-    }
-    if (axis.type === "slider") {
-      const number = parseFloat(value);
-      const min = axis.min;
-      const max = axis.max;
-      const current = Number.isFinite(number) ? number : min;
-      const fill = max > min ? ((current - min) / (max - min)) * 100 : 0;
-      return `<input class="tweak-range" type="range" min="${min}" max="${max}" step="${Number(axis.step) || 1}" value="${current}" data-axis="${index}" style="--fill:${fill}%" aria-label="${label}">`;
-    }
-    if (axis.type === "toggle") {
-      const on = value === axis.on;
-      return `<button class="tweak-switch${on ? " on" : ""}" type="button" role="switch" aria-checked="${on}" data-action="toggle-axis" data-axis="${index}" aria-label="${label}"></button>`;
-    }
-    if (axis.type === "swatch") {
-      return `<span class="tweak-swatches">${(axis.options || [])
-        .map(
-          (option, optionIndex) =>
-            `<button class="tweak-swatch${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" style="--swatch:${escapeHtml(option.value)}" aria-pressed="${option.value === value}" aria-label="${label}: ${escapeHtml(option.label)}"></button>`
-        )
-        .join("")}</span>`;
-    }
-    return `<span class="tweak-seg">${(axis.options || [])
-      .map(
-        (option, optionIndex) =>
-          `<button class="tweak-seg-item${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" aria-pressed="${option.value === value}" aria-label="${label}: ${escapeHtml(option.label)}">${escapeHtml(option.label)}</button>`
-      )
-      .join("")}</span>`;
-  }
-
-  // The menu and the tune panel share the dock's expand slot; opening one
-  // closes the other so the dock never stacks two drawers.
-  function openPanel() {
-    if (panelOpen || !panelAxes.length) return;
-    if (menuOpen || menuCloseTimer) {
-      afterMenuClose(openPanel);
-      return;
-    }
-    panelOpen = true;
-    menuOpen = false;
-    const dock = root?.querySelector(".dock");
-    if (!dock) {
-      render();
-      return;
-    }
-    dock.classList.remove("open");
-    dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
-    dock.classList.add("tuning");
-    dock.querySelector(".tune")?.setAttribute("aria-expanded", "true");
-    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
-  }
-
-  function closePanel() {
-    if (!panelOpen) return;
-    panelOpen = false;
-    const dock = root?.querySelector(".dock");
-    if (!dock) {
-      render();
-      return;
-    }
-    dock.classList.remove("tuning");
-    dock.querySelector(".tune")?.setAttribute("aria-expanded", "false");
-    renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
-  }
-
-  function refreshTuneIndicator() {
-    const group = groups[activeGroupIndex];
-    if (!group) return;
-    root?.querySelector(".tune")?.classList.toggle("modified", anyAxisModified(group));
-  }
-
-  function handlePanelInput(event) {
-    const input = event.target;
-    if (!input.classList?.contains("tweak-range")) return;
-    const group = groups[activeGroupIndex];
-    const axis = panelAxes[Number(input.dataset.axis)];
-    if (!group || !axis) return;
-    const value = Array.isArray(axis.steps) ? axis.steps[Number(input.value)]?.value : `${input.value}${axis.unit || ""}`;
-    if (value === undefined) return;
-    const min = Number(input.min);
-    const max = Number(input.max);
-    if (max > min) input.style.setProperty("--fill", `${((Number(input.value) - min) / (max - min)) * 100}%`);
-    setAxisValue(group, axis, value);
-    syncCanvasTweaks(group);
-    const readout = input.parentElement?.querySelector(".tweak-value");
-    if (readout) readout.textContent = axisDisplay(axis, value);
-    refreshTuneIndicator();
-  }
-
   function handleToolbarClick(event) {
     const button = event.target.closest?.("[data-action]");
     if (!button) return;
@@ -1610,7 +1288,6 @@
     else if (action === "canvas-fit") fitCanvas();
     else if (action === "canvas-theme") toggleCanvasTheme();
     else if (action === "canvas-responsive") toggleCanvasResponsive();
-    else if (action === "canvas-tune") tuneCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
     else if (action === "canvas-keep") {
       if (button.dataset.held === "true") delete button.dataset.held;
       else keepCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
@@ -1620,40 +1297,6 @@
     else if (action === "toggle-menu") {
       if (menuOpen) closeMenu();
       else openMenu();
-    } else if (action === "toggle-panel") {
-      if (panelOpen) closePanel();
-      else openPanel();
-    } else if (action === "toggle-axis") {
-      const group = groups[activeGroupIndex];
-      const axis = panelAxes[Number(button.dataset.axis)];
-      if (!group || !axis) return;
-      const next = axisValue(group, axis) === axis.on ? axis.off : axis.on;
-      setAxisValue(group, axis, next);
-      syncCanvasTweaks(group);
-      button.classList.toggle("on", next === axis.on);
-      button.setAttribute("aria-checked", String(next === axis.on));
-      refreshTuneIndicator();
-    } else if (action === "pick-axis") {
-      const group = groups[activeGroupIndex];
-      const axis = panelAxes[Number(button.dataset.axis)];
-      const choice = axis?.options?.[Number(button.dataset.option)];
-      if (!group || !axis || !choice) return;
-      setAxisValue(group, axis, choice.value);
-      syncCanvasTweaks(group);
-      button.parentElement?.querySelectorAll("[data-action='pick-axis']").forEach((item) => {
-        item.classList.toggle("selected", item === button);
-        item.setAttribute("aria-pressed", String(item === button));
-      });
-      refreshTuneIndicator();
-    } else if (action === "reset-axis") {
-      const group = groups[activeGroupIndex];
-      const axis = panelAxes[Number(button.dataset.axis)];
-      if (!group || !axis) return;
-      resetAxis(group, axis);
-      syncCanvasTweaks(group);
-      renderedSignature = "";
-      render();
-      root.querySelector(".tune")?.focus({ preventScroll: true });
     } else if (action === "restore") {
       const square = root.querySelector(".minimized");
       if (square && !square.classList.contains("fading")) {
@@ -1708,37 +1351,19 @@
       if (event.key === "Tab") {
         const controls = Array.from(root.querySelectorAll('button,input,[tabindex="0"]')).filter((node) =>
           !node.disabled && !node.closest('[inert],.viewport-hidden') &&
-          (!node.closest('.panel') || panelOpen) && node.getClientRects().length && getComputedStyle(node).visibility !== "hidden");
+          node.getClientRects().length && getComputedStyle(node).visibility !== "hidden");
         const next = wrap(controls.indexOf(root.activeElement) + (event.shiftKey ? -1 : 1), controls.length);
         event.preventDefault();
         controls[next]?.focus({ preventScroll: true });
       } else if (event.key === "Escape") {
         event.preventDefault();
-        if (panelOpen) {
-          panelOpen = false;
-          renderedSignature = "";
-          render();
-          root.querySelector(".canvas-close")?.focus({ preventScroll: true });
-        } else closeCanvas();
+        closeCanvas();
       } else {
         const frame = event.target.closest?.(".canvas-frame");
-        if (frame && (event.key === "t" || event.key === "T")) {
-          event.preventDefault();
-          tuneCanvasOption(Number(frame.dataset.group), Number(frame.dataset.option));
-        } else if (frame && event.key === "Enter") {
+        if (frame && event.key === "Enter") {
           event.preventDefault();
           keepCanvasOption(Number(frame.dataset.group), Number(frame.dataset.option));
         }
-      }
-      return;
-    }
-    // Focused tune controls own their keys (arrows adjust sliders, Space
-    // flips switches); only Escape falls through to close the panel.
-    if (event.target.closest?.(".panel")) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closePanel();
-        root.querySelector(".tune")?.focus({ preventScroll: true });
       }
       return;
     }
@@ -1761,11 +1386,6 @@
       event.preventDefault();
       navigateGroup(1);
     } else if (event.key === "Escape") {
-      if (panelOpen) {
-        event.preventDefault();
-        closePanel();
-        return;
-      }
       if (!menuOpen) {
         document.activeElement?.blur();
         return;
@@ -1816,7 +1436,7 @@
     liveRegion.textContent =
       group.options.length > 1
         ? `${group.displayLabel}, ${option.label}, option ${group.activeOptionIndex + 1} of ${group.options.length}`
-        : `${group.displayLabel}, tune values with the tune button`;
+        : `${group.displayLabel}, ${option.label}`;
   }
 
   // Copy a ready-to-paste keep instruction for the agent. Only claims success
@@ -1838,13 +1458,7 @@
 
   function keepInstruction(group) {
     const option = group.options[group.activeOptionIndex];
-    const axes = axesForGroup(group);
-    const values = axes.map((axis) => `${axis.label || axis.var} ${axisDisplay(axis, axisValue(group, axis))}`).join(", ");
-    return !axes.length
-      ? `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`
-      : group.options.length === 1
-        ? `Keep "${group.displayLabel}" with ${values}; bake these values in and remove the unship markup.`
-        : `Keep "${option.label}" for "${group.displayLabel}" with ${values}; bake these values in and remove the other unship options in that group.`;
+    return `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`;
   }
 
   function clearCopiedStatus() {
@@ -2113,7 +1727,7 @@
       characterData: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-unship-pick", OPTION_ATTR, "data-unship-tweaks", CANVAS_ATTR, "hidden", "class", "style", "src", "href"]
+      attributeFilter: ["data-unship-pick", OPTION_ATTR, CANVAS_ATTR, "hidden", "class", "style", "src", "href"]
     });
   }
 
@@ -2266,43 +1880,21 @@
       .dock:not(.open) .menuitem.current:hover{background:rgba(255,255,255,.17)}
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
+      .menu-header{display:flex;gap:4px;align-items:center}
+      .menu-header .menuitem.current{flex:1;min-width:0;padding:0 12px;font-size:12px;font-weight:450}
+      .menu-header.has-canvas .menuitem.current{border-radius:20px 9px 9px 20px}
+      .menu-header .canvas-enter{display:flex;gap:10px;width:90px;min-width:90px;margin:0;padding:0 12px;font-size:12px;font-weight:450;justify-content:space-between;border-radius:9px 20px 20px 9px}
+      .menu-header .menu-name{font-weight:inherit}
       .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .menu-caret{width:6px;height:6px;min-width:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-.5px,-.5px);margin-left:auto;margin-right:3px;opacity:.65;transition:transform var(--dur) var(--ease)}
-      .open .menuitem.current .menu-caret{transform:rotate(225deg) translate(-1.5px,-1.5px)}
+      .menu-caret{width:18px;height:18px;min-width:18px;margin-left:auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+      .menu-caret path{transform-origin:12px 12px;transition:transform var(--dur) var(--ease),opacity .18s ease}
+      .menu-caret path:first-child{transform:translateY(-5px)}
+      .menu-caret path:last-child{transform:translateY(5px)}
+      .open .menu-caret path:first-child{transform:rotate(45deg)}
+      .open .menu-caret path:nth-child(2){transform:scaleX(.2);opacity:0}
+      .open .menu-caret path:last-child{transform:rotate(-45deg)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em}
-      .panel{max-height:0;overflow:hidden;opacity:0;margin-bottom:0;transition:max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
-      .tuning .panel{max-height:min(232px,calc(100vh - 168px));overflow-y:auto;opacity:1;margin-bottom:var(--gap);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
-      .tuning .panel.morphing{overflow:hidden;transition:height var(--dur) var(--ease),max-height var(--dur) var(--ease),opacity .18s ease,margin var(--dur) var(--ease)}
-      .tweak{display:flex;align-items:center;gap:.7em;min-height:30px;padding:0 .55em 0 .95em}
-      .tweak.shared{border-top:.5px solid rgba(255,255,255,.14);margin-top:4px;padding-top:4px}
-      .tweak-name{opacity:.85;min-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .tweak-range{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:16px;margin:0;background:transparent;cursor:pointer}
-      .tweak-range::-webkit-slider-runnable-track{height:3px;border-radius:999px;background:linear-gradient(to right,#f5f5f5 var(--fill,0%),rgba(255,255,255,.22) var(--fill,0%))}
-      .tweak-range::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;margin-top:-5px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-      .tweak-range::-moz-range-track{height:3px;border-radius:999px;background:linear-gradient(to right,#f5f5f5 var(--fill,0%),rgba(255,255,255,.22) var(--fill,0%))}
-      .tweak-range::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#fff}
-      .tweak-range:focus-visible{outline:0}
-      .tweak-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(255,255,255,.35)}
-      .tweak-value{min-width:44px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums;padding:2px 5px;border-radius:6px;white-space:nowrap}
-      .tweak-value:hover{opacity:1;background:rgba(255,255,255,.12)}
-      .tweak-switch{width:28px;height:16px;min-width:28px;border-radius:999px;background:rgba(255,255,255,.25);position:relative;margin-left:auto;padding:0;transition:background .15s ease}
-      .tweak-switch::after{content:"";position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .15s ease,background .15s ease}
-      .tweak-switch.on{background:#f5f5f5}
-      .tweak-switch.on::after{transform:translateX(12px);background:#000}
-      .tweak-seg{margin-left:auto;display:inline-flex;background:rgba(255,255,255,.12);border-radius:999px;padding:2px;gap:2px;font-size:11px}
-      .tweak-seg-item{padding:2px 9px;border-radius:999px;transition:background .12s ease,color .12s ease}
-      .tweak-seg-item:hover{background:rgba(255,255,255,.12)}
-      .tweak-seg-item.selected{background:#f5f5f5;color:#000}
-      .tweak-swatches{margin-left:auto;display:inline-flex;gap:8px;align-items:center;padding-right:4px}
-      .tweak-swatch{width:13px;height:13px;min-width:13px;border-radius:50%;background:var(--swatch);padding:0;transition:transform .12s ease}
-      .tweak-swatch:hover{transform:scale(1.15)}
-      .tweak-swatch.selected{box-shadow:0 0 0 2px #000,0 0 0 3.5px #fff}
-      .tune{position:relative}
-      .next+.tune{margin-left:9px}
-      .tune svg{display:block}
-      .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
-      .tuning .tune{background:rgba(255,255,255,.14)}
       .nav{position:relative;width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .prev::before,.next::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
@@ -2312,11 +1904,11 @@
       .label{position:relative;flex:1;min-width:0;text-align:center;padding:0 .65em;min-height:var(--h);display:flex;align-items:center;justify-content:center;gap:.55em;white-space:nowrap;overflow:hidden;border-radius:var(--r);transition:background .12s ease;touch-action:none}
       .label.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       @keyframes holdFill{to{transform:none}}
+      .boxing .menu,.boxing .row{opacity:0;transition:opacity .12s ease}
+      .boxing.unboxing .menu,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
+      .preboxed .menu,.preboxed .row{opacity:0;transition:none}
       .dock.boxing{overflow:hidden;pointer-events:none;transition:width .3s var(--ease),height .3s var(--ease),border-radius .3s var(--ease),padding .3s var(--ease),left .3s var(--ease)}
-      .boxing .menu,.boxing .panel,.boxing .row{opacity:0;transition:opacity .12s ease}
-      .boxing.unboxing .menu,.boxing.unboxing .panel,.boxing.unboxing .row{opacity:1;transition:opacity .15s ease .14s}
       .dock.preboxed{overflow:hidden;transition:none}
-      .preboxed .menu,.preboxed .panel,.preboxed .row{opacity:0;transition:none}
       .minimized{position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;width:${MINI_SIZE_PX}px;height:${MINI_SIZE_PX}px;padding:0;border-radius:50%;background:#000;cursor:pointer;display:grid;place-items:center;transition:transform .2s cubic-bezier(.32,.72,0,1),opacity .14s ease;animation:miniIn .14s cubic-bezier(0,0,.2,1)}
       @keyframes miniIn{from{transform:translateX(-50%) scale(1.06)}to{transform:translateX(-50%)}}
       .minimized::before{content:"";width:6px;height:6px;border:1.5px solid #fff;transform:rotate(45deg)}
@@ -2333,7 +1925,7 @@
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .canvas-enter,.canvas-fit{height:var(--h);padding:0 10px;border-radius:999px;white-space:nowrap;font-size:11px}
-      .canvas-enter{display:grid;place-items:center;box-sizing:border-box;min-width:59px;margin-left:5px;background:rgba(255,255,255,.12)}
+      .canvas-enter{display:grid;place-items:center;box-sizing:border-box;width:var(--nav);min-width:var(--nav);padding:0;margin-left:5px;background:rgba(255,255,255,.12)}
       .canvas-enter.preparing{opacity:.68;pointer-events:none}
       .canvas-spinner{width:9px;height:9px;border:1.5px solid #ffffff59;border-top-color:#fff;border-radius:50%;animation:spin .45s linear infinite}
       @keyframes spin{to{transform:rotate(1turn)}}
@@ -2372,27 +1964,26 @@
       .canvas-frame-toolbar button{position:relative;min-height:26px;padding:0 9px;border-radius:999px;overflow:hidden}
       .canvas-frame-toolbar button:hover,.canvas-frame-toolbar button:focus-visible{background:rgba(255,255,255,.14)}
       .canvas-keep.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
-      .canvas-dock{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;width:max-content;max-width:calc(100vw - 20px);left:50%!important}
-      .canvas-dock .panel{margin-bottom:0}
-      .canvas-dock.tuning .panel{margin-bottom:var(--gap)}
+      .dock.canvas-dock{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;width:max-content;max-width:calc(100vw - 20px);left:50%!important}
       .canvas-row{gap:3px}
       .canvas-close::before,.canvas-close::after,.canvas-zoom::before,.canvas-zoom-in::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:1.5px;background:currentColor;transform:translate(-50%,-50%)}
       .canvas-close::before{transform:translate(-50%,-50%) rotate(45deg)}
       .canvas-close::after{transform:translate(-50%,-50%) rotate(-45deg)}
       .canvas-zoom-in::after{transform:translate(-50%,-50%) rotate(90deg)}
       .canvas-divider{width:1px;height:22px;flex:none;background:rgba(255,255,255,.14)}
-      .canvas-state-toggle{position:relative;width:var(--h);height:var(--h);min-width:var(--h);padding:0;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.1);transition:background .16s ease,transform .12s ease}
+      .canvas-state-toggle{position:relative;width:var(--h);height:var(--h);min-width:var(--h);padding:0;border-radius:50%;overflow:hidden;background:transparent;transition:background .16s ease,transform .12s ease}
       .canvas-state-toggle:active{transform:scale(.9)}
-      .canvas-state-toggle[aria-pressed="true"]{background:#f5f5f3;color:#050505}
+      .canvas-responsive-toggle[aria-pressed="true"]{background:#f5f5f3;color:#050505}
+      .canvas-theme-toggle{background:transparent;color:#aaa}
+      .canvas-theme-toggle:hover,.canvas-theme-toggle:focus-visible{background:#ffffff16;color:#f5f5f3}
       .canvas-state-icon{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .16s ease,transform .2s cubic-bezier(.32,.72,0,1)}
-      .canvas-state-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+      .canvas-enter svg,.canvas-state-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
       .canvas-responsive-toggle .canvas-state-secondary svg{width:20px;height:20px}
       .canvas-state-primary{opacity:1;transform:rotate(0) scale(1)}
       .canvas-state-secondary{opacity:0;transform:rotate(-28deg) scale(.6)}
       .canvas-state-toggle[aria-pressed="true"] .canvas-state-primary{opacity:0;transform:rotate(28deg) scale(.6)}
       .canvas-state-toggle[aria-pressed="true"] .canvas-state-secondary{opacity:1;transform:rotate(0) scale(1)}
-      .canvas-zoom-value{height:var(--h);min-width:46px;padding:0 8px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
-      .canvas-fit{background:rgba(255,255,255,.1)}
+      .canvas-zoom-value{box-sizing:border-box;height:var(--h);width:40px;min-width:40px;flex:none;padding:0 4px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
@@ -2405,7 +1996,6 @@
       .dock[data-dir="prev"] .group-count-current,.dock[data-dir="prev"] .option-count-current{--dx:0px;--dy:-8px}
       .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
       .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
-      .tweak.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (max-width:520px){.canvas-row{gap:2px}}
       @media (max-width:340px){.canvas-fit{display:none}}
@@ -2423,7 +2013,6 @@
 
     root = host.attachShadow({ mode: "open" });
     root.addEventListener("click", handleToolbarClick);
-    root.addEventListener("input", handlePanelInput);
     root.addEventListener("scroll", handleMenuScroll, true);
     root.addEventListener("wheel", handleMenuWheel, { passive: false });
     root.addEventListener("mousedown", handleToolbarMouseDown);

@@ -329,7 +329,7 @@ test("check ignores nested JSX props before the pick attribute", async () => {
   });
 });
 
-test("check reports orphaned tweak and presentation-hint attributes", async () => {
+test("check reports retired control markup and orphaned presentation hints", async () => {
   const root = await mkdtemp(join(tmpdir(), "unship-check-"));
   await mkdir(join(root, "src"), { recursive: true });
   await writeFile(

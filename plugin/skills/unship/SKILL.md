@@ -9,6 +9,8 @@ Use Unship to create temporary alternatives in real source, let the human compar
 
 Unship is local comparison tooling. The picker script runs in the user's local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The human chooses by naming a visible option label in chat; you settle source by keeping that option and removing temporary artifacts.
 
+Make requested design adjustments directly in source. Use Unship to compare discrete alternatives.
+
 ## Normal Requests
 
 Treat ordinary prompts as complete enough to begin. Examples:
@@ -68,6 +70,8 @@ Keep verification proportional to the phase. Before the first handoff, do only c
 - exactly one direct option is initially visible;
 - hidden direct options are actually hidden, including computed `display: none` when a rendered DOM can be checked cheaply.
 
+For literal HTML, run `$UNSHIP check --readiness --json --root <comparison-directory>`. Correct failures and verify uncertain results manually.
+
 Do not run full release checks during ordinary variant creation unless the source cannot be edited safely without them. Full typecheck, build, browser automation, mobile smoke, `unship check`, and cleanup verification belong to picker setup changes, selected-option cleanup, or final shipping cleanup.
 
 Use the rendered page when the user asks for browser help, setup requires manual verification, or source is insufficient.
@@ -109,38 +113,6 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 ## Inline Mode Safety
 
 Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, submit controls, global scripts, analytics triggers, autoplay media, focus traps, destructive side effects, and stateful providers. If unsafe, reduce scope or explain that inline mode is not suitable.
-
-## Tuning Existing UI or Variants
-
-When the user asks to tune or calibrate an existing design, or a few continuous adjustments would help compare options, add a small set of meaningful `data-unship-tweaks` axes. Preserve the requested number of choices. A single direct option supports tuning without inventing alternatives.
-
-Declare axes as a JSON array on the option, or on the group for shared controls. Each axis needs a short `label`, a CSS custom property in `var`, and an inline default on the same element. Use that property in the rendered CSS so every control has a visible effect.
-
-- Numeric `slider`: finite `min` and `max` with `max > min`, positive `step`, and optional `unit`.
-- Token `slider`: at least two `steps`, each with a `label` and CSS `value`; do not also declare a numeric range.
-- `segmented`: two to four labeled `options` with CSS values.
-- `swatch`: at least two labeled color `options` with CSS values.
-- `toggle`: explicit CSS values for `on` and `off`.
-
-Defaults for token, segmented, swatch, and toggle controls must match a declared value. Use distinct labels and variables within each panel; put shared controls on the group, without shadowing their variables on options.
-
-```html
-<section data-unship-pick="Card">
-  <div data-unship-option="Soft" style="--card-pad: 24px; --card-accent: #275c45;"
-       data-unship-tweaks='[
-         {"type":"slider","label":"Padding","var":"--card-pad","min":12,"max":40,"step":4,"unit":"px"},
-         {"type":"swatch","label":"Accent","var":"--card-accent","options":[
-           {"label":"Fern","value":"#275c45"},{"label":"Ink","value":"#263b58"}
-         ]}
-       ]'>...</div>
-</section>
-```
-
-For literal HTML, use `$UNSHIP check --readiness --json --root <comparison-directory>` as the lightweight handoff check. A `fail` needs correction; `uncertain` needs source or rendered verification. Keep the root focused on the consuming preview, not Unship's own source or test fixtures.
-
-Tell the human to open Tune, adjust the controls, click a slider readout to reset it, and hold the option label (or press Enter while it is focused) to copy a keep instruction. Tuning is temporary browser state; it does not save source and resets on reload.
-
-When the human pastes a keep instruction, apply the stated values to the retained source before removing temporary markup. Resolve named token/color choices to their declared CSS values; ask only if the instruction is ambiguous. Keep remaining explorations mounted until final cleanup is requested.
 
 ## Hidden Option Safety
 
@@ -190,7 +162,7 @@ Canvas is the simultaneous companion to the normal one-at-a-time picker. Add one
 
 Choose the Arrangement yourself from the content; do not ask the user to operate layout controls. Keep the marked Group as the smallest self-contained source scope that renders truthfully. Canvas Frames are script-free snapshots, so a target that depends on canvas pixels, shadow DOM, or client JavaScript needs a smaller static preview surface.
 
-Canvas reuses declared tweaks and hold-to-Keep instructions. Do not build custom Canvas controls, annotation, sharing, ranking, or persistence into the explored source.
+Canvas supports hold-to-Keep instructions. Do not build custom Canvas controls, annotation, sharing, ranking, or persistence into the explored source.
 
 ## Human Comparison Handoff
 

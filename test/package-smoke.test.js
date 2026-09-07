@@ -35,12 +35,12 @@ test("packed package is small and excludes legacy implementation paths", () => {
   assert.equal(result.status, 0, result.stderr);
   const pack = JSON.parse(result.stdout)[0];
   const files = pack.files.map((file) => file.path);
-  assert.equal(pack.size < 64_000, true, `package size ${pack.size} should stay under 64 KB`);
-  assert.equal(pack.unpackedSize < 225_000, true, `unpacked size ${pack.unpackedSize} should stay under 225 KB`);
+  assert.equal(pack.size < 54_000, true, `package size ${pack.size} should stay under 54 KB`);
+  assert.equal(pack.unpackedSize < 200_000, true, `unpacked size ${pack.unpackedSize} should stay under 200 KB`);
   // The picker is injected verbatim into consuming apps, so its uncompressed
   // weight matters independently of how well the tarball compresses.
   const pickerEntry = pack.files.find((file) => file.path === "src/picker/unship-picker.js");
-  assert.equal(pickerEntry.size < 120_000, true, `picker size ${pickerEntry.size} should stay under 120 KB`);
+  assert.equal(pickerEntry.size < 100_000, true, `picker size ${pickerEntry.size} should stay under 100 KB`);
   assert.deepEqual(files.sort(), EXPECTED_PACKED_FILES);
   assert.equal(files.some((file) => file.startsWith("src/bridge/")), false);
   assert.equal(files.some((file) => file.startsWith("src/core/")), false);
