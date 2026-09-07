@@ -172,7 +172,7 @@ test("arrow buttons clear hold-to-copy status immediately", async () => {
   }
 });
 
-test("arrow navigation closes an expanded group menu before switching options", async () => {
+test("keyboard navigation closes an expanded group menu before switching options", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
@@ -181,7 +181,7 @@ test("arrow navigation closes an expanded group menu before switching options", 
 
     await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
     await page.waitForTimeout(320);
-    await page.getByRole("button", { name: /next option/i }).click();
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).press("ArrowRight");
 
     const duringClose = await host.evaluate((element) => {
       const root = element.shadowRoot;
@@ -221,18 +221,14 @@ test("menu-close transition serializes rapid and keyboard navigation", async () 
 
     await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
     await page.waitForTimeout(320);
-    await page.getByRole("button", { name: /next option/i }).click();
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).press("ArrowRight");
     await page.getByRole("button", { name: /next option/i }).click();
     await page.waitForTimeout(320);
     assert.equal(await host.evaluate((element) => element.shadowRoot.querySelector(".label-main").textContent), "Three");
 
     await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
     await page.waitForTimeout(320);
-    await host.evaluate((element) => {
-      const label = element.shadowRoot.querySelector(".label");
-      label.focus();
-      label.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, composed: true, cancelable: true }));
-    });
+    await page.getByRole("menuitem", { name: /Active group Hero/ }).press("ArrowDown");
     await page.waitForTimeout(320);
     const afterGroupKey = await host.evaluate((element) => {
       const root = element.shadowRoot;
@@ -571,7 +567,7 @@ test("long group menus scroll immediately while the active header stays pinned",
         headerTop: header.top - root.querySelector(".dock").getBoundingClientRect().top,
         scrollTop: list.scrollTop,
         scrollable: list.scrollHeight > list.clientHeight,
-        overflowBelow: list.classList.contains("overflow-below")
+        bottomOverlay: getComputedStyle(list, "::after").content
       };
     });
     const listCenter = await page.locator("[data-unship-toolbar]").evaluate((host) => {
@@ -591,24 +587,24 @@ test("long group menus scroll immediately while the active header stays pinned",
       return {
         headerTop: header.top - root.querySelector(".dock").getBoundingClientRect().top,
         scrollTop: list.scrollTop,
-        overflowAbove: list.classList.contains("overflow-above")
+        topOverlay: getComputedStyle(list, "::before").content
       };
     });
 
     assert.equal(before.scrollTop, 0);
     assert.equal(before.scrollable, true);
-    assert.equal(before.overflowBelow, true);
+    assert.equal(before.bottomOverlay, "none");
     assert.equal(after.scrollTop > 0, true);
     // Opening a bottom-anchored dock moves the whole dock. Scrolling must
     // preserve the header position within it, including during that morph.
     assert.ok(Math.abs(after.headerTop - before.headerTop) < 1);
-    assert.equal(after.overflowAbove, true);
+    assert.equal(after.topOverlay, "none");
   } finally {
     await browser.close();
   }
 });
 
-test("group menu animates only its middle slot while header and controls stay coherent", async () => {
+test("group menu hides variant controls while expanded and restores them on close", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
@@ -636,18 +632,18 @@ test("group menu animates only its middle slot while header and controls stay co
         scrollable: list.scrollHeight > list.clientHeight,
         animating: list.getAnimations().some((animation) => animation.playState === "running"),
         rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
-        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+        controlsVisible: getComputedStyle(root.querySelector(".row")).visibility !== "hidden" && !root.querySelector(".row").inert
       };
     });
     assert.deepEqual(opening, {
       scrollable: true,
       animating: true,
       rowBottom: closed.rowBottom,
-      controlsVisible: true
+      controlsVisible: false
     });
 
     await host.evaluate((element) =>
-      element.shadowRoot.querySelector(".label").dispatchEvent(
+      element.shadowRoot.querySelector(".menuitem.current").dispatchEvent(
         new WheelEvent("wheel", { deltaY: 120, bubbles: true, composed: true, cancelable: true })
       )
     );
@@ -677,7 +673,7 @@ test("group menu animates only its middle slot while header and controls stay co
       return {
         animating: root.querySelector(".menu-list").getAnimations().some((animation) => animation.playState === "running"),
         rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
-        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+        controlsVisible: getComputedStyle(root.querySelector(".row")).visibility !== "hidden" && !root.querySelector(".row").inert
       };
     });
     assert.deepEqual(closing, { animating: true, rowBottom: closed.rowBottom, controlsVisible: true });
@@ -701,10 +697,41 @@ test("group menu animates only its middle slot while header and controls stay co
       return {
         listHeight: root.querySelector(".menu-list").getBoundingClientRect().height,
         rowBottom: root.querySelector(".row").getBoundingClientRect().bottom,
-        controlsVisible: root.querySelector(".label").getBoundingClientRect().height > 0
+        controlsVisible: getComputedStyle(root.querySelector(".row")).visibility !== "hidden" && !root.querySelector(".row").inert
       };
     });
     assert.deepEqual(closedAgain, { listHeight: 0, rowBottom: closed.rowBottom, controlsVisible: true });
+  } finally {
+    await browser.close();
+  }
+});
+
+test("short previews give the group list room for complete rows", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 240 } });
+    const groups = Array.from({ length: 3 }, (_, i) => `<section data-unship-pick="Group ${i}"><div data-unship-option="Current">${i}</div></section>`).join("");
+    await page.setContent(`${groups}<script>${picker}</script>`);
+    const header = page.getByRole("menuitem", { name: /Active group/ });
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await header.click();
+      await page.locator("[data-unship-toolbar]").evaluate(async (host) => {
+        await Promise.allSettled(host.shadowRoot.getAnimations({ subtree: true }).map(animation => animation.finished));
+      });
+      const bounds = await page.locator(".menu-list").evaluate(list => {
+        const dock = list.closest(".dock").getBoundingClientRect();
+        const rect = list.getBoundingClientRect();
+        return { height: rect.height, contentHeight: list.scrollHeight, lastBottom: list.lastElementChild.getBoundingClientRect().bottom - rect.bottom, top: dock.top, bottom: dock.bottom };
+      });
+      assert.equal(bounds.height, 86);
+      assert.equal(bounds.contentHeight, bounds.height);
+      assert.equal(bounds.lastBottom, 0);
+      assert.ok(bounds.top >= 14 && bounds.bottom <= 226);
+      await header.click();
+      await page.locator("[data-unship-toolbar]").evaluate(async (host) => {
+        await Promise.allSettled(host.shadowRoot.getAnimations({ subtree: true }).map(animation => animation.finished));
+      });
+    }
   } finally {
     await browser.close();
   }

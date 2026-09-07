@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unship · One group</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3ed;color:#242723;font:15px/1.5 system-ui,-apple-system,sans-serif}header{display:flex;justify-content:space-between;padding:24px 5vw;border-bottom:1px solid #deded5}a{color:inherit}main{max-width:1280px;margin:auto;padding:48px 32px 140px}h1{font-size:clamp(32px,5vw,56px);line-height:1.05;letter-spacing:-.055em;font-weight:550;margin:12px 0 20px}.intro{max-width:670px;color:#62685e}.eyebrow{text-transform:uppercase;font-size:11px;letter-spacing:.12em;color:#72796d}.option-head{margin:40px 0 24px;max-width:700px}h2{font-size:24px;font-weight:550;letter-spacing:-.035em;margin:0 0 8px}.option-head p{margin:0;color:#62685e}.samples{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}.sample{min-width:0}.sample h3{font-size:12px;font-weight:500;margin:0 0 10px;color:#62685e}.frame-wrap{display:flex;justify-content:center;background:#e9e5da;border:1px solid #ddd8cb;border-radius:20px;overflow:hidden}iframe{border:0;display:block;width:100%;height:300px}.narrow iframe{max-width:320px}.note{font-size:12px;color:#72796d;margin-top:22px;max-width:700px}[hidden]{display:none!important}
+</style></head><body><header><b>unship / studies</b><a href="/">Back to Fieldwork ↗</a></header><main><div class="eyebrow">Toolbar · one group</div><h1>One group.<br>How much chrome?</h1><p class="intro">The selected single-group toolbar gives Canvas its own full-width row. Every sample uses the real picker, with working variant arrows and Canvas where available.</p>
+<section>
+<article><div class="option-head"><h2>Full Canvas · a dedicated top row</h2><p>Canvas spans the toolbar width. The group sits above the variant below, keeping their context together. Without Canvas, the toolbar stays compact in one row.</p></div><div class="samples" data-layout="full"></div></article>
+</section><p class="note">The selected layout is applied to the real toolbar. Try the controls inside each sample.</p></main>
+<script type="module">
+const source = await fetch('/unship-picker.js').then(response => response.text());
+for(const samples of document.querySelectorAll('[data-layout]')) {
+ for(const [label,canvas,long] of [['With Canvas',true,false],['Without Canvas',false,false],['Long labels · 320 px',true,true]]) {
+  const sample=document.createElement('div'); sample.className='sample';
+  const heading=document.createElement('h3');heading.textContent=label;
+  const wrap=document.createElement('div');wrap.className='frame-wrap'+(long?' narrow':'');
+  const frame=document.createElement('iframe');frame.title=samples.dataset.layout+' — '+label;
+  const group=long?'Landing page introduction':'Welcome';
+  const options=long?['A quieter editorial welcome','A more expressive introduction','Room for the story']:['Quiet start','Studio journal','A small welcome'];
+  frame.srcdoc=`<!doctype html><html><head><style>*{box-sizing:border-box}body{margin:0;padding:25px;background:#e9e5da;color:#414c40;font:14px/1.5 system-ui}small{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#788171}h2{font:500 27px/1.15 Georgia,serif;margin:14px 0 8px;max-width:240px}p{font-size:12px;max-width:230px;margin:0;color:#788171}[hidden]{display:none!important}</style></head><body><section data-unship-pick="${group}" ${canvas?'data-unship-canvas="grid"':''}>${options.map((name,i)=>`<article data-unship-option="${name}" ${i?'hidden':''}><small>Fieldwork / 0${i+1}</small><h2>${['A little room<br>to begin.','Notes from<br>the studio.','Make yourself<br>at home.'][i]}</h2><p>A small space for the things taking shape.</p></article>`).join('')}</section><script>${source}<\/script></body></html>`;
+  wrap.append(frame);sample.append(heading,wrap);samples.append(sample);
+ }
+}
+</script></body></html>

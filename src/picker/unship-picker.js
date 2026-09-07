@@ -8,6 +8,7 @@
   const MATRIX_WIDTHS = [1280, 768, 390];
   const CANVAS_ICONS = {
     desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>',
+    backToPage: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-2"/><path d="M5 12h8m-2.5-2.5 2.5 2.5-2.5 2.5"/></svg>',
     frames: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5"/><rect x="10" y="11" width="11" height="9" rx="2"/></svg>',
     responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 15.5H4.5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2V9M10 15.5v4m-4 0h6"/><rect x="13" y="9" width="8.5" height="12" rx="2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>',
@@ -64,6 +65,7 @@
   let canvasShell = null;
   let canvasCloseTimer = null;
   let canvasRevealTimer = null;
+  let canvasEntryTimer = null;
   let canvasContentTimer = null;
   let canvasCacheTimer = null;
   let canvasDockEntering = false;
@@ -312,12 +314,15 @@
 
     const list = dock.querySelector(".menu-list");
     if (list) {
-      const viewportLimit = Math.max(0, Math.min(224, window.innerHeight - 208));
+      const reservedHeight = dock.offsetHeight - list.offsetHeight - dock.querySelector(".row").offsetHeight
+        - parseFloat(getComputedStyle(list).marginTop) - parseFloat(getComputedStyle(dock.querySelector(".menu")).marginBottom)
+        + parseFloat(getComputedStyle(dock).getPropertyValue("--gap"));
+      const viewportLimit = Math.max(0, Math.min(224, window.innerHeight - reservedHeight - 28));
       list.style.setProperty("--menu-list-height", `${Math.min(list.scrollHeight, viewportLimit)}px`);
     }
+    dock.querySelector(".row").inert = true;
     dock.classList.add("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "true");
-    requestAnimationFrame(syncMenuOverflow);
     renderedSignature = renderSignature(groups.length === 1 ? "single" : "multi");
   }
 
@@ -332,6 +337,7 @@
       return;
     }
 
+    dock.querySelector(".row").inert = false;
     dock.classList.remove("open");
     dock.querySelector(".menuitem.current")?.setAttribute("aria-expanded", "false");
     clearTimeout(menuCloseTimer);
@@ -386,8 +392,8 @@
 
     const swapClass = switchDir ? " swap" : "";
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
-      ${groups.length > 1 ? menu() : ""}
-      <div class="row">
+      ${groups.length > 1 ? menu() : group.canvasLayout ? `<div class="menu"><div class="menu-header full-canvas">${canvasButton()}</div></div>` : ""}
+      <div class="row"${menuOpen ? " inert" : ""}>
         ${rowMarkup(group, option, swapClass)}
       </div>
     </div>`);
@@ -397,13 +403,14 @@
   // than one option to compare. The label supports keep, drag and minimize.
   function rowMarkup(group, option, swapClass = "") {
     const comparable = group.options.length > 1;
+    const soloCanvas = groups.length === 1 && group.canvasLayout;
     const title =
       copied === "ok"
         ? "✓ Copied"
         : copied === "fail"
           ? "Couldn't copy. Try again"
           : escapeHtml(
-              !comparable
+              soloCanvas ? option.label : !comparable
                 ? groups.length === 1
                   ? group.displayLabel
                   : option.label
@@ -416,19 +423,18 @@
       : `${escapeHtml(group.displayLabel)}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
     return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
         <button class="label" type="button" aria-label="${ariaLabel}">
-          <span class="label-main${swapClass}">${title}</span>
+          ${soloCanvas ? `<span class="stack-label"><span class="solo-context">${escapeHtml(group.displayLabel)}</span><span class="label-main${swapClass}">${title}</span></span>` : `<span class="label-main${swapClass}">${title}</span>`}
           ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
-        ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}
-        ${groups.length === 1 && canvasGroups().length ? canvasButton() : ""}`;
+        ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}`;
   }
 
   function canvasGroups() {
     return groups.filter((group) => group.canvasLayout);
   }
 
-  function canvasButton(attached = false) {
-    return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas" title="Open Canvas">${attached ? "<span>Canvas</span>" : ""}${CANVAS_ICONS.frames}</button>`;
+  function canvasButton() {
+    return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas" title="Open Canvas"><span>Canvas</span><span class="canvas-entry-icon" aria-hidden="true">${CANVAS_ICONS.frames}</span></button>`;
   }
 
   function canvasRowMarkup() {
@@ -441,7 +447,7 @@
       ${responsive ? `<i class="canvas-divider" aria-hidden="true"></i>${responsive}` : ""}
       ${canvasThemeMarkup()}
       <i class="canvas-divider" aria-hidden="true"></i>
-      <button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Back to page" title="Back to page"></button>`;
+      <button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Back to page" title="Back to page">${CANVAS_ICONS.backToPage}</button>`;
   }
 
   function canvasResponsiveMarkup() {
@@ -523,13 +529,22 @@
   }
 
   function setCanvasEntryPreparing(preparing) {
+    clearTimeout(canvasEntryTimer);
     const button = root?.querySelector('[data-action="open-canvas"]');
     if (!button) return;
     button.classList.toggle("preparing", preparing);
     button.toggleAttribute("aria-busy", preparing);
     button.setAttribute("aria-disabled", String(preparing));
     button.setAttribute("aria-label", preparing ? "Preparing Canvas" : "Open Canvas");
-    button.innerHTML = preparing ? '<span class="canvas-spinner" aria-hidden="true"></span>' : "Canvas";
+    const icon = button.querySelector(".canvas-entry-icon");
+    if (!icon) return;
+    if (preparing) {
+      canvasEntryTimer = setTimeout(() => {
+        if (canvasPreparing && button.isConnected) icon.innerHTML = '<span class="canvas-spinner"></span>';
+      }, 200);
+    } else {
+      icon.innerHTML = CANVAS_ICONS.frames;
+    }
   }
 
   function maybeRevealCanvas() {
@@ -542,6 +557,7 @@
     if (!canvasPreparing || !canvasShell) return;
     clearTimeout(canvasRevealTimer);
     canvasPreparing = false;
+    setCanvasEntryPreparing(false);
     canvasOpen = true;
     pauseObserver(() => { document.documentElement.style.overflow = "hidden"; });
     fitCanvas({ animate: false });
@@ -567,6 +583,7 @@
     const wasPreparing = canvasPreparing;
     canvasOpen = false;
     canvasPreparing = false;
+    setCanvasEntryPreparing(false);
     clearTimeout(canvasRevealTimer);
     clearTimeout(canvasContentTimer);
     clearTimeout(canvasCacheTimer);
@@ -1250,18 +1267,7 @@
       })
       .join("");
 
-    return `<div class="menu" role="menu"><div class="menu-header${canvasGroups().length ? " has-canvas" : ""}" role="none"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><svg class="menu-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/><path d="M6 12h12"/><path d="M6 12h12"/></svg></button>${canvasGroups().length ? canvasButton(true) : ""}</div><div class="menu-list" role="none">${items}</div></div>`;
-  }
-
-  function syncMenuOverflow() {
-    const list = root?.querySelector(".menu-list");
-    if (!list) return;
-    list.classList.toggle("overflow-above", list.scrollTop > 1);
-    list.classList.toggle("overflow-below", list.scrollTop + list.clientHeight < list.scrollHeight - 1);
-  }
-
-  function handleMenuScroll(event) {
-    if (event.target.classList?.contains("menu-list")) syncMenuOverflow();
+    return `<div class="menu" role="menu"><div class="menu-header${canvasGroups().length ? " has-canvas" : ""}" role="none"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><svg class="menu-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/><path d="M6 12h12"/><path d="M6 12h12"/></svg></button>${canvasGroups().length ? canvasButton() : ""}</div><div class="menu-list" role="none">${items}</div></div>`;
   }
 
   function handleMenuWheel(event) {
@@ -1272,7 +1278,6 @@
     list.scrollTop += event.deltaY;
     if (list.scrollTop !== before) {
       event.preventDefault();
-      syncMenuOverflow();
     }
   }
 
@@ -1865,13 +1870,10 @@
       .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
       .group-count,.option-count{display:inline-flex;align-items:baseline}
       .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
-      .menu{display:block;margin-bottom:var(--gap)}
+      .menu{display:block;margin-bottom:var(--gap);transition:margin-bottom var(--dur) var(--ease)}
+      .dock.open>.menu{margin-bottom:0}
       .menu-list{display:block;position:relative;height:0;margin-top:0;overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.34) transparent;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
       .open .menu-list{height:var(--menu-list-height,0px);margin-top:var(--gap);opacity:1;visibility:visible;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .16s ease .04s,visibility 0s}
-      .open .menu-list::before,.open .menu-list::after{content:"";position:sticky;z-index:2;display:block;height:12px;margin-bottom:-12px;pointer-events:none;opacity:0;transition:opacity .15s ease}
-      .open .menu-list::before{top:0;background:linear-gradient(#000,transparent)}
-      .open .menu-list::after{bottom:0;margin-top:-12px;margin-bottom:0;background:linear-gradient(transparent,#000)}
-      .open .menu-list.overflow-above::before,.open .menu-list.overflow-below::after{opacity:1}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
       .menuitem:first-child{margin-top:0}
       .menu-list .menuitem:first-child{margin-top:0}
@@ -1881,12 +1883,15 @@
       .open .menuitem.current{background:#f5f5f5;color:#000}
       .open .menuitem.current .group-count{opacity:.55}
       .menu-header{display:flex;gap:4px;align-items:center}
-      .menu-header .menuitem.current{flex:1;min-width:0;padding:0 12px;font-size:12px;font-weight:450}
+      .menu-header .menuitem.current{flex:1;min-width:0;padding:0 12px;font-size:11px;font-weight:450}
       .menu-header.has-canvas .menuitem.current{border-radius:20px 9px 9px 20px}
-      .menu-header .canvas-enter{display:flex;gap:10px;width:90px;min-width:90px;margin:0;padding:0 12px;font-size:12px;font-weight:450;justify-content:space-between;border-radius:9px 20px 20px 9px}
-      .menu-header .menu-name{font-weight:inherit}
-      .menu-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .menu-caret{width:18px;height:18px;min-width:18px;margin-left:auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+      .menu-header .canvas-enter{display:flex;gap:10px;width:90px;min-width:90px;margin:0;padding:0 12px;font-size:11px;font-weight:450;justify-content:space-between;border-radius:9px 20px 20px 9px}
+      .menu-header.full-canvas .canvas-enter{width:100%;min-width:0;flex:1;border-radius:999px}
+      .stack-label{display:flex;flex-direction:column;min-width:0;text-align:left;gap:3px}
+      .solo-context{font-size:10px;font-weight:450;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .menu-header .menu-name{font-size:inherit;font-weight:inherit}
+      .menu-name{font-size:11.5px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .menu-caret{opacity:.5;width:18px;height:18px;min-width:18px;margin-left:auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
       .menu-caret path{transform-origin:12px 12px;transition:transform var(--dur) var(--ease),opacity .18s ease}
       .menu-caret path:first-child{transform:translateY(-5px)}
       .menu-caret path:last-child{transform:translateY(5px)}
@@ -1895,6 +1900,8 @@
       .open .menu-caret path:last-child{transform:rotate(-45deg)}
       .menu-option{margin-left:auto;opacity:.7;font-size:.9em;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
       .row{display:flex;align-items:center;gap:.3em}
+      .dock:not(.canvas-dock)>.row{height:var(--h);overflow:hidden;transition:height var(--dur) var(--ease),opacity .12s ease}
+      .dock.open>.row{height:0;opacity:0;visibility:hidden;pointer-events:none}
       .nav{position:relative;width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .prev::before,.next::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
@@ -1922,11 +1929,12 @@
       .dock.snapping{transition:left .22s var(--ease),bottom .22s var(--ease),top .22s var(--ease)}
       .label:hover,.label:focus{background:transparent;box-shadow:none;outline:0}
       .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
-      .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
+      .label-main{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .option-count{font-size:11.5px;flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .canvas-enter,.canvas-fit{height:var(--h);padding:0 10px;border-radius:999px;white-space:nowrap;font-size:11px}
       .canvas-enter{display:grid;place-items:center;box-sizing:border-box;width:var(--nav);min-width:var(--nav);padding:0;margin-left:5px;background:rgba(255,255,255,.12)}
-      .canvas-enter.preparing{opacity:.68;pointer-events:none}
+      .canvas-enter.preparing{pointer-events:none}
+      .canvas-entry-icon{opacity:.5;display:grid;place-items:center;width:18px;height:18px;flex:none}
       .canvas-spinner{width:9px;height:9px;border:1.5px solid #ffffff59;border-top-color:#fff;border-radius:50%;animation:spin .45s linear infinite}
       @keyframes spin{to{transform:rotate(1turn)}}
       .canvas-enter:hover,.canvas-fit:hover,.canvas-state-toggle:hover{background:rgba(255,255,255,.17)}
@@ -1966,16 +1974,18 @@
       .canvas-keep.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       .dock.canvas-dock{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;width:max-content;max-width:calc(100vw - 20px);left:50%!important}
       .canvas-row{gap:3px}
-      .canvas-close::before,.canvas-close::after,.canvas-zoom::before,.canvas-zoom-in::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:1.5px;background:currentColor;transform:translate(-50%,-50%)}
-      .canvas-close::before{transform:translate(-50%,-50%) rotate(45deg)}
-      .canvas-close::after{transform:translate(-50%,-50%) rotate(-45deg)}
+      .canvas-zoom::before,.canvas-zoom-in::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:1.5px;background:currentColor;transform:translate(-50%,-50%)}
+      .canvas-close svg{transform:translateX(-1px);width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+      .canvas-close.nav{transition:background .16s ease,transform .16s ease}
+      .canvas-close.nav:hover{background:rgba(255,255,255,.2);transform:scale(1.06)}
+      .canvas-close.nav:active{transform:scale(.94)}
       .canvas-zoom-in::after{transform:translate(-50%,-50%) rotate(90deg)}
       .canvas-divider{width:1px;height:22px;flex:none;background:rgba(255,255,255,.14)}
       .canvas-state-toggle{position:relative;width:var(--h);height:var(--h);min-width:var(--h);padding:0;border-radius:50%;overflow:hidden;background:transparent;transition:background .16s ease,transform .12s ease}
       .canvas-state-toggle:active{transform:scale(.9)}
       .canvas-responsive-toggle[aria-pressed="true"]{background:#f5f5f3;color:#050505}
-      .canvas-theme-toggle{background:transparent;color:#aaa}
-      .canvas-theme-toggle:hover,.canvas-theme-toggle:focus-visible{background:#ffffff16;color:#f5f5f3}
+      .canvas-theme-toggle{background:transparent}
+      .canvas-theme-toggle:hover,.canvas-theme-toggle:focus-visible{background:#ffffff16}
       .canvas-state-icon{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .16s ease,transform .2s cubic-bezier(.32,.72,0,1)}
       .canvas-enter svg,.canvas-state-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
       .canvas-responsive-toggle .canvas-state-secondary svg{width:20px;height:20px}
@@ -1983,7 +1993,7 @@
       .canvas-state-secondary{opacity:0;transform:rotate(-28deg) scale(.6)}
       .canvas-state-toggle[aria-pressed="true"] .canvas-state-primary{opacity:0;transform:rotate(28deg) scale(.6)}
       .canvas-state-toggle[aria-pressed="true"] .canvas-state-secondary{opacity:1;transform:rotate(0) scale(1)}
-      .canvas-zoom-value{box-sizing:border-box;height:var(--h);width:40px;min-width:40px;flex:none;padding:0 4px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+      .canvas-zoom-value{font-size:11.5px;box-sizing:border-box;height:var(--h);width:40px;min-width:40px;flex:none;padding:0 4px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
@@ -2013,7 +2023,6 @@
 
     root = host.attachShadow({ mode: "open" });
     root.addEventListener("click", handleToolbarClick);
-    root.addEventListener("scroll", handleMenuScroll, true);
     root.addEventListener("wheel", handleMenuWheel, { passive: false });
     root.addEventListener("mousedown", handleToolbarMouseDown);
     root.addEventListener("keydown", handleToolbarKeydown);

@@ -94,8 +94,17 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
       '<div data-unship-option="Proof"><img src="https://unship.test/slow.svg" alt="">Proof</div>'
     );
     await page.setContent(slowPage, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => window.__unshipPicker?.getState().canvas.preparing);
+    const initial = await page.getByRole("button", { name: "Open Canvas" }).evaluate((button) => {
+      button.click();
+      return {
+        label: button.textContent,
+        icon: Boolean(button.querySelector(".canvas-entry-icon svg")),
+        spinner: Boolean(button.querySelector(".canvas-spinner")),
+        width: button.offsetWidth
+      };
+    });
+    assert.deepEqual(initial, { label: "Canvas", icon: true, spinner: false, width: 90 });
+    await page.locator(".canvas-entry-icon .canvas-spinner").waitFor();
     const preparing = await page.locator("[data-unship-toolbar]").evaluate((host) => {
       const root = host.shadowRoot;
       const shell = root.querySelector(".canvas-shell");
@@ -111,7 +120,7 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
         overflow: document.documentElement.style.overflow
       };
     });
-    assert.deepEqual(preparing, { open: false, label: "", ariaLabel: "Preparing Canvas", spinner: true, width: 90, opacity: "0", pointerEvents: "none", overflow: "" });
+    assert.deepEqual(preparing, { open: false, label: "Canvas", ariaLabel: "Preparing Canvas", spinner: true, width: 90, opacity: "0", pointerEvents: "none", overflow: "" });
 
     releaseImages();
     await page.getByRole("button", { name: "Back to page" }).waitFor();

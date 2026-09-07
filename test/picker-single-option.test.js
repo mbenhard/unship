@@ -78,3 +78,31 @@ test("retired control metadata cannot add controls or values to a Keep instructi
     assert.equal(await page.locator('[data-unship-pick]').evaluate(el => el.style.getPropertyValue('--space')), '16px');
   } finally { await browser.close(); }
 });
+
+test("single-group Canvas keeps a full-width entry and separate group context", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
+    await page.setContent(`<section data-unship-pick="Welcome" data-unship-canvas="grid"><div data-unship-option="Quiet start">A</div><div data-unship-option="Studio journal" hidden>B</div></section><script>${picker}</script>`);
+    const host = page.locator('[data-unship-toolbar]');
+    const state = await host.evaluate(host => {
+      const root = host.shadowRoot;
+      const entry = root.querySelector('.canvas-enter');
+      return { entryWidth: entry.offsetWidth, headerWidth: entry.parentElement.offsetWidth, radius: getComputedStyle(entry).borderTopLeftRadius, group: root.querySelector('.solo-context').textContent, label: root.querySelector('.label-main').textContent, listIcon: Boolean(root.querySelector('.menu-caret')) };
+    });
+    assert.equal(state.entryWidth, state.headerWidth);
+    assert.equal(state.radius, '999px');
+    assert.equal(state.group, 'Welcome');
+    assert.equal(state.label, 'Quiet start');
+    assert.equal(state.listIcon, false);
+    await page.getByRole('button', { name: 'Next option' }).click();
+    assert.equal(await host.locator('.label-main').textContent(), 'Studio journal');
+    await page.getByRole('button', { name: 'Open Canvas' }).click();
+    const back = page.getByRole('button', { name: 'Back to page' });
+    await back.waitFor();
+    assert.equal(await back.locator('svg').count(), 1);
+    await back.click();
+    await page.getByRole('button', { name: 'Open Canvas' }).waitFor();
+    assert.equal(await host.locator('.label-main').textContent(), 'Studio journal');
+  } finally { await browser.close(); }
+});

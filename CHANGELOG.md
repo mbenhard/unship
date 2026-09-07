@@ -7,6 +7,8 @@ All notable changes to Unship are documented here.
 - Add Canvas for simultaneous comparison with `stack`, `grid`, and responsive `matrix` arrangements, script-free snapshots, native pan/zoom, light/dark themes, and warm reopen caching.
 - Preserve explicit Keep choices and cumulative clipboard output, invalidate stale snapshots after source changes, and contain keyboard focus in Canvas.
 - Add the attached Canvas tab, matching group/Canvas labels, List / Close menu animation, right-aligned Back to page control, and compact Canvas spacing.
+- Give single-group Canvas a full-width row; reduce label sizes and entry-icon opacity, and use an optically aligned return-to-page icon with hover feedback.
+- Keep the Canvas label stable during preparation, showing an icon-only spinner after 200 ms; remove menu fades, hide variant controls in expanded group lists, and size menus for short previews.
 - Remove experimental tuning controls and their runtime, state, metadata validation, and authoring instructions. Design adjustments happen directly in source through the agent. Cleanup still detects retired markup.
 - Add global-first installation for Cursor, Gemini CLI, Windsurf, Cline, and explicit Roo, with Copilot as repo-local guidance; detect Codex alongside other agent homes.
 - Accept positional harness names such as `install cursor gemini` and expand repo-local targets while retaining the portable default.

@@ -6,6 +6,9 @@ const port = Number(process.env.PORT || 4173);
 const routes = new Map([
   ["/", [new URL("playground.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/toolbar", [new URL("toolbar-exploration.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/canvas-exit", [new URL("canvas-exit.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/canvas-icons", [new URL("canvas-icons.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/single-group", [new URL("single-group.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/canvas", [new URL("canvas-fixture.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/unship-picker.js", [new URL("../src/picker/unship-picker.js", import.meta.url), "text/javascript; charset=utf-8"]]
 ]);
