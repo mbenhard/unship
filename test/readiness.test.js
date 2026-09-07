@@ -102,34 +102,9 @@ test("readiness reports uncertain when the group range has low confidence", () =
   assert.equal(groups[0].findings[0].level, "uncertain");
 });
 
-test("readiness accepts a valid inline-group hint", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<h1 data-unship-pick="Headline" data-unship-as="segmented">',
-      '  <span data-unship-option="Claim">A</span>',
-      '  <span data-unship-option="Question" hidden>B</span>',
-      "</h1>"
-    ].join("\n")
-  );
 
-  assert.deepEqual(groups[0].findings, []);
-});
 
-test("readiness fails an invalid data-unship-as value", () => {
-  const groups = scanReadiness(
-    "src/App.html",
-    [
-      '<h1 data-unship-pick="Headline" data-unship-as="dropdown">',
-      '  <span data-unship-option="Claim">A</span>',
-      '  <span data-unship-option="Question" hidden>B</span>',
-      "</h1>"
-    ].join("\n")
-  );
 
-  assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["as-value"]);
-  assert.equal(groups[0].findings[0].level, "fail");
-});
 
 test("readiness accepts Canvas Arrangements and fails invalid values", () => {
   for (const layout of ["stack", "grid", "matrix"]) {
@@ -147,17 +122,7 @@ test("readiness accepts Canvas Arrangements and fails invalid values", () => {
   assert.deepEqual(invalid[0].findings.map((finding) => `${finding.level}:${finding.code}`), ["fail:canvas-value"]);
 });
 
-test("readiness notes an ignored hint on groups with more than 4 options", () => {
-  const spans = ["A", "B", "C", "D", "E"]
-    .map((label, index) => `  <span data-unship-option="${label}"${index ? " hidden" : ""}>x</span>`)
-    .join("\n");
-  const groups = scanReadiness(
-    "src/App.html",
-    `<h1 data-unship-pick="Headline" data-unship-as="segmented">\n${spans}\n</h1>`
-  );
 
-  assert.deepEqual(groups[0].findings.map((finding) => `${finding.level}:${finding.code}`), ["note:as-overflow"]);
-});
 
 test("readiness ignores options belonging to a nested group", () => {
   const groups = scanReadiness(
@@ -404,24 +369,7 @@ test("readiness scans many instrumented groups in bounded time", () => {
   assert.ok(elapsed < 3000, `scan took ${elapsed}ms`);
 });
 
-test("checkUnshipReadiness keeps pass status when only notes are present", async () => {
-  const root = await mkdtemp(join(tmpdir(), "unship-readiness-"));
-  await mkdir(join(root, "src"), { recursive: true });
-  const spans = ["A", "B", "C", "D", "E"]
-    .map((label, index) => `<span data-unship-option="${label}"${index ? " hidden" : ""}>x</span>`)
-    .join("");
-  await writeFile(
-    join(root, "src", "App.html"),
-    `<h1 data-unship-pick="Headline" data-unship-as="segmented">${spans}</h1>\n`,
-    "utf8"
-  );
 
-  const result = await checkUnshipReadiness({ root });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.status, "pass");
-  assert.equal(result.summary.noteCount, 1);
-});
 
 
 test("readiness rejects retired control markup without interpreting its payload", () => {

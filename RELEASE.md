@@ -37,7 +37,6 @@ The package should publish only these files:
 - `src/picker/unship-picker.js`
 - `src/project-files/index.js`
 - `src/setup/index.js`
-- `src/update/index.js`
 
 The `files` array in `package.json` and `test/package-smoke.test.js` enforce this. The Claude Code plugin files in `.claude-plugin/` and `plugin/` stay out of the tarball; when bumping the package version, bump the `version` fields in `plugin/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to match, and refresh `plugin/skills/unship/SKILL.md` whenever the bundled skill changes. `test/plugin-manifest.test.js` enforces both.
 
@@ -58,7 +57,7 @@ unship install --repair --dry-run --json --no-project --no-update-check
 unship install --repair --yes --no-project --no-update-check
 ```
 
-Restart Codex or Claude Code to reload the skill. The skill prefers the project's local CLI, then a verified global CLI, then the registry. Existing project-local packages take precedence: update those explicitly with `npm install -D /absolute/path/to/unship-cli-0.2.0.tgz`, refresh stale project instructions with `unship init --force`, and remount stale picker snippets only when needed. Run `doctor --json --no-update-check` inside each consuming app, not inside Unship's own source/tests where residue is intentional.
+Restart Codex or Claude Code to reload the skill. Honor an explicitly selected build; otherwise use the project-local CLI, then a verified global CLI, then the registry. Update deliberate project pins explicitly with `npm install -D /absolute/path/to/unship-cli-0.2.0.tgz`. Refresh instructions using that same CLI. In each consuming app, run `setup --out <existing-served-picker-file> --json`; inspect differing contents before repeating with `--force`, which backs them up. Keep the dev-only mount and reload/rebuild the actual preview as needed. `doctor --out <picker-file> --json` compares local bytes; `doctor --inline --out <HTML-file> --json` verifies literal inline mounts. Restarting the agent or checking the CLI version alone does not verify the served runtime.
 
 Validate a real project from comparison through keep-instruction cleanup before publishing. The version bump and local installation do not publish a package or update npm dist-tags.
 
@@ -110,7 +109,7 @@ npm exec @unship/cli@latest -- install --dry-run --json --no-update-check
 npm exec @unship/cli@latest -- install cursor gemini --dry-run --json --no-update-check
 npm exec @unship/cli@latest -- doctor --json --no-update-check
 npm exec @unship/cli@latest -- snippet
-npm exec @unship/cli@latest -- setup --json
+npm exec @unship/cli@latest -- setup --out public/unship-picker.js --src /unship-picker.js --json
 
 smoke_dir="$(mktemp -d)"
 (cd "$smoke_dir" && npm exec @unship/cli@latest -- init --target all --force --json)

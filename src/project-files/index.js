@@ -1,5 +1,5 @@
-import { readdir } from "node:fs/promises";
-import { extname, join, relative, sep } from "node:path";
+import { copyFile, mkdir, mkdtemp, readdir } from "node:fs/promises";
+import { basename, extname, join, relative, sep } from "node:path";
 
 export const DEFAULT_IGNORES = new Set([
   ".git",
@@ -65,4 +65,12 @@ export function extension(path) {
 
 export function toPosix(path) {
   return path.split(sep).join("/");
+}
+
+// Backups live outside scanned source; never overwrite an earlier recovery copy.
+export async function backupFile(path, directory) {
+  await mkdir(directory, { recursive: true });
+  const backup = join(await mkdtemp(join(directory, "backup-")), basename(path));
+  await copyFile(path, backup);
+  return backup;
 }

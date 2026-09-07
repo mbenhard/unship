@@ -1,76 +1,92 @@
-import { access, readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { walkProjectFiles } from "../project-files/index.js";
+import { access, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { backupFile, walkProjectFiles } from "../project-files/index.js";
+import { projectInstructionPaths } from "../agent-targets/index.js";
 
 const BUNDLED_SKILL = new URL("../../agent/skills/unship/SKILL.md", import.meta.url);
 const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
-const SKILL_PATHS = [
-  ".agents/skills/unship/SKILL.md",
-  ".claude/skills/unship/SKILL.md",
-  ".cline/skills/unship/SKILL.md",
-  ".gemini/skills/unship/SKILL.md",
-  ".opencode/skills/unship/SKILL.md",
-  ".roo/skills/unship/SKILL.md",
-  ".windsurf/skills/unship/SKILL.md"
-];
-const PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
+export const PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
 const SEARCH_EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".astro", ".vue", ".svelte"]);
-const DEFAULT_PREVIEW_PORTS = [3000, 3001, 5173, 5174, 4173, 4321, 4200, 8080];
 
-export async function setupProject({ root = process.cwd(), dryRun = false } = {}) {
-  const snippet = await inlineSnippet();
+export async function pickerSnippet({ inline = false, src = "/unship-picker.js", persist, globalShortcuts = false } = {}) {
+  if (persist !== undefined && persist !== "local") throw new Error("--persist must be local.");
+  const attrs = ["data-unship-dev"];
+  if (persist === "local") attrs.push('data-unship-persist="local"');
+  if (globalShortcuts) attrs.push("data-unship-global-shortcuts");
+  if (inline) return `<script ${attrs.join(" ")}>\n${await readFile(BUNDLED_PICKER, "utf8")}\n</script>`;
+  const escaped = src.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+  return `<script src="${escaped}" ${attrs.join(" ")}></script>`;
+}
+
+export async function setupProject({ root = process.cwd(), out, src, inline = false, force = false, dryRun = false, persist, globalShortcuts } = {}) {
+  if (src && !out) throw new Error("setup --src requires --out; use --inline for an embedded snippet.");
+  if (out && inline) throw new Error("Use --out for a runtime file or --inline for an embedded snippet, not both.");
+  const snippet = out && !src ? null : await pickerSnippet({ inline: !out, src, persist, globalShortcuts });
   const mount = {
     status: "manual",
-    mode: "inline",
+    mode: out ? "external" : "inline",
     snippet,
-    instructions: [
-      "Add the returned inline snippet to the smallest dev-only app shell or preview page that renders the Unship options.",
-      "Keep the snippet local/dev-only and remove it before shipping."
-    ]
+    instructions: [out
+      ? "Use one dev-only app shell mount; its URL must serve the picker file. Remove it before shipping."
+      : "Add this snippet to one dev-only app shell or preview page. Remove it before shipping."]
+  };
+  if (!out) return {
+    ok: true, setup: "manual", framework: "universal", detectedFramework: "universal", signals: [], dryRun,
+    picker: { status: "inline", path: "inline" }, mount, next: mount.instructions
   };
 
-  return {
-    ok: true,
-    setup: "manual",
-    framework: "universal",
-    detectedFramework: "universal",
-    signals: [],
-    dryRun,
-    picker: {
-      status: "inline",
-      path: "inline"
-    },
-    mount,
-    next: mount.instructions
-  };
-}
-
-export async function inspectProject({ root = process.cwd(), previewPorts } = {}) {
-  const skillFile = await firstExisting(root, SKILL_PATHS);
-  const pickerFile = await firstExisting(root, PICKER_CANDIDATES);
-  const devMount = await findFirstMount(root);
-  const previewServers = await detectPreviewServers({
-    ports: previewPorts || DEFAULT_PREVIEW_PORTS
-  });
-
-  return {
-    framework: "universal",
-    signals: [],
-    skillInstalled: Boolean(skillFile),
-    skillFile,
-    skillCurrent: skillFile ? await fileMatches(join(root, skillFile), BUNDLED_SKILL) : false,
-    pickerFileFound: Boolean(pickerFile),
-    pickerFile,
-    pickerFileCurrent: pickerFile ? await fileMatches(join(root, pickerFile), BUNDLED_PICKER) : false,
-    devMountFound: Boolean(devMount),
-    devMountFile: devMount?.file || null,
-    previewServers
-  };
-}
-
-async function inlineSnippet() {
+  const path = resolve(root, out);
   const source = await readFile(BUNDLED_PICKER, "utf8");
-  return `<script data-unship-dev>\n${source}\n</script>`;
+  let existing = null;
+  try {
+    const stat = await lstat(path);
+    if (!stat.isFile()) throw new Error(`Picker destination must be a regular file: ${path}`);
+    existing = await readFile(path, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const current = existing === source;
+  const blocked = existing !== null && !current && !force;
+  const status = current ? "current" : blocked ? "different" : existing === null ? "created" : "updated";
+  let backup;
+  if (!current && !blocked && !dryRun) {
+    await mkdir(dirname(path), { recursive: true });
+    if (existing !== null) backup = await backupFile(path, join(root, ".unship", "backups"));
+    await writeFile(path, source, { encoding: "utf8", flag: existing === null ? "wx" : "w" });
+  }
+  return {
+    ok: !blocked, dryRun,
+    picker: { status: dryRun && !current && !blocked ? `would-${status === "created" ? "create" : "update"}` : status, path, current: current || (!blocked && !dryRun), ...(backup ? { backup } : {}) },
+    mount,
+    next: blocked
+      ? ["The destination differs from this build. Inspect it, then repeat setup with --force to replace it with a backup."]
+      : mount.instructions
+  };
+}
+
+export async function inspectProject({ root = process.cwd(), out, inline = false, previewPorts = [] } = {}) {
+  if (inline && !out) throw new Error("Use doctor --inline --out <HTML-file> to inspect an inline mount.");
+  const skillFile = await firstExisting(root, [...projectInstructionPaths].filter((path) => path.endsWith("/SKILL.md")));
+  const pickerFile = out ? (await existsPath(resolve(root, out)) ? out : null) : await firstExisting(root, PICKER_CANDIDATES);
+  const inlineText = inline && pickerFile ? await readFile(resolve(root, pickerFile), "utf8") : null;
+  const devMount = inline
+    ? (inlineText?.includes("data-unship-dev") ? { file: pickerFile, text: inlineText } : null)
+    : await findFirstMount(root, out && resolve(root, out));
+  const embedded = devMount?.text.match(/<script\b(?=[^>]*\bdata-unship-dev\b)[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+  const pickerFileCurrent = !inline && pickerFile ? await fileMatches(resolve(root, pickerFile), BUNDLED_PICKER) : false;
+  const inspectInline = inline || (!out && !pickerFile && Boolean(embedded));
+  const pickerCurrent = inspectInline
+    ? (embedded ? embedded.trim() === (await readFile(BUNDLED_PICKER, "utf8")).trim() : null)
+    : pickerFile ? pickerFileCurrent : null;
+  return {
+    framework: "universal", signals: [],
+    skillInstalled: Boolean(skillFile), skillFile,
+    skillCurrent: skillFile ? await fileMatches(join(root, skillFile), BUNDLED_SKILL) : false,
+    pickerFileFound: Boolean(pickerFile) && !inline, pickerFile: inline ? null : pickerFile, pickerFileCurrent,
+    pickerCurrent, pickerMode: inspectInline ? "inline" : "external",
+    devMountFound: Boolean(devMount), devMountFile: devMount?.file || null,
+    previewServers: await detectPreviewServers({ ports: previewPorts })
+  };
 }
 
 async function detectPreviewServers({ ports }) {
@@ -149,11 +165,11 @@ async function fileMatches(path, referenceUrl) {
   }
 }
 
-async function findFirstMount(root) {
+async function findFirstMount(root, out) {
   for await (const { file, rel } of walkProjectFiles({ root, extensions: SEARCH_EXTENSIONS })) {
-    if (PICKER_CANDIDATES.includes(rel)) continue;
+    if (PICKER_CANDIDATES.includes(rel) || file === out) continue;
     const text = await readFile(file, "utf8");
-    if (text.includes("data-unship-dev") || text.includes("unship-picker.js")) return { file: rel };
+    if (text.includes("data-unship-dev") || text.includes("unship-picker.js")) return { file: rel, text };
   }
   return null;
 }

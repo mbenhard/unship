@@ -1,33 +1,15 @@
 import { readFile } from "node:fs/promises";
+import { projectInstructionPaths } from "../agent-targets/index.js";
 import { walkProjectFiles } from "../project-files/index.js";
 
 const EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".astro", ".md", ".mdx", ".liquid", ".hbs", ".handlebars", ".njk", ".ejs"]);
 // Retired attributes remain detectable so cleanup can remove older previews.
-const PATTERNS = ["data-unship-pick", "data-unship-option", "data-unship-tweaks", "data-unship-as", "data-unship-canvas", "unship-picker", "<!-- unship"];
+const PATTERNS = ["data-unship-dev", "data-unship-pick", "data-unship-option", "data-unship-tweaks", "data-unship-as", "data-unship-canvas", "unship-picker", "<!-- unship"];
 const PICK_ATTR = "data-unship-pick";
 const OPTION_ATTR = "data-unship-option";
 const MAX_RANGE_LINES = 200;
 
-const ALLOWED_PATHS = [
-  /^agent\/skills\/unship\/SKILL\.md$/,
-  /^\.agents\/skills\/unship\/SKILL\.md$/,
-  /^\.claude\/skills\/unship\/SKILL\.md$/,
-  /^\.cline\/skills\/unship\/SKILL\.md$/,
-  /^\.clinerules\/workflows\/unship\.md$/,
-  /^\.cursor\/commands\/unship\.md$/,
-  /^\.cursor\/rules\/unship\.mdc$/,
-  /^\.gemini\/commands\/unship\.toml$/,
-  /^\.gemini\/skills\/unship\/SKILL\.md$/,
-  /^\.github\/instructions\/unship\.instructions\.md$/,
-  /^\.opencode\/skills\/unship\/SKILL\.md$/,
-  /^\.opencode\/commands\/unship\.md$/,
-  /^\.roo\/commands\/unship\.md$/,
-  /^\.roo\/skills\/unship\/SKILL\.md$/,
-  /^\.windsurf\/skills\/unship\/SKILL\.md$/,
-  /^\.windsurf\/workflows\/unship\.md$/,
-  /^AGENTS\.md$/,
-  /^CLAUDE\.md$/
-];
+
 
 export async function checkUnshipResidue({ root = process.cwd(), includeBuild = false } = {}) {
   const diagnostics = [];
@@ -142,7 +124,6 @@ export function scanExplorations(file, text) {
   });
 }
 
-const AS_ATTR = "data-unship-as";
 const CANVAS_ATTR = "data-unship-canvas";
 
 export function scanReadiness(file, rawText) {
@@ -230,30 +211,6 @@ export function scanReadiness(file, rawText) {
     }
 
     const groupTag = openTagAt(text, group.attrOffset, safe);
-    const asHint = groupTag ? readQuotedAttribute(groupTag.source, AS_ATTR) : null;
-    if (asHint?.kind === "dynamic") {
-      findings.push({
-        level: "uncertain",
-        line: startLine,
-        code: "as-dynamic",
-        message: "data-unship-as value is dynamic; verify the inline-group hint manually."
-      });
-    } else if (asHint && asHint.value !== "segmented" && asHint.value !== "toggle") {
-      findings.push({
-        level: "fail",
-        line: startLine,
-        code: "as-value",
-        message: `data-unship-as must be "segmented" or "toggle", found "${asHint.value}".`
-      });
-    } else if (asHint && certain && options.length > 4) {
-      findings.push({
-        level: "note",
-        line: startLine,
-        code: "as-overflow",
-        message: "data-unship-as is ignored for groups with more than 4 options; this group renders as a full dock group."
-      });
-    }
-
     const canvasHint = groupTag ? readQuotedAttribute(groupTag.source, CANVAS_ATTR) : null;
     if (canvasHint?.kind === "dynamic") {
       findings.push({
@@ -590,7 +547,7 @@ function escapeRegExp(value) {
 }
 
 function isAllowedInstructionFile(rel) {
-  return ALLOWED_PATHS.some((pattern) => pattern.test(rel));
+  return rel === "agent/skills/unship/SKILL.md" || projectInstructionPaths.has(rel);
 }
 
 function sourceForScanning(file, text) {

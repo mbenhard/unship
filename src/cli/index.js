@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { parseArgs } from "node:util";
 import { createInterface } from "node:readline/promises";
+import { backupFile } from "../project-files/index.js";
 import { initTargetFiles } from "../agent-targets/index.js";
 import { getAgentTemplates } from "../agent/index.js";
 import { checkUnshipReadiness, checkUnshipResidue } from "../check/index.js";
 import { applyInstallPlan, applyUninstallPlan, planInstall, planUninstall } from "../install/index.js";
-import { inspectProject, setupProject } from "../setup/index.js";
-import { checkForUpdates } from "../update/index.js";
+import { inspectProject, pickerSnippet, setupProject } from "../setup/index.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -16,7 +17,10 @@ let flags = {};
 
 try {
   flags = parseFlags(args.slice(1));
-  if (command === "install") {
+  if (command === "--version" || command === "version") {
+    const pkg = await readPackageInfo();
+    console.log(flags.json ? JSON.stringify({ packageName: pkg.name, version: pkg.version }) : pkg.version);
+  } else if (command === "install") {
     const plan = await planInstall(installOptions(flags));
     if (plan.printSkill) {
       console.log(plan.skill);
@@ -30,11 +34,6 @@ try {
         : approved
           ? (flags["dry-run"] ? plan : await applyInstallPlan(plan))
           : { ok: false, command: "install", error: "Install cancelled.", next: [] };
-      if (result.ok && !flags.json) {
-        const pkg = await readPackageInfo();
-        const updates = await updateStatus(pkg, { disabled: Boolean(flags["no-update-check"]) });
-        result = withUpdateNextActions(result, updates);
-      }
       printInstallResult(result, flags.json);
       if (!result.ok) process.exitCode = 1;
     }
@@ -66,14 +65,17 @@ try {
     print(await doctor({
       root: flags.root || process.cwd(),
       previewPorts: parsePorts(flags.ports),
-      updateCheckDisabled: Boolean(flags["no-update-check"])
+      out: flags.out, inline: Boolean(flags.inline)
     }), flags.json);
   } else if (command === "setup") {
     const result = await setupProject({
       root: flags.root || process.cwd(),
-      dryRun: Boolean(flags["dry-run"])
+      dryRun: Boolean(flags["dry-run"]),
+      out: flags.out, src: flags.src, inline: Boolean(flags.inline), force: Boolean(flags.force),
+      persist: flags.persist, globalShortcuts: Boolean(flags["global-shortcuts"])
     });
     print(result, flags.json);
+    if (!result.ok) process.exitCode = 1;
   } else if (command === "help" || command === "--help" || command === "-h") {
     printHelp();
   } else {
@@ -94,6 +96,7 @@ async function init({ target, force }) {
   const written = [];
   const skipped = [];
   const stale = [];
+  const backups = [];
   for (const file of files) {
     await mkdir(dirname(file.path), { recursive: true });
     try {
@@ -106,6 +109,7 @@ async function init({ target, force }) {
       } else if (file.forceOverwrite === false) {
         skipped.push(file.path);
       } else {
+        backups.push(await backupFile(file.path, join(process.cwd(), ".unship", "backups")));
         await writeFile(file.path, file.content, "utf8");
         written.push(file.path);
       }
@@ -118,100 +122,61 @@ async function init({ target, force }) {
   return {
     ok: stale.length === 0,
     written,
+    backups,
     skipped,
     stale,
-    next: stale.length ? ["Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions."] : []
+    next: stale.length ? ["Run init --force --json with this CLI to refresh stale installed Unship instructions."] : []
   };
 }
 
 function parseFlags(items) {
-  const parsed = { _: [] };
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (item === "--json") parsed.json = true;
-    else if (item === "--force") parsed.force = true;
-    else if (item === "--all") parsed.all = true;
-    else if (item === "--yes") parsed.yes = true;
-    else if (item === "--repair") parsed.repair = true;
-    else if (item === "--readiness") parsed.readiness = true;
-    else if (item === "--no-update-check") parsed["no-update-check"] = true;
-    else if (item === "--no-project") parsed["no-project"] = true;
-    else if (item === "--print-skill") parsed["print-skill"] = true;
-    else if (item === "--project") parsed.project = true;
-    else if (item === "--harness") parsed.harness = items[++index];
-    else if (item === "--target") parsed.target = items[++index];
-    else if (item === "--framework") parsed.framework = items[++index];
-    else if (item === "--src") parsed.src = items[++index];
-    else if (item === "--persist") parsed.persist = items[++index];
-    else if (item === "--ports") parsed.ports = items[++index];
-    else if (item === "--root") parsed.root = items[++index];
-    else if (item === "--dir") parsed.dir = items[++index];
-    else if (item === "--include-build") parsed["include-build"] = true;
-    else if (item === "--dry-run") parsed["dry-run"] = true;
-    else if (item === "--global-shortcuts") parsed["global-shortcuts"] = true;
-    else if (item === "--inline") parsed.inline = true;
-    else if (!item.startsWith("-")) parsed._.push(item);
-    else throw new Error(`Unknown flag: ${item}`);
+  const booleans = ["json", "force", "all", "yes", "repair", "readiness", "no-update-check", "no-project", "print-skill", "project", "include-build", "dry-run", "global-shortcuts", "inline"];
+  const strings = ["harness", "target", "framework", "src", "persist", "ports", "root", "dir", "out"];
+  const options = Object.fromEntries([...booleans.map((key) => [key, { type: "boolean" }]), ...strings.map((key) => [key, { type: "string" }])]);
+  const { values, positionals } = parseArgs({ args: items, options, allowPositionals: true });
+  const installFlags = ["json", "all", "yes", "repair", "force", "harness", "root", "project", "no-project", "dry-run", "no-update-check"];
+  const allowed = {
+    install: [...installFlags, "print-skill"],
+    uninstall: installFlags,
+    init: ["json", "target", "force"],
+    setup: ["json", "root", "out", "src", "inline", "force", "dry-run", "persist", "global-shortcuts", "framework"],
+    snippet: ["json", "src", "inline", "persist", "global-shortcuts"],
+    doctor: ["json", "root", "out", "inline", "ports", "no-update-check"],
+    check: ["json", "root", "include-build", "readiness"]
+  }[command];
+  for (const key of Object.keys(values)) {
+    if (allowed && !allowed.includes(key)) throw new Error(`--${key} does not apply to ${command}.`);
+    if (strings.includes(key) && !values[key].trim()) throw new Error(`--${key} requires a nonempty value.`);
   }
-  return parsed;
+  if (values.persist !== undefined && values.persist !== "local") throw new Error("--persist must be local.");
+  if (values.inline && values.src) throw new Error("--src cannot be used with --inline.");
+  return { ...values, _: positionals };
 }
 
 async function printSnippet(flags) {
-  if (flags.inline) {
-    const source = await readFile(new URL("../picker/unship-picker.js", import.meta.url), "utf8");
-    const tag = `<script data-unship-dev>\n${source}\n</script>`;
-    if (flags.json) console.log(JSON.stringify({ ok: true, snippet: tag }));
-    else console.log(tag);
-    return;
-  }
-
-  const src = flags.src || "/unship-picker.js";
-  const attrs = ["data-unship-dev"];
-  if (flags.persist === "local") attrs.push('data-unship-persist="local"');
-  if (flags["global-shortcuts"]) attrs.push("data-unship-global-shortcuts");
-  const tag = `<script src="${src}" ${attrs.join(" ")}></script>`;
-  if (flags.json) console.log(JSON.stringify({ ok: true, snippet: tag }));
-  else console.log(tag);
+  const snippet = await pickerSnippet({ ...flags, globalShortcuts: flags["global-shortcuts"] });
+  console.log(flags.json ? JSON.stringify({ ok: true, snippet }) : snippet);
 }
 
 async function readPackageInfo() {
   return JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
 }
 
-async function updateStatus(pkg, { disabled = false } = {}) {
-  return checkForUpdates({
-    packageName: pkg.name,
-    currentVersion: pkg.version,
-    disabled
-  });
-}
-
-function withUpdateNextActions(result, updates) {
-  if (!updates?.next) return result;
-  const next = result.next || [];
-  return {
-    ...result,
-    updates,
-    next: next.includes(updates.next) ? next : [updates.next, ...next]
-  };
-}
-
-async function doctor({ root, previewPorts, updateCheckDisabled = false }) {
+async function doctor({ root, out, inline, previewPorts }) {
   const pkg = await readPackageInfo();
-  const updates = await updateStatus(pkg, { disabled: updateCheckDisabled });
-  const project = await inspectProject({ root, previewPorts });
+  const project = await inspectProject({ root, out, inline, previewPorts });
   const residue = await checkUnshipResidue({ root });
   const unship = summarizeUnship(residue);
   return {
     ok: true,
     packageName: pkg.name,
     version: pkg.version,
-    updates,
+    updates: { checked: false, reason: "disabled" },
     node: process.version,
     project,
     residue,
     unship,
-    next: nextActions({ project, unship, updates }),
+    next: nextActions({ project, unship }),
     reminder: "Unship is local comparison tooling. Have the agent remove unused variants and run unship check before shipping."
   };
 }
@@ -225,19 +190,21 @@ function summarizeUnship(residue) {
   };
 }
 
-function nextActions({ project, unship, updates }) {
+function nextActions({ project, unship }) {
   const actions = [];
-  if (updates?.next) actions.push(updates.next);
 
   if (project.skillInstalled && !project.skillCurrent) {
-    actions.push("Run npx @unship/cli@latest init --force --json to refresh stale installed Unship instructions.");
+    actions.push("Run init --force --json with this CLI to refresh stale installed Unship instructions.");
   }
 
-  if (project.pickerFileFound && !project.pickerFileCurrent) {
-    actions.push("Run setup --json and replace stale picker mounts with the returned dev-only snippet.");
-  } else if (!project.pickerFileFound || !project.devMountFound) {
-    actions.push("Run setup --json after a local app shell exists if you need the picker mounted.");
+  if (project.pickerCurrent === false) {
+    actions.push(project.pickerMode === "inline"
+      ? "Run setup --inline --json with this CLI and replace the stale inline mount."
+      : "Run setup --json --out <existing-picker-file> with this CLI. Inspect differing contents before using --force; replacement saves a backup.");
+  } else if (project.pickerCurrent === null) {
+    actions.push("Picker freshness is unverified. Use setup --out <served-picker-file> or doctor --inline --out <HTML-file> with this CLI.");
   }
+  if (!project.devMountFound) actions.push("Add one dev-only script mount in the app shell that serves the comparison.");
 
   if (unship.activeExplorationCount > 0) {
     const labels = summarizeLabels(unship.explorations.map((item) => item.pick));
@@ -264,6 +231,7 @@ function print(value, json) {
     printDoctor(value);
   } else {
     const lines = [];
+    if (value.backups?.length) lines.push(`Backups: ${value.backups.join(", ")}`);
     if (value.written?.length) lines.push(`Wrote ${value.written.join(", ")}`);
     if (value.stale?.length) lines.push(`Stale existing ${value.stale.join(", ")}`);
     if (value.skipped?.length) lines.push(`Skipped existing ${value.skipped.join(", ")}`);
@@ -276,22 +244,15 @@ function printDoctor(value) {
   const preview = value.project.previewServers.length ? value.project.previewServers.map((server) => server.url).join(", ") : "none detected";
   const lines = [
     `${value.packageName} ${value.version}`,
-    doctorUpdateLine(value.updates),
     `Node ${value.node}`,
     `Skill installed ${value.project.skillInstalled ? "yes" : "no"}${value.project.skillInstalled ? ` (${value.project.skillCurrent ? "current" : "stale"})` : ""}`,
-    `Picker file ${value.project.pickerFileFound ? value.project.pickerFile : "missing"}${value.project.pickerFileFound ? ` (${value.project.pickerFileCurrent ? "current" : "stale"})` : ""}`,
+    `Picker ${value.project.pickerMode}: ${value.project.pickerCurrent === null ? "unverified" : value.project.pickerCurrent ? "current" : "different"}${value.project.pickerFile ? ` (${value.project.pickerFile})` : ""}`,
     `Dev mount ${value.project.devMountFound ? value.project.devMountFile : "missing"}`,
     `Preview servers ${preview}`,
     value.reminder
   ].filter(Boolean);
   appendNext(lines, value.next);
   console.log(lines.join("\n"));
-}
-
-function doctorUpdateLine(updates) {
-  if (updates?.available === true) return `Update available ${updates.current} -> ${updates.latest}`;
-  if (updates?.checked === false) return "Update check disabled";
-  return "";
 }
 
 function parsePorts(value) {
@@ -324,18 +285,18 @@ function printInstallResult(result, json) {
     console.log(JSON.stringify(result));
     return;
   }
-  if (!result.ok) {
+  if (!result.ok && !result.harnesses) {
     console.log(result.error || `Unship ${result.command === "uninstall" ? "uninstall" : "install"} failed.`);
     printNext(result.next);
     return;
   }
   const label = result.command === "uninstall" ? "uninstall" : "install";
-  const lines = [result.dryRun ? `Unship ${label} dry run.` : `Unship ${label} complete.`];
+  const lines = [result.dryRun ? `Unship ${label} dry run.` : `Unship ${label} ${result.ok ? "complete" : "incomplete"}.`];
   if (result.dryRun) {
     lines.push("No files were changed.");
   } else if (result.command !== "uninstall") {
     lines.push("Workflow: ask your agent for options, compare them in your local preview, pick a direction in chat, and have the agent clean up the unused variants.");
-    lines.push("Before shipping: have the agent run npx @unship/cli@latest check --json.");
+    lines.push("Before shipping: have the agent run check --json with this CLI.");
   }
   if (label === "install" && result.harnesses?.length) {
     const detectedNames = result.harnesses.filter((harness) => harness.detected).map((harness) => harness.name);
@@ -350,10 +311,12 @@ function printInstallResult(result, json) {
     lines.push(`${harness.name}: ${harness.status}`);
     for (const file of harness.files || []) {
       lines.push(`- ${file.status}: ${friendlyPath(file.path, result.home)}`);
+      if (file.backup) lines.push(`  Backup: ${friendlyPath(file.backup, result.home)}`);
     }
   }
   for (const item of result.legacy || []) {
     lines.push(`Legacy ${item.status}: ${friendlyPath(item.path, result.home)}`);
+    if (item.backup) lines.push(`Backup: ${friendlyPath(item.backup, result.home)}`);
   }
   if (result.project) lines.push(`Project: ${result.project.status}`);
   appendNext(lines, result.next);
@@ -389,7 +352,9 @@ async function confirmPlan(question) {
 function printSetup(result) {
   const lines = [
     `Picker ${result.picker.status}: ${result.picker.path}`,
-    `Mount ${result.mount.status}${result.mount.file ? `: ${result.mount.file}` : ""}`
+    `Mount ${result.mount.status}${result.mount.file ? `: ${result.mount.file}` : ""}`,
+    ...(result.picker.backup ? [`Backup ${result.picker.backup}`] : []),
+    ...(result.mount.snippet ? [result.mount.snippet] : [])
   ];
   if (result.next?.length) lines.push(...result.next.map((item) => `Next: ${item}`));
   console.log(lines.join("\n"));
@@ -441,9 +406,10 @@ Iterate with your agent in the app, not in chat.
 
 Usage:
   unship install [harness...] [--yes|--dry-run|--json]
-  unship setup --json
+  unship setup --out <served-file> [--src <script-url>] [--force] [--json]
   unship check [--readiness] [--json]
-  unship doctor [--json]
+  unship doctor [--out <picker-file>] [--json]
+  unship --version
   unship snippet [--inline|--json]
   unship init [--target portable|all|<agent>]
   unship uninstall [--yes|--dry-run|--json]
@@ -457,7 +423,9 @@ Workflow:
   5. Your agent cleans up unused variants before shipping.
 
 Agent notes:
-  setup returns a dev-only picker snippet when a local preview needs one.
+  setup prepares the selected runtime; --force replaces a differing file with a backup.
+  setup --inline returns an embedded snippet. Framework mount placement stays with the agent.
+  doctor stays offline unless explicit --ports are supplied; --no-update-check is a compatibility no-op.
   check verifies that no Unship preview artifacts remain.
-  check --readiness verifies comparison structure and presentation hints before handoff.`);
+  check --readiness verifies comparison structure and Canvas arrangements before handoff.`);
 }

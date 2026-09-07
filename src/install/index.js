@@ -2,10 +2,12 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAgentTemplates } from "../agent/index.js";
+import { backupFile } from "../project-files/index.js";
+import { projectSkillPaths } from "../agent-targets/index.js";
+import { PICKER_CANDIDATES as PROJECT_PICKER_CANDIDATES } from "../setup/index.js";
 import { checkUnshipResidue } from "../check/index.js";
 
 const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
-const PROJECT_PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
 
 const TARGETS = [
   {
@@ -13,7 +15,7 @@ const TARGETS = [
     name: "Shared .agents skill",
     aliases: ["agents", "codex", "antigravity"],
     detectPaths: [".codex", ".agents"],
-    files: [{ role: "skill", relativePath: ".agents/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m }],
+    files: [{ role: "skill", relativePath: projectSkillPaths.codex, template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m }],
     legacy: [{ relativePath: ".agents/skills/unship-design/SKILL.md", marker: /patch-session|unship-design|Legacy Unship/i }]
   },
   {
@@ -22,7 +24,7 @@ const TARGETS = [
     aliases: ["claude"],
     detectPath: ".claude",
     files: [
-      { role: "skill", relativePath: ".claude/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "skill", relativePath: projectSkillPaths.claude, template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
       { role: "command", relativePath: ".claude/commands/unship.md", template: "claudeCommand", requiresRole: "skill", staleMarker: /Use the Unship skill for this request/i }
     ],
     legacy: [
@@ -48,7 +50,7 @@ const TARGETS = [
     aliases: ["gemini", "gemini-cli"],
     detectPath: ".gemini",
     files: [
-      { role: "skill", relativePath: ".gemini/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "skill", relativePath: projectSkillPaths.gemini, template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
       { role: "command", relativePath: ".gemini/commands/unship.toml", template: "geminiCommand", requiresRole: "skill", staleMarker: /Compare temporary local alternatives with Unship/i }
     ],
     legacy: [],
@@ -71,7 +73,7 @@ const TARGETS = [
     aliases: ["cline"],
     detectPaths: [".cline", "Documents/Cline"],
     files: [
-      { role: "skill", relativePath: ".cline/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "skill", relativePath: projectSkillPaths.cline, template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
       { role: "workflow", relativePath: "Documents/Cline/Workflows/unship.md", template: "clineWorkflow", requiresRole: "skill", staleMarker: /Use the Unship skill for this request/i }
     ],
     legacy: []
@@ -83,7 +85,7 @@ const TARGETS = [
     manual: true,
     files: [],
     legacy: [],
-    next: ["GitHub Copilot loads Unship from repo-local instructions; run npx @unship/cli@latest init --target copilot."]
+    next: ["GitHub Copilot loads Unship from repo-local instructions; run init --target copilot with this CLI."]
   },
   {
     id: "opencode",
@@ -92,7 +94,7 @@ const TARGETS = [
     manual: true,
     files: [],
     legacy: [],
-    next: ["OpenCode loads Unship from repo-local instructions; run npx @unship/cli@latest init --target opencode."]
+    next: ["OpenCode loads Unship from repo-local instructions; run init --target opencode with this CLI."]
   },
   {
     id: "roo",
@@ -101,7 +103,7 @@ const TARGETS = [
     explicitOnly: true,
     detectPath: ".roo",
     files: [
-      { role: "skill", relativePath: ".roo/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "skill", relativePath: projectSkillPaths.roo, template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
       { role: "command", relativePath: ".roo/commands/unship.md", template: "rooCommand", requiresRole: "skill", staleMarker: /Compare temporary local alternatives with Unship/i }
     ],
     legacy: []
@@ -352,7 +354,7 @@ async function planInstallProject(context) {
     included: true,
     status: "manual",
     root: context.root,
-    reason: "Project picker setup is explicit; run setup --json in the app repo and mount the returned dev-only snippet."
+    reason: "Project picker setup is explicit; run setup --json --out <served-picker-file> with this CLI in the app repo and add a dev-only mount."
   };
 }
 
@@ -384,7 +386,7 @@ async function planUninstallProject(context) {
         operation: context.dryRun ? "would-remove" : "remove",
         status: context.dryRun ? "would-remove" : "pending-remove"
       });
-    } else if (await existsPath(path)) {
+    } else if (await exists(path)) {
       files.push({
         path,
         relativePath,
@@ -410,12 +412,14 @@ async function applyPlan(plan, mode) {
       try {
         if (operationWrites(file.operation)) {
           await mkdir(dirname(file.path), { recursive: true });
+          if (file.state !== "missing") file.backup = await backupFile(file.path, join(plan.home, ".local", "share", "unship", "backups"));
           await writeFile(file.path, file.content, "utf8");
           file.status = file.state === "legacy" && file.role === "command" ? "legacy-replaced-with-shim" : "written";
           file.operation = "wrote";
           delete file.content;
         } else if (file.operation === "remove") {
-          await rm(file.path, { force: true, recursive: true });
+          if (file.state !== "current") file.backup = await backupFile(file.path, join(plan.home, ".local", "share", "unship", "backups"));
+          await rm(file.path, { force: true });
           file.status = "removed";
           file.operation = "removed";
         }
@@ -429,7 +433,8 @@ async function applyPlan(plan, mode) {
   for (const item of plan.legacy || []) {
     try {
       if (item.operation === "remove") {
-        await rm(item.path, { force: true, recursive: true });
+        item.backup = await backupFile(item.path, join(plan.home, ".local", "share", "unship", "backups"));
+        await rm(item.path, { force: true });
         item.status = "removed";
         item.operation = "removed";
       } else if (item.status === "legacy-replaced-with-shim") {
@@ -522,12 +527,12 @@ function nextActions({ harnesses }) {
   const hasCommandHarness = harnesses.some((item) => item.files?.some((file) => file.role === "command" || file.role === "workflow"));
   if (hasCommandHarness || harnesses.some((item) => item.id === "agents")) {
     next.push("Try /unship where available, or ask: use unship to compare 3 directions for the hero section.");
-    next.push("If /unship is unavailable after restart, run npx @unship/cli@latest doctor --json and use the natural-language fallback.");
+    next.push("If /unship is unavailable after restart, run doctor --json with this CLI and use the natural-language fallback.");
   }
   for (const harness of harnesses) {
     if (harness.next?.length) next.push(...harness.next);
   }
-  next.push("Inside an app repo, run npx @unship/cli@latest setup --json to get the dev-only picker snippet.");
+  next.push("Inside an app repo, run setup --json --out <served-picker-file> with this CLI to prepare the runtime, then mount it dev-only.");
   next.push("Optional repo helpers can be added later with unship init.");
   return next;
 }
@@ -559,15 +564,15 @@ async function targetHasExistingFiles(home, target) {
 async function targetAvailability(home, target) {
   if (target.manual) return "manual";
   const paths = target.detectPaths || (target.detectPath ? [target.detectPath] : []);
-  if (!paths.length) return await existsPath(home) ? "writable" : "unknown";
+  if (!paths.length) return await exists(home) ? "writable" : "unknown";
   for (const path of paths) {
-    if (await exists(join(home, path))) return "detected-loaded";
+    if (await exists(join(home, path))) return "detected";
   }
-  return await existsPath(home) ? "writable" : "unknown";
+  return await exists(home) ? "writable" : "unknown";
 }
 
 function hasFailures(plan) {
-  return (plan.harnesses || []).some((harness) => harness.status === "failed")
+  return (plan.harnesses || []).some((harness) => harness.status === "failed" || harness.status === "blocked")
     || (plan.legacy || []).some((item) => item.status === "failed")
     || plan.project?.status === "failed"
     || plan.project?.status === "blocked-active-variants";
@@ -583,15 +588,6 @@ async function readOptional(path) {
 }
 
 async function exists(path) {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function existsPath(path) {
   try {
     await access(path);
     return true;
@@ -623,6 +619,6 @@ function installConsentError(command) {
     harnesses: [],
     legacy: [],
     project: { included: false, status: "skipped" },
-    next: [`Run npx @unship/cli@latest ${command} --dry-run --json to inspect, or add --yes to ${command === "uninstall" ? "remove files" : "write"}.`]
+    next: [`Run ${command} --dry-run --json with this CLI to inspect, or add --yes to ${command === "uninstall" ? "remove files" : "write"}.`]
   };
 }

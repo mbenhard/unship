@@ -4,6 +4,13 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Prepare runtime files directly with `setup --out`: exact-byte no-op checks, explicit replacement with backups, and shared inline/external snippet options.
+- Verify explicit copied or inline mounts with doctor; keep diagnostics offline by default and remove automatic npm update checks.
+- Preserve the chosen CLI build through repair instructions, add `--version`, and shorten the skill around the setup/compare/cleanup workflow.
+- Detect custom-named dev mounts during cleanup; remove readiness guidance for retired inline controls and share installed-instruction path definitions.
+- Preserve recovery copies when replacing agent instructions, report detected homes without claiming skills are loaded, and return failure for blocked command installation.
+- Add a packed-package comparison/update/cleanup lifecycle test; reuse Chromium across DOM tests while keeping each test in an isolated context.
+
 - Add Canvas for simultaneous comparison with `stack`, `grid`, and responsive `matrix` arrangements, script-free snapshots, native pan/zoom, light/dark themes, and warm reopen caching.
 - Preserve explicit Keep choices and cumulative clipboard output, invalidate stale snapshots after source changes, and contain keyboard focus in Canvas.
 - Add the attached Canvas tab, matching group/Canvas labels, List / Close menu animation, right-aligned Back to page control, and compact Canvas spacing.

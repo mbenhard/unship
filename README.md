@@ -17,19 +17,20 @@ Unship does not send telemetry. No remote service. No account or remote session 
 Copy for CLI:
 
 ```bash
-npx @unship/cli@latest install
+npm install -g @unship/cli
+unship install
 ```
 
 Agent-assisted install:
 
 ```txt
-Set up Unship for this repo. Run `npx @unship/cli@latest install --dry-run`, explain what it detected and which files it would write, then ask me before running the install. If I approve, run `npx @unship/cli@latest install --yes`.
+Install Unship instructions for my coding agent using the installed @unship/cli. Inspect `unship install --dry-run --json`, then install with `unship install --yes`. Preserve my custom instructions.
 ```
 
 `install` is global-first: it detects known coding harness homes, installs managed skills or instructions where the harness supports them, adds slash-command shims where supported, and can be re-run later to repair or refresh setup. If detection misses a harness you use, name it:
 
 ```bash
-npx @unship/cli@latest install cursor gemini
+unship install cursor gemini
 ```
 
 Restart your agent, then use `/unship` where available or ask naturally when the harness loads installed instructions:
@@ -49,7 +50,7 @@ Where supported, `/unship` works too:
 For unsupported harnesses:
 
 ```bash
-npx @unship/cli@latest install --print-skill
+unship install --print-skill
 ```
 
 Put the printed `SKILL.md` wherever your agent loads skills.
@@ -139,16 +140,20 @@ If a comparison is too risky to inline, ask the agent to make a smaller preview 
 Most users only need `install`, then natural-language prompts.
 
 ```bash
-npx @unship/cli@latest install
-npx @unship/cli@latest doctor --json
-npx @unship/cli@latest setup --json
-npx @unship/cli@latest check --json
-npx @unship/cli@latest check --readiness --json
+unship install
+unship doctor --json
+unship setup --out public/unship-picker.js --src /unship-picker.js --json
+unship check --json
+unship check --readiness --json
 ```
 
-`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including presentation attributes and retired preview markup.
+`setup --out` copies the selected runtime directly to the specified file and leaves identical bytes untouched. A differing file is preserved unless you repeat with `--force`, which saves a backup under `.unship/backups/`. Supply the app's actual served path and script URL; the paths above are examples. The agent adds the small returned script tag to one dev-only app shell. Setup does not rewrite framework source.
 
-`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and presentation hints, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored.
+`setup --inline --json` (also the legacy no-argument setup behavior) returns an embedded script for standalone previews. `snippet` remains available and uses the same attribute handling. `--persist local` and `--global-shortcuts` work in either mode.
+
+`check` finds temporary Unship artifacts before release, including custom-named dev script mounts and retired attributes. Remove unused copied runtime files as well as their mounts.
+
+`check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and Canvas arrangements, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored.
 
 The npm package is `@unship/cli`. The binary is `unship`, so local installs can run:
 
@@ -159,7 +164,7 @@ The npm package is `@unship/cli`. The binary is `unship`, so local installs can 
 If your team wants repo-local agent instructions:
 
 ```bash
-npx @unship/cli@latest init
+unship init
 ```
 
 The default `portable` target installs Codex/shared, Claude, and OpenCode helpers. Individual targets: `codex`, `antigravity`, `claude`, `opencode`, `cursor`, `copilot`, `gemini`, `windsurf`, `cline`, and `roo`. Use `all` for all supported repo helpers except Roo, which is explicit-only.
@@ -168,16 +173,23 @@ The default `portable` target installs Codex/shared, Claude, and OpenCode helper
 
 If `/unship` does not appear, restart your agent. Most agents load skills and slash commands at startup.
 
-Then check setup:
+Check a copied runtime against the selected CLI build:
 
 ```bash
-npx @unship/cli@latest doctor --json
+unship --version
+unship doctor --out public/unship-picker.js --json
 ```
 
-If installed files are stale:
+For an inline HTML mount, use `doctor --inline --out preview.html --json`. Doctor reports unknown freshness when it cannot verify the supplied mount; it does not prove which bytes a browser has loaded. It stays offline by default. `--ports 4326` explicitly probes a preview port; results are hints, not proof of app ownership. `--no-update-check` remains a compatibility no-op.
+
+Updating instructions and updating a project's copied runtime are separate operations. Reuse `setup --out <existing-file>` before handing off a comparison; inspect differences before `--force`. Reload the page, and rebuild if the preview serves an old build. Restarting an agent does not refresh a project script.
+
+Upgrade the package explicitly with `npm install -g @unship/cli@latest` (or your project's package manager), then refresh instructions below. For unpublished local builds, install the exact tarball instead. Keep using that executable; do not switch to npm `@latest` during setup or repair.
+
+If installed agent instructions are stale:
 
 ```bash
-npx @unship/cli@latest install --repair
+unship install --repair
 ```
 
 Natural language still works even when the slash command is unavailable:

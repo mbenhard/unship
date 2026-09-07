@@ -36,7 +36,7 @@
     "access": "public"
   },
   "scripts": {
-    "check": "node --check src/agent-targets/index.js && node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/install/index.js && node --check src/project-files/index.js && node --check src/setup/index.js && node --check src/update/index.js && node --check src/picker/unship-picker.js",
+    "check": "node --check src/agent-targets/index.js && node --check src/agent/index.js && node --check src/check/index.js && node --check src/cli/index.js && node --check src/install/index.js && node --check src/project-files/index.js && node --check src/setup/index.js && node --check src/picker/unship-picker.js",
     "e2e": "node e2e/toolbar-readiness.mjs",
     "demo": "node e2e/preview.mjs",
     "test": "node --test",

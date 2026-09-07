@@ -15,6 +15,10 @@ const INIT_TARGETS = {
 };
 INIT_TARGETS.antigravity = INIT_TARGETS.codex;
 
+export const projectSkillPaths = Object.fromEntries(Object.entries(INIT_TARGETS).map(([name, files]) => [name, files.find((file) => file.template === "skill").path]));
+
+export const projectInstructionPaths = new Set(Object.values(INIT_TARGETS).flatMap((files) => files.map((file) => file.path)));
+
 export function initTargetFiles(target, templates) {
   const names = target === "portable" ? ["codex", "claude", "opencode"]
     : target === "all" ? Object.keys(INIT_TARGETS).filter((name) => name !== "roo") : [target];

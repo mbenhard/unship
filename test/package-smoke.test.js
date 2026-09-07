@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+import { createServer } from "node:http";
+import { chromium } from "playwright";
 
 const EXPECTED_PACKED_FILES = [
   "LICENSE",
@@ -18,8 +20,7 @@ const EXPECTED_PACKED_FILES = [
   "src/install/index.js",
   "src/picker/unship-picker.js",
   "src/project-files/index.js",
-  "src/setup/index.js",
-  "src/update/index.js"
+  "src/setup/index.js"
 ];
 
 test("picker runtime version matches package version", async () => {
@@ -134,4 +135,58 @@ test("packed package smoke runs seamless install commands", async () => {
   const initRoo = results.get("init --target roo --force --json");
   assert.equal(initRoo.written.includes(".roo/commands/unship.md"), true);
   assert.match(await readFile(join(consumer, ".roo", "commands", "unship.md"), "utf8"), /Compare temporary local alternatives/);
+
+  // Exercise the installed package, not the checkout: update -> serve -> compare -> settle.
+  const app = join(consumer, "apps", "demo");
+  await mkdir(join(app, "public"), { recursive: true });
+  const invoke = (args) => {
+    const result = spawnSync(bin, args, { cwd: app, env, encoding: "utf8" });
+    return { code: result.status, data: JSON.parse(result.stdout) };
+  };
+  assert.equal(invoke(["install", "codex", "--yes", "--json"]).code, 0);
+  assert.equal(await readFile(join(home, ".agents/skills/unship/SKILL.md"), "utf8"), await readFile(join(consumer, "node_modules/@unship/cli/agent/skills/unship/SKILL.md"), "utf8"));
+  const runtime = await readFile(join(consumer, "node_modules/@unship/cli/src/picker/unship-picker.js"), "utf8");
+  const oldRuntime = runtime + "\n// older local build, same package version\n";
+  await writeFile(join(app, "public/preview-picker.js"), oldRuntime);
+  const args = ["setup", "--out", "public/preview-picker.js", "--src", "/preview-picker.js", "--json"];
+  assert.equal(invoke(args).code, 1);
+  const updated = invoke([...args, "--force"]);
+  assert.equal(updated.code, 0);
+  assert.equal(await readFile(updated.data.picker.backup, "utf8"), oldRuntime);
+  assert.equal(invoke(args).data.picker.status, "current");
+  const htmlPath = join(app, "index.html");
+  await writeFile(htmlPath, `<html><body><section data-unship-pick="Hero" data-unship-canvas="grid"><div data-unship-option="Current">A</div><div data-unship-option="Proof" hidden>B</div></section>${updated.data.mount.snippet}</body></html>`);
+  assert.equal(invoke(["check", "--readiness", "--json"]).data.summary.groupCount, 1);
+  assert.equal(invoke(["doctor", "--out", "public/preview-picker.js", "--json"]).data.project.pickerCurrent, true);
+
+  const server = createServer(async (request, response) => {
+    const script = request.url === "/preview-picker.js";
+    response.setHeader("content-type", script ? "text/javascript" : "text/html");
+    response.end(await readFile(script ? join(app, "public/preview-picker.js") : htmlPath));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  let browser;
+  try {
+    const url = `http://127.0.0.1:${server.address().port}`;
+    assert.equal(await (await fetch(`${url}/preview-picker.js`)).text(), runtime);
+    browser = await chromium.launch();
+    const page = await browser.newPage();
+    await page.goto(url);
+    assert.equal(await page.evaluate(() => window.__unshipPicker.version), JSON.parse(await readFile(join(consumer, "node_modules/@unship/cli/package.json"), "utf8")).version);
+    await page.getByRole("button", { name: "Next option", exact: true }).click();
+    assert.equal(await page.locator('[data-unship-option="Proof"]').isVisible(), true);
+    await page.getByRole("button", { name: "Open Canvas" }).click();
+    await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelectorAll(".canvas-frame.ready").length === 2);
+    await page.getByRole("button", { name: "Back to page", exact: true }).click();
+    assert.equal(await page.locator('[data-unship-option="Proof"]').isVisible(), true);
+  } finally {
+    await browser?.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await writeFile(htmlPath, '<html><body><section>B</section></body></html>');
+  await rm(join(app, "public/preview-picker.js"));
+  assert.equal(invoke(["check", "--json"]).code, 0);
+  assert.equal(invoke(["uninstall", "codex", "--yes", "--json"]).code, 0);
+  await assert.rejects(readFile(join(home, ".agents/skills/unship/SKILL.md")), { code: "ENOENT" });
+
 });

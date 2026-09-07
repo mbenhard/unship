@@ -52,11 +52,7 @@ async function runCliWithHome(args, cwd, home) {
   });
 }
 
-function nextPatchVersion(version) {
-  const parts = version.split(".").map(Number);
-  parts[2] += 1;
-  return parts.join(".");
-}
+
 
 test("help lists seamless install commands", () => {
   const result = spawnSync(process.execPath, [CLI, "help"], { encoding: "utf8" });
@@ -81,7 +77,7 @@ test("install print-skill outputs the bundled skill without writing", async () =
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /name: unship/);
   assert.match(result.stdout, /Variant Creation/);
-  assert.match(result.stdout, /comparison-readiness verification/);
+  assert.match(result.stdout, /check --readiness/);
   await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
 });
 
@@ -151,6 +147,8 @@ test("install repair includes existing stale shared agents files alongside detec
   assert.equal(result.status, 0, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.deepEqual(json.harnesses.map((item) => item.id), ["agents", "cursor"]);
+  const backup = json.harnesses.find((h) => h.id === "agents").files[0].backup;
+  assert.match(await readFile(backup, "utf8"), /STALE_MARKER_DO_NOT_KEEP/);
   assert.equal(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), await readFile(new URL("../agent/skills/unship/SKILL.md", import.meta.url), "utf8"));
   assert.doesNotMatch(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /STALE_MARKER_DO_NOT_KEEP/);
 });
@@ -279,7 +277,7 @@ test("install plain output groups next actions once", async () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Unship install complete/);
   assert.match(result.stdout, /ask your agent for options/);
-  assert.match(result.stdout, /have the agent run npx @unship\/cli@latest check --json/);
+  assert.match(result.stdout, /have the agent run check --json with this CLI/);
   assert.match(result.stdout, /Next:\n- Restart/);
   assert.match(result.stdout, /If \/unship is unavailable after restart/);
   assert.match(result.stdout, /natural-language fallback/);
@@ -350,8 +348,9 @@ test("install skips user modified skill and blocks claude command", async () => 
 
   const result = await runCliWithHome(["install", "--harness", "claude", "--yes", "--json"], cwd, home);
 
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 1, result.stderr);
   const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
   assert.equal(JSON.stringify(json).includes("user-modified"), true);
   assert.equal(JSON.stringify(json).includes("blocked-missing-skill"), true);
   await assert.rejects(readFile(join(home, ".claude", "commands", "unship.md"), "utf8"));
@@ -488,47 +487,11 @@ test("init writes portable skill by default", async () => {
   assert.equal(json.written.includes(".opencode/commands/unship.md"), true);
   const skill = await readFile(join(cwd, ".agents", "skills", "unship", "SKILL.md"), "utf8");
   assert.match(skill, /name: unship/);
-  assert.match(skill, /Command Prefix/);
-  assert.match(skill, /Variant Creation/);
-  assert.match(skill, /Picker Setup/);
-  assert.match(skill, /use unship to compare 4 hero directions/i);
-  assert.match(skill, /empty, loading, and error states/i);
-  assert.match(skill, /button system treatments/i);
-  assert.match(skill, /Do not build a custom switcher/i);
-  assert.match(skill, /Do not start, open, or automate a browser by default/i);
-  assert.match(skill, /detected preview servers as hints/i);
-  assert.match(skill, /Unship is local comparison tooling/i);
-  assert.match(skill, /does not send telemetry/i);
-  assert.match(skill, /Picker selection does not save source/i);
-  assert.match(skill, /Keep verification proportional to the phase/i);
-  assert.match(skill, /comparison-readiness verification/i);
-  assert.match(skill, /exactly one direct option is initially visible/i);
-  assert.match(skill, /computed `display:\s*none`/i);
-  assert.match(skill, /Do not run full release checks during ordinary variant creation/i);
-  assert.match(skill, /Variant-specific CSS must not accidentally override hidden state/i);
-  assert.match(skill, /\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/i);
-  assert.match(skill, /Framework script helpers can enforce ordering rules/i);
-  assert.match(skill, /Next\.js App Router/i);
-  assert.match(skill, /do not place a sync or defer `next\/script` mount outside the root document or root `head`/i);
-  assert.match(skill, /whether picker setup was reused, changed, skipped, or not checked/i);
-  assert.match(skill, /multiple groups with the same label/i);
-  assert.match(skill, /the variant group label/i);
-  assert.match(skill, /the visible option labels/i);
-  assert.match(skill, /comparison-readiness checks run/i);
-  assert.match(skill, /any detected preview servers as hints only/i);
-  assert.match(skill, /cleanup status if existing Unship artifacts already exist/i);
-  assert.match(skill, /repeated option labels/i);
-  assert.match(skill, /"the second one"/i);
-  assert.match(skill, /overlapping active explorations/i);
-  assert.match(skill, /If `\/unship` is unavailable after installation, continue from the natural-language request/i);
-  assert.match(skill, /\.\/node_modules\/\.bin\/unship/);
-  assert.match(skill, /If no app source or preview shell exists yet/i);
-  assert.match(skill, /Settle a selected group/i);
-  assert.match(skill, /Final cleanup/i);
-  assert.doesNotMatch(skill, /Before stopping for human choice, open or reuse the preview page/i);
-  assert.doesNotMatch(skill, /Use subagent mode only as an authoring workflow/i);
-  assert.match(skill, /project\.skillInstalled.*project\.skillCurrent/s);
-  assert.doesNotMatch(skill, /unship-design/);
+  assert.equal(skill, await readFile(new URL("../agent/skills/unship/SKILL.md", import.meta.url), "utf8"));
+  assert.match(skill, /setup --out/);
+  assert.match(skill, /picker.current: true/);
+  assert.doesNotMatch(skill, /run this freshness check|extract.*JavaScript body/i);
+
 });
 
 test("init antigravity writes workspace skill", async () => {
@@ -631,7 +594,7 @@ test("init fails loudly when an installed skill is stale", async () => {
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, false);
   assert.equal(json.stale.includes(".agents/skills/unship/SKILL.md"), true);
-  assert.match(json.next.join("\n"), /npx @unship\/cli@latest init --force --json/);
+  assert.match(json.next.join("\n"), /init --force --json with this CLI/);
   assert.doesNotMatch(json.next.join("\n"), /npx unship init/);
 });
 
@@ -670,7 +633,7 @@ test("unknown legacy setup flags fail without a stack trace", () => {
     assert.equal(result.status, 1);
     const json = JSON.parse(result.stdout);
     assert.equal(json.ok, false);
-    assert.match(json.error, new RegExp(`Unknown flag: ${flag}`));
+    assert.match(json.error, new RegExp(`Unknown option.*${flag}`));
     assert.equal(result.stderr, "");
     assert.doesNotMatch(result.stdout, /Error:/);
   }
@@ -856,47 +819,16 @@ test("doctor json can disable update checks", async () => {
   assert.equal(json.next.some((item) => /install --repair/.test(item)), false);
 });
 
-test("doctor json reports update availability from npm registry", async () => {
+test("doctor stays offline by default", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-  const latest = nextPatchVersion(PACKAGE_VERSION);
-
-  await withServer((request, response) => {
-    assert.equal(request.url, "/%40unship%2Fcli");
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ "dist-tags": { latest } }));
-  }, async (port) => {
-    const result = await runCli(["doctor", "--json"], cwd, {
-      UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}`
-    });
-
+  let requests = 0;
+  await withServer((request, response) => { requests++; response.end("{}"); }, async (port) => {
+    const result = await runCli(["doctor", "--json"], cwd, { UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}` });
     assert.equal(result.status, 0, result.stderr);
     const json = JSON.parse(result.stdout);
-    assert.equal(json.updates.checked, true);
-    assert.equal(json.updates.available, true);
-    assert.equal(json.updates.current, PACKAGE_VERSION);
-    assert.equal(json.updates.latest, latest);
-    assert.match(json.updates.next, /install --repair/);
-    assert.equal(json.next[0], json.updates.next);
-  });
-});
-
-test("doctor json continues when update check is unavailable", async () => {
-  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
-
-  await withServer((request, response) => {
-    response.writeHead(500, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "offline" }));
-  }, async (port) => {
-    const result = await runCli(["doctor", "--json"], cwd, {
-      UNSHIP_NPM_REGISTRY: `http://127.0.0.1:${port}`
-    });
-
-    assert.equal(result.status, 0, result.stderr);
-    const json = JSON.parse(result.stdout);
-    assert.equal(json.updates.checked, true);
-    assert.equal(json.updates.available, null);
-    assert.equal(json.updates.error, "unavailable");
-    assert.equal(json.ok, true);
+    assert.deepEqual(json.updates, { checked: false, reason: "disabled" });
+    assert.deepEqual(json.project.previewServers, []);
+    assert.equal(requests, 0);
   });
 });
 
@@ -1064,4 +996,24 @@ test("install detects Codex alongside other agent homes", async () => {
   assert.deepEqual(plan.harnesses.map(h => h.id), ["agents", "claude"]);
   assert.equal(plan.harnesses[0].detected, true);
   assert.equal(plan.harnesses[0].fallback, false);
+});
+
+
+test("CLI validates setup arguments and supports conventional version output", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  for (const args of [["setup", "--out"], ["setup", "--out", ""], ["setup", "--persist", "forever"], ["snippet", "--inline", "--src", "/x.js"], ["check", "--force"]]) {
+    const result = await runCli([...args, "--json"], cwd);
+    assert.equal(result.status, 1, args.join(" "));
+    assert.equal(JSON.parse(result.stdout).ok, false);
+    assert.equal(result.stderr, "");
+  }
+  const version = await runCli(["--version"], cwd);
+  assert.equal(version.stdout.trim(), PACKAGE_VERSION);
+  const result = await runCli(["setup", "--out", "public/picker.js", "--src", "/picker.js", "--json"], cwd);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).picker.current, true);
+  await writeFile(join(cwd, "public/picker.js"), "different");
+  const blocked = await runCli(["setup", "--out", "public/picker.js", "--json"], cwd);
+  assert.equal(blocked.status, 1);
+  assert.equal(JSON.parse(blocked.stdout).picker.current, false);
 });

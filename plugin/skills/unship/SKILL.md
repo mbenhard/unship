@@ -1,141 +1,37 @@
 ---
 name: unship
-description: "Use when the user wants to compare agent-made local alternatives: UI sections, copy, states, flows, design-system directions, rendered docs or DX surfaces, visual directions, picker previews, or cleanup of temporary Unship markup."
+description: "Compare agent-made local alternatives in the real app: UI, copy, states, small flows, design-system treatments, rendered docs or DX previews. Use for Unship setup, Canvas comparisons, selection, and cleanup."
 ---
 
 # Unship
 
-Use Unship to create temporary alternatives in real source, let the human compare them in the local browser, and then clean every Unship artifact before shipping. Unship is a decision surface for work that designers and developers judge best in the actual app: UI, copy, product states, flows, design-system treatments, rendered docs previews, and developer experience surfaces.
+Unship is local comparison tooling: create temporary alternatives in real source, let the human compare them in the browser, then settle the chosen source. The script runs locally and does not send telemetry. Picker selection does not save source or make a product decision; the agent applies the human's choice.
 
-Unship is local comparison tooling. The picker script runs in the user's local preview, Unship does not send telemetry, and picker selection does not save source or make a product decision. The human chooses by naming a visible option label in chat; you settle source by keeping that option and removing temporary artifacts.
-
-Make requested design adjustments directly in source. Use Unship to compare discrete alternatives.
-
-## Normal Requests
-
-Treat ordinary prompts as complete enough to begin. Examples:
-
-- `use unship to compare 4 hero directions`
-- `generate 3 copywriting directions for section X with unship`
-- `use unship to explore empty, loading, and error states for the import flow`
-- `use unship to compare 3 button system treatments`
-- `use unship to render 3 CLI help output directions`
-
-Parse intent this way:
-
-- A number means exactly that many visible choices unless the user says `plus current`.
-- A section, element, state, flow step, design-system sample, rendered docs preview, or DX surface defines the smallest source scope that can be varied cleanly.
-- `copywriting` means preserve structure and vary message, proof, CTA, tone, and hierarchy.
-- `visual`, `layout`, or `design` means vary composition while staying inside the app's design language.
-- `state` means compare realistic product states such as empty, loading, error, success, long-label, reduced-motion, or permission-limited views.
-- `flow` means compare a small source-contained path or step sequence, not a production experiment framework.
-- `system`, `tokens`, or `design system` means compare local component or style treatments that can be rendered in source.
-- `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface. Do not treat raw Markdown files as directly comparable by the picker.
-- `canvas` means opt the requested Groups into simultaneous comparison with `data-unship-canvas`. Choose each Group's Arrangement from its rendered proportions: `stack` for wide, shallow sections; `grid` for compact components; `matrix` only when responsive widths should be compared together.
-- If the target is ambiguous, inspect the page/source first and choose the most likely match.
+Make requested adjustments directly in source. Use the picker for discrete alternatives, not live parameter controls.
 
 ## Command Prefix
 
-Choose the CLI prefix only when a CLI command is needed:
+Choose one CLI for the request and retain it for every command:
 
-- If `./node_modules/.bin/unship` exists, use `./node_modules/.bin/unship`.
-- Otherwise, if `command -v unship` finds an executable, resolve its path and verify its owning npm package metadata names `@unship/cli` before using it. A matching binary name alone is insufficient: older or unrelated tools can also be named `unship`. This preserves a verified local development install before it is published.
-- Otherwise use `npx -y @unship/cli@latest` so npm does not stop for an install prompt.
+- In Unship's own repo (`package.json` names `@unship/cli`), use `node src/cli/index.js`.
+- Honor an explicitly requested build. Otherwise prefer `./node_modules/.bin/unship`, then a global executable whose owning npm package is verified as `@unship/cli`. A matching command name alone is insufficient.
+- Only if neither is available, use `npx -y @unship/cli@latest`.
 
-Use the chosen prefix as `$UNSHIP` for every CLI call in this project. Check availability before using a global binary. When working on Unship itself (`package.json` names `@unship/cli`), use `node src/cli/index.js` to test the checkout instead of fetching the published package.
+The examples below use `$UNSHIP` to mean that chosen command. Run from the consuming app root, especially in monorepos. Do not replace a deliberate project pin or unpublished local build with npm `@latest`. Package updates use the app's package manager; `install --repair` refreshes agent instructions, not project runtime files.
 
-For status checks during normal prototyping, prefer:
-
-```bash
-$UNSHIP doctor --json --no-update-check
-```
-
-Use `doctor` when setup freshness, stale installed files, or existing Unship work matters. If `doctor` reports `project.skillInstalled: true` and `project.skillCurrent: false`, refresh installed repo-local instructions with `$UNSHIP init --force --json` before continuing. If `pickerFileCurrent: false`, run setup only when the picker is still needed.
-
-If `/unship` is unavailable after installation, continue from the natural-language request. Do not require the slash command when this skill is already active.
-
-If no app source or preview shell exists yet, code normally first and defer setup until there is a local app shell to mount the picker into.
+If `/unship` is unavailable after installation, continue from the natural-language request. Use `init --target <agent>` only when project-local instructions are needed; preserve custom instructions before an explicit `--force` refresh.
 
 ## Variant Creation
 
-Use this path for ordinary requests to generate, compare, or explore alternatives. Create the smallest source-level comparison that lets the human judge the options in the running local preview. Inspect the named route, component, source area, or local comparison artifact first. Expand to immediate shared components, tokens, styles, and copy context only when the target is unresolved or local design patterns are unclear.
+Inspect the requested source and its immediate design context. Ordinary prompts are enough to begin: `use unship to compare 4 hero directions`, explore empty/loading/error states, or compare button system treatments.
 
-Alternatives must be derived from the app's vocabulary unless the user explicitly asks to depart from it. Avoid unrelated refactors. Extract helpers only when they make the temporary comparison clearer or avoid obvious repeated markup.
+- A requested number means exactly that many choices unless the user says “plus current”. Otherwise create 2–4 meaningful alternatives with short, distinct labels.
+- Keep the smallest scope that lets the human judge the decision. Match the app's design language unless asked to depart from it. For copy comparisons, preserve structure and vary the message.
+- For docs or CLI output, make a local rendered preview; the picker cannot compare raw files.
+- Reuse independent comparisons. Settle overlapping work according to an existing user choice; ask only when the desired winner or scope is ambiguous.
+- If no app source or preview shell exists yet, create it before mounting the picker.
 
-Keep verification proportional to the phase. Before the first handoff, do only comparison-readiness verification:
-
-- the expected `data-unship-pick` group exists;
-- the expected option labels exist;
-- the options are direct children of the group;
-- exactly one direct option is initially visible;
-- hidden direct options are actually hidden, including computed `display: none` when a rendered DOM can be checked cheaply.
-
-For literal HTML, run `$UNSHIP check --readiness --json --root <comparison-directory>`. Correct failures and verify uncertain results manually.
-
-Do not run full release checks during ordinary variant creation unless the source cannot be edited safely without them. Full typecheck, build, browser automation, mobile smoke, `unship check`, and cleanup verification belong to picker setup changes, selected-option cleanup, or final shipping cleanup.
-
-Use the rendered page when the user asks for browser help, setup requires manual verification, or source is insufficient.
-
-## Picker Setup
-
-Picker setup is local development infrastructure. Reuse an existing dev-only picker mount when present. Do not reinstall, inline, copy, repair, or replace the picker during ordinary variant creation unless the picker is missing, stale, or the user asked to change setup.
-
-If picker setup is missing and the comparison needs it now, run:
-
-```bash
-$UNSHIP setup --json
-```
-
-Use the returned `mount.snippet` and instructions. Patch only the smallest local/dev-only app shell or preview artifact that renders the Unship options. Only inspect Unship package files if these commands fail or the project has unusual setup needs.
-
-Framework script helpers can enforce ordering rules that plain scripts do not. If the picker has no strict ordering requirement, prefer the simplest valid dev-only script mount for the app shell. In Next.js App Router, do not place a sync or defer `next/script` mount outside the root document or root `head`; move it into the root `head`, add `async`, or use a plain dev-only `<script>` include instead.
-
-If `doctor` reports `project.previewServers`, treat detected preview servers as hints instead of opening, navigating, or starting a browser. Do not assume they are the right app or route. If `doctor` reports `unship.explorations` or `next`, use those fields as concise context for existing temporary work.
-
-## Instruction Precedence
-
-1. The user's explicit request for count, style, scope, or temporary retention.
-2. Safety and local-only cleanup requirements.
-3. The app's design system and implementation constraints.
-4. Unship defaults.
-
-When these conflict, explain the tradeoff briefly and choose the smallest safe interpretation.
-
-## Defaults
-
-- Create 2-4 meaningful variants.
-- Interpret `N variants` as `N` choices shown unless the user says `N alternatives plus current`.
-- Include `Current` only when baseline comparison is useful.
-- Use 1-3 word labels, ideally under 18 characters.
-- Use inline mode for focused section, component, state, copy, or local comparison artifact work.
-- Use Canvas only when the user asks for it or simultaneous comparison is the explicit task.
-
-## Inline Mode Safety
-
-Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, submit controls, global scripts, analytics triggers, autoplay media, focus traps, destructive side effects, and stateful providers. If unsafe, reduce scope or explain that inline mode is not suitable.
-
-## Hidden Option Safety
-
-Inactive options rely on `hidden`. Variant-specific CSS must not accidentally override hidden state. Be careful with option classes that set `display: grid`, `display: flex`, or `display: block`; if needed, preserve this local comparison guard near the relevant CSS:
-
-```css
-[hidden] { display: none !important; }
-```
-
-## Smooth Workflow Edges
-
-- Report detected preview servers as hints instead of opening, navigating, or starting a browser.
-- If no preview server is detected, tell the user to start the app the way they normally do.
-- If `setup` returns manual instructions, patch only the smallest dev-only mount point or explain what still needs manual wiring.
-- If an existing Unship exploration overlaps the requested target, or the user asks to ship, finish, or clean, ask what to keep or clean before changing it.
-- If an existing Unship exploration is independent, or the user clearly asks for another round, report it briefly and proceed.
-- If typecheck/build fails before your edits, report that baseline state and keep Unship changes isolated.
-
-## Markup Contract
-
-Wrap each temporary group with `data-unship-pick`. Put direct child choices inside with `data-unship-option`.
-
-Do not build a custom switcher, segmented control, tab set, or app-level preference for Unship comparisons. The source alternatives are the product; the Unship picker toolbar is the comparison control.
+Do not build a custom switcher, tab set, or preference system. Use this markup contract, with direct child options and exactly one initially visible:
 
 ```html
 <section data-unship-pick="Hero">
@@ -144,57 +40,64 @@ Do not build a custom switcher, segmented control, tab set, or app-level prefere
 </section>
 ```
 
-If setup cannot patch the app automatically, inject the picker locally with `$UNSHIP snippet` or an equivalent dev-only script include.
+Hidden options still exist in the app. Avoid duplicate active IDs, scripts, analytics triggers, autoplay, focus traps, submit controls, and conflicting stateful providers. Reduce scope if alternatives cannot safely coexist.
 
-## Canvas Mode
+Variant-specific CSS must not override hidden state. When needed, add a local guard:
 
-Canvas is the simultaneous companion to the normal one-at-a-time picker. Add one Arrangement hint to every Group that belongs on the Canvas:
-
-```html
-<section data-unship-pick="Header" data-unship-canvas="stack">…</section>
-<section data-unship-pick="Cards" data-unship-canvas="grid">…</section>
-<section data-unship-pick="Hero" data-unship-canvas="matrix">…</section>
+```css
+[hidden] { display: none !important; }
 ```
 
-- `stack` keeps wide, shallow Options underneath one another.
-- `grid` lets compact Options flow side by side and wrap.
-- `matrix` prepares every Option at 1280, 768, and 390 pixel viewport widths. Canvas opens with Desktop visible; its responsive toggle reveals Tablet and Mobile together.
+## Picker Setup
 
-Choose the Arrangement yourself from the content; do not ask the user to operate layout controls. Keep the marked Group as the smallest self-contained source scope that renders truthfully. Canvas Frames are script-free snapshots, so a target that depends on canvas pixels, shadow DOM, or client JavaScript needs a smaller static preview surface.
+Before handing off a new or reused comparison, prepare the runtime at the path its existing dev-only mount serves. A current CLI or restarted agent does not make an old copied script current.
 
-Canvas supports hold-to-Keep instructions. Do not build custom Canvas controls, annotation, sharing, ranking, or persistence into the explored source.
+```bash
+$UNSHIP setup --out public/unship-picker.js --src /unship-picker.js --json
+```
 
-## Human Comparison Handoff
+The paths above are examples: choose the app's actual served file and URL. Reuse an existing destination; do not add a second mount. Setup creates a missing file, leaves identical bytes untouched, and reports differing content without overwriting it. For a known old generated picker, repeat with `--force`; replacement saves a backup. Preserve custom modifications and resolve them deliberately before replacement. Require `picker.current: true` after preparation.
 
-Do not start, open, or automate a browser by default. The human compares alternatives in their own running preview.
+Setup prepares the file, not the app shell. Add the returned small script tag once in a dev-only shell. Do not ship the mount or runtime. Respect framework script ordering: in Next.js App Router, use a valid root-document script placement or an appropriate async include, rather than a synchronous `next/script` in an arbitrary component.
 
-Before stopping for human choice, report:
+If the preview serves built output or caches an old script, rebuild/reload as needed and verify the served file matches the selected runtime. Reinjecting a script does not replace an already-running singleton. Report unresolved browser freshness honestly.
 
-- the variant group label;
-- the visible option labels;
-- comparison-readiness checks run;
-- whether picker setup was reused, changed, skipped, or not checked;
-- any detected preview servers as hints only;
-- cleanup status if existing Unship artifacts already exist.
+For a standalone HTML preview that needs embedding, use `$UNSHIP setup --inline --json` and its returned snippet. Verify literal HTML with `$UNSHIP doctor --inline --out <HTML-file> --json`; templated mounts may require browser verification. Inline output also supports `--persist local` and `--global-shortcuts` when explicitly wanted.
 
-If the human names a winner ambiguously, verify the selected group and option label before editing. Ambiguity includes multiple groups with the same label, repeated option labels, the user saying "the second one" after other changes, or overlapping active explorations.
+Doctor is optional troubleshooting, not a step in every iteration. Use `doctor --out <served-file> --json` for an explicit asset. It checks local files; it does not prove which runtime the browser loaded. Optional `--ports` results are preview hints, not evidence that a server belongs to the app. Avoid broad scans or registry checks during ordinary comparisons.
 
-If no preview server is detected, say that the user should start the app normally and compare the visible option labels in the Unship picker. Only use browser automation when the user explicitly asks, setup requires manual verification, or you are changing Unship's picker/setup implementation itself. If you do verify, keep it to a functional smoke check: the picker appears, expected option labels are present, and switching does not reload the page. Do not judge visual quality for the human.
+## Canvas
 
-## Cleanup
+Use Canvas when requested or when simultaneous comparison is the explicit task. Add an arrangement to the relevant group:
 
-### Settle a selected group
+```html
+<section data-unship-pick="Header" data-unship-canvas="stack">...</section>
+<section data-unship-pick="Cards" data-unship-canvas="grid">...</section>
+<section data-unship-pick="Hero" data-unship-canvas="matrix">...</section>
+```
 
-When the human names a winner for one group and wants to continue prototyping, keep that option's real source, remove losing options for that group, and remove `data-unship-*` attributes from the settled source. Keep the picker mount if more exploration is still active or expected.
+Choose `stack` for wide, shallow options, `grid` for compact components, and `matrix` for responsive comparison at 1280, 768, and 390 pixels. Matrix opens at Desktop; the responsive toggle reveals Tablet and Mobile. Choose the arrangement from the content rather than asking the user to manage layout controls.
 
-### Final cleanup
+Canvas frames are script-free snapshots. For content dependent on canvas pixels, shadow DOM, or client JavaScript, use a smaller static preview that represents the decision faithfully. Keep the marked group self-contained. Use the existing Canvas and Keep controls; do not add annotation, sharing, ranking, or persistence systems.
 
-When the human asks to ship, finish, cancel, or clean all Unship work, remove all losing choices, all `data-unship-*` attributes, picker mounts, and Unship comments, then run:
+## Verification and Handoff
+
+Keep verification proportional to the phase. During creation, check the expected group and option labels, direct-child structure, exactly one initially visible option, and computed `display: none` for inactive options when rendered verification is needed.
+
+For literal source, run `$UNSHIP check --readiness --json --root <comparison-directory>`. Resolve failures; check uncertain dynamic markup manually. A result with zero groups does not verify the requested comparison. Full release checks belong to setup changes, selected-source cleanup, or shipping, not ordinary variant edits.
+
+Do not start, open, or automate a browser by default. Use it when requested, when setup needs verification, or when source cannot establish readiness. Check expected controls and switching; the human judges the alternatives.
+
+Hand off the group and visible option labels, readiness checks, and whether runtime setup was reused or updated. Mention unresolved setup or cleanup work. Use the app's known preview URL; if no preview is running, use its normal development command when requested. Do not treat a detected localhost port as the correct app automatically.
+
+## Selection and Cleanup
+
+When the user chooses, keep that option's real source, remove the losing options and `data-unship-*` attributes for that group. Keep the mount while other comparisons remain. If labels or “the second one” are ambiguous across groups or edits, clarify before deleting alternatives.
+
+For final cleanup, remove all temporary options, attributes, comments, script mounts, and unused picker files, including custom-named copies. Follow choices already supplied; do not choose a winner on the user's behalf. Run:
 
 ```bash
 $UNSHIP check --json
 ```
 
-Do not claim final cleanup is complete until the check is clean.
-
-Do not invent lifecycle commands. The human chooses by naming the visible option in chat; the agent edits source and verifies cleanup.
+Do not claim final cleanup until the check is clean. Run the app's relevant checks/build for the settled source. Preserve unrelated project changes and keep the runtime/instructions out of the production artifact.
