@@ -12,7 +12,7 @@
     frames: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5"/><rect x="10" y="11" width="11" height="9" rx="2"/></svg>',
     responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 15.5H4.5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2V9M10 15.5v4m-4 0h6"/><rect x="13" y="9" width="8.5" height="12" rx="2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>',
-    moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z"></path></svg>'
+    moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.2 3.6a8.6 8.6 0 1 0 10.2 10.2A7 7 0 0 1 10.2 3.6Z"></path></svg>'
   };
   const CANVAS_MIN_ZOOM = 0.05;
   const CANVAS_MAX_ZOOM = 2;
@@ -405,16 +405,16 @@
     const comparable = group.options.length > 1;
     const title =
       copied === "ok"
-        ? "✓ Copied"
+        ? '<span>✓ Copied</span><span class="copy-next">Paste into your AI chat</span>'
         : copied === "fail"
           ? "Couldn't copy. Try again"
           : escapeHtml(option.label);
     const ariaLabel = comparable
-      ? `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`
-      : `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
+      ? `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to copy this choice, then paste into your AI chat. Double-click to minimize, drag to move. Press Enter to copy, Shift plus Enter to minimize`
+      : `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}. Hold to copy this choice, then paste into your AI chat. Double-click to minimize, drag to move. Press Enter to copy, Shift plus Enter to minimize`;
     return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
-        <button class="label" type="button" aria-label="${ariaLabel}">
-          <span class="label-main${swapClass}">${title}</span>
+        <button class="label" type="button" aria-label="${ariaLabel}" title="Hold to copy choice, then paste into your AI chat">
+          <span class="label-main${swapClass}${copied === "ok" ? " copy-status" : ""}">${title}</span>
           ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}`;
@@ -644,7 +644,7 @@
       <div class="canvas-frame-toolbar" role="toolbar" aria-label="Canvas Frame actions" aria-hidden="true" inert>
         <span class="canvas-option-name"></span>
         <span class="canvas-frame-width"></span>
-        <button class="canvas-keep" type="button" data-action="canvas-keep">Hold to keep</button>
+        <button class="canvas-keep" type="button" data-action="canvas-keep" title="Hold or press Enter to copy this choice, then paste into your AI chat">Hold to copy choice</button>
       </div>`;
     const world = shell.querySelector(".canvas-world");
 
@@ -690,7 +690,7 @@
     }
     frame.style.width = `${width}px`;
     frame.tabIndex = 0;
-    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press Enter to keep`);
+    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press Enter to copy this choice, then paste into your AI chat`);
     const iframe = document.createElement("iframe");
     iframe.className = "canvas-iframe";
     iframe.title = `${group.displayLabel}: ${option.label} at ${width} pixels`;
@@ -835,7 +835,11 @@
         canvasKeeps.set(groupIndex, instruction);
         shell.querySelectorAll(`.canvas-frame[data-group="${groupIndex}"]`).forEach((frame) => frame.classList.toggle("kept", Number(frame.dataset.option) === optionIndex));
       }
-      liveRegion.textContent = ok ? `Copied ${canvasKeeps.size} Canvas ${canvasKeeps.size === 1 ? "choice" : "choices"}. Paste the keep instruction to your agent` : "Copy failed";
+      if (canvasFrameTarget) {
+        const failedTarget = !ok && Number(canvasFrameTarget.dataset.group) === groupIndex && Number(canvasFrameTarget.dataset.option) === optionIndex;
+        showCanvasFrameToolbar(canvasFrameTarget, failedTarget);
+      }
+      liveRegion.textContent = ok ? `Copied ${canvasKeeps.size} ${canvasKeeps.size === 1 ? "choice" : "choices"}. Paste into your AI chat to apply` : "Copy failed";
     });
     return canvasKeepQueue;
   }
@@ -888,7 +892,7 @@
     scheduleCanvasFrameToolbarHide();
   }
 
-  function showCanvasFrameToolbar(frame) {
+  function showCanvasFrameToolbar(frame, copyFailed = false) {
     clearTimeout(canvasFrameHideTimer);
     canvasFrameTarget = frame;
     const toolbar = canvasShell?.querySelector(".canvas-frame-toolbar");
@@ -902,6 +906,9 @@
       button.dataset.group = frame.dataset.group;
       button.dataset.option = frame.dataset.option;
     });
+    toolbar.querySelector(".canvas-keep").textContent = copyFailed
+      ? "Couldn't copy. Try again"
+      : frame.classList.contains("kept") ? "✓ Copied — paste into your AI chat" : "Hold to copy choice";
     toolbar.inert = false;
     toolbar.setAttribute("aria-hidden", "false");
     toolbar.classList.add("visible");
@@ -1444,12 +1451,12 @@
     const ok = await copyText(instruction);
     copied = ok ? "ok" : "fail";
     renderPreservingLabelFocus();
-    liveRegion.textContent = ok ? "Copied. Paste the keep instruction to your agent" : "Copy failed";
+    liveRegion.textContent = ok ? "Copied. Paste into your AI chat to apply" : "Copy failed";
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = false;
       renderPreservingLabelFocus();
-    }, 1800);
+    }, 4000);
   }
 
   function keepInstruction(group) {
@@ -1919,6 +1926,8 @@
       .label:hover,.label:focus{background:transparent;box-shadow:none;outline:0}
       .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
       .label-main{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .label-main.copy-status{display:grid;gap:1px;line-height:1.2;white-space:normal}
+      .copy-next{font-size:10px;opacity:.7}
       .option-count{font-size:11.5px;flex:none;opacity:.7;font-variant-numeric:tabular-nums}
       .canvas-enter,.canvas-fit{height:var(--h);padding:0 10px;border-radius:999px;white-space:nowrap;font-size:11px}
       .canvas-enter{display:grid;place-items:center;box-sizing:border-box;width:var(--nav);min-width:var(--nav);padding:0;margin-left:5px;background:rgba(255,255,255,.12)}
@@ -1947,18 +1956,18 @@
       .canvas-frame:hover,.canvas-frame:focus-within{z-index:4}
       .canvas-frame:focus-visible{outline:2px solid #111;outline-offset:4px}
       .canvas-shell[data-theme="dark"] .canvas-frame:focus-visible{outline-color:#fff}
-      .canvas-frame::after{content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-radius:50%;background:#111;opacity:0;box-shadow:0 0 0 2px #fff}
-      .canvas-shell[data-theme="dark"] .canvas-frame::after{background:#fff;box-shadow:0 0 0 2px #111}
+      .canvas-frame::after{content:"✓";position:absolute;right:8px;top:8px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#111;color:#fff;font:600 12px/1 system-ui;opacity:0;box-shadow:0 0 0 2px #fff}
+      .canvas-shell[data-theme="dark"] .canvas-frame::after{background:#fff;color:#111;box-shadow:0 0 0 2px #111}
       .canvas-frame.kept::after{opacity:1}
       .canvas-iframe{display:block;width:100%;height:180px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .16s ease}
       .canvas-frame.ready .canvas-iframe{opacity:1}
       .canvas-frame.viewport-hidden{display:none}
       .canvas-frame.failed{min-height:96px;background:rgba(127,127,127,.08)}
-      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:32px;padding:4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
+      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 4px 4px 8px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
       .canvas-frame-toolbar.visible{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
-      .canvas-option-name{padding-left:9px;max-width:180px;overflow:hidden;text-overflow:ellipsis}
-      .canvas-frame-width{padding:0 7px;opacity:.6;font-variant-numeric:tabular-nums}
-      .canvas-frame-toolbar button{position:relative;min-height:26px;padding:0 9px;border-radius:999px;overflow:hidden}
+      .canvas-option-name{padding-left:9px;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+      .canvas-frame-width{flex:none;padding:0 7px;opacity:.6;font-variant-numeric:tabular-nums}
+      .canvas-frame-toolbar button{flex:none;position:relative;min-height:26px;padding:0 9px;border-radius:999px;overflow:hidden}
       .canvas-frame-toolbar button:hover,.canvas-frame-toolbar button:focus-visible{background:rgba(255,255,255,.14)}
       .canvas-keep.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
       .dock.canvas-dock{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;width:max-content;max-width:calc(100vw - 20px);left:50%!important}
@@ -1991,10 +2000,7 @@
       .dock.top.enter{animation-name:dockInTop}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
-      .dock[data-dir="next"] .group-count-current,.dock[data-dir="next"] .option-count-current{--dx:0px;--dy:8px}
-      .dock[data-dir="prev"] .group-count-current,.dock[data-dir="prev"] .option-count-current{--dx:0px;--dy:-8px}
-      .label-main.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
-      .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
+      .label-main.swap,.option-count-current.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (max-width:520px){.canvas-row{gap:2px}}
       @media (max-width:340px){.canvas-fit{display:none}}

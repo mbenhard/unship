@@ -11,7 +11,7 @@ test("double-clicking the label minimizes the dock to a circular button and clic
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
 
-    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).dblclick();
     await page.waitForFunction(() => {
       const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
       return root && !root.querySelector(".dock") && root.querySelector(".minimized");
@@ -439,7 +439,7 @@ test("minimize and restore keep an edge-snapped dock anchored to its corner", as
 
     // Minimize without any viewport event: the circle must land in the same
     // corner the dock hugged, not stay centered on the wide dock's anchor.
-    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).dblclick();
     await page.waitForFunction(() => {
       const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
       return root && !root.querySelector(".dock") && root.querySelector(".minimized");
@@ -483,7 +483,7 @@ test("a minimized edge snap keeps hugging the edge across viewport syncs", async
     await page.mouse.move(700, 540, { steps: 8 });
     await page.mouse.up();
 
-    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).dblclick();
     await page.waitForFunction(() => {
       const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
       return root && !root.querySelector(".dock") && root.querySelector(".minimized");

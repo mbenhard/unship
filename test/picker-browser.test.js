@@ -105,7 +105,7 @@ test("toolbar animates only the changing counter number", async () => {
         totalText: root.querySelector(".option-count-total").textContent.trim(),
         currentAnimates: root.querySelector(".option-count-current").classList.contains("swap"),
         totalAnimates: root.querySelector(".option-count-total").classList.contains("swap"),
-        nextDy: getComputedStyle(root.querySelector(".option-count-current")).getPropertyValue("--dy").trim()
+        nextDx: getComputedStyle(root.querySelector(".option-count-current")).getPropertyValue("--dx").trim()
       };
     });
 
@@ -114,13 +114,13 @@ test("toolbar animates only the changing counter number", async () => {
     assert.equal(counter.totalText, "3");
     assert.equal(counter.currentAnimates, true);
     assert.equal(counter.totalAnimates, false);
-    assert.equal(counter.nextDy, "8px");
+    assert.equal(counter.nextDx, "8px");
 
     await page.getByRole("button", { name: /previous option/i }).click();
-    const previousDy = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
-      getComputedStyle(host.shadowRoot.querySelector(".option-count-current")).getPropertyValue("--dy").trim()
+    const previousDx = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
+      getComputedStyle(host.shadowRoot.querySelector(".option-count-current")).getPropertyValue("--dx").trim()
     );
-    assert.equal(previousDy, "-8px");
+    assert.equal(previousDx, "-8px");
   } finally {
     await browser.close();
   }
@@ -154,7 +154,7 @@ test("toolbar does not outline or ring the active variant title after switching"
     assert.equal(styles.outlineWidth, "0px");
     assert.equal(styles.boxShadow, "none");
 
-    await page.getByRole("button", { name: /hold to keep this option/i }).hover();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).hover();
     const hoverStyles = await page.locator("css=[data-unship-toolbar]").evaluate((host) => {
       const style = getComputedStyle(host.shadowRoot.querySelector(".label"));
       return {
@@ -175,7 +175,7 @@ test("toolbar placement changes only by dragging the label", async () => {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await page.setContent(`<section data-unship-pick="Hero"><div data-unship-option="Current">A</div><div data-unship-option="Visual" hidden>B</div></section><script>${picker}</script>`);
 
-    await page.getByRole("button", { name: /hold to keep this option/i }).click();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).click();
     assert.equal(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".dock").classList.contains("bottom")),
       true
@@ -238,7 +238,7 @@ test("toolbar keeps one style node and live region across render modes", async (
     await page.waitForTimeout(80);
     assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
 
-    await page.getByRole("button", { name: /hold to keep this option/i }).dblclick();
+    await page.getByRole("button", { name: /hold to copy this choice/i }).dblclick();
     await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelector(".minimized"));
     assert.deepEqual(await counts(), { styles: 1, liveRegions: 1 });
 

@@ -114,7 +114,7 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
         label: button.textContent,
         ariaLabel: button.getAttribute("aria-label"),
         spinner: Boolean(button.querySelector(".canvas-spinner")),
-        width: button.getBoundingClientRect().width,
+        width: button.offsetWidth,
         opacity: getComputedStyle(shell).opacity,
         pointerEvents: getComputedStyle(shell).pointerEvents,
         overflow: document.documentElement.style.overflow
@@ -446,6 +446,9 @@ test("Canvas Keep actions accumulate one choice per Group", async () => {
     assert.match(copied, /Keep "Direct" for "Hero"/);
     const kept = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll(".canvas-frame.kept")).map((frame) => `${frame.dataset.group}:${frame.dataset.option}`));
     assert.deepEqual(kept, ["0:1", "1:1", "1:1", "1:1"]);
+    assert.equal(await page.locator(".canvas-keep").textContent(), "✓ Copied — paste into your AI chat");
+    await host.evaluate((node) => node.shadowRoot.querySelector('.canvas-frame[data-group="0"][data-option="0"]').dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+    assert.equal(await page.locator(".canvas-keep").textContent(), "Hold to copy choice");
   });
 });
 
@@ -487,6 +490,7 @@ test("Canvas does not mark failed copies as kept", async () => {
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelector('[aria-live]').textContent === 'Copy failed');
     assert.equal(await page.locator('[data-unship-toolbar] .canvas-frame.kept').count(), 0);
+    assert.equal(await page.locator('.canvas-keep').textContent(), "Couldn't copy. Try again");
   });
 });
 

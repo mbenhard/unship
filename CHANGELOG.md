@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Match option-name and counter motion, clarify copying choices into an AI chat, show visible Canvas copy feedback and checkmarks, and refine the frame pill spacing and moon icon.
+
 - Keep recovery backups and pre-existing ignore rules during agent-led comparison cleanup.
 - Show only the option label in the navigation row; group names remain in the multi-group list and accessible descriptions.
 - Prepare runtime files directly with `setup --out`: exact-byte no-op checks, explicit replacement with backups, and shared inline/external snippet options.
