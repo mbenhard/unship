@@ -14,17 +14,25 @@ Unship does not send telemetry. No remote service. No account or remote session 
 
 ## Install
 
+Copy for CLI:
+
 ```bash
 npx @unship/cli@latest install
 ```
 
-Want your agent to handle setup safely? Copy this:
+Agent-assisted install:
 
 ```txt
 Set up Unship for this repo. Run `npx @unship/cli@latest install --dry-run`, explain what it detected and which files it would write, then ask me before running the install. If I approve, run `npx @unship/cli@latest install --yes`.
 ```
 
-Restart your agent, then ask naturally:
+`install` is global-first: it detects known coding harness homes, installs managed skills or instructions where the harness supports them, adds slash-command shims where supported, and can be re-run later to repair or refresh setup. If detection misses a harness you use, name it:
+
+```bash
+npx @unship/cli@latest install cursor gemini
+```
+
+Restart your agent, then use `/unship` where available or ask naturally when the harness loads installed instructions:
 
 ```txt
 use unship to compare 4 hero directions
@@ -38,7 +46,7 @@ Where supported, `/unship` works too:
 /unship compare 3 hero directions
 ```
 
-For unsupported agents:
+For unsupported harnesses:
 
 ```bash
 npx @unship/cli@latest install --print-skill
@@ -102,6 +110,25 @@ Options (or the group itself) can also declare tunable axes with `data-unship-tw
 
 Tuned values are remembered per option while comparing, clicking a slider's readout resets that axis, and holding the label copies a keep instruction that includes every current value so the agent can bake them into source. A group with a single option becomes a tweak-only exploration: no variants, just calibration of existing UI.
 
+### Canvas
+
+Ask for Canvas when switching one Option at a time is not enough:
+
+```txt
+use unship on canvas to compare 4 directions for the header, hero, and feature cards
+use unship on canvas to compare the hero at desktop, tablet, and mobile widths
+```
+
+Canvas presents every opted-in Group and Option on one bounded, zoomable surface. The agent chooses the Arrangement from the content:
+
+```html
+<header data-unship-pick="Header" data-unship-canvas="stack">…</header>
+<section data-unship-pick="Feature card" data-unship-canvas="grid">…</section>
+<section data-unship-pick="Hero" data-unship-canvas="matrix">…</section>
+```
+
+`stack` is for wide sections, `grid` is for compact components, and `matrix` renders every Option at 1280, 768, and 390 pixel viewport widths. Matrix Groups open with Desktop previews only; one responsive toggle reveals Tablet and Mobile together without moving or zooming the Canvas, while Fit explicitly reframes everything. Canvas prepares visible Frames before its short reveal, switches light/dark in place, and uses native CSS transforms for pointer drag, two-finger trackpad panning, and cursor-relative pinch zoom. It reuses the standard Unship dock, tuning axes, and hold-to-Keep workflow; it does not add annotations, sharing, saved boards, or layout controls.
+
 ## Good For
 
 - UI section variants
@@ -136,7 +163,7 @@ npx @unship/cli@latest check --json
 npx @unship/cli@latest check --readiness --json
 ```
 
-`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including `data-unship-tweaks` and `data-unship-as` attributes.
+`setup` returns a dev-only picker snippet for a local app shell. `check` verifies that temporary Unship artifacts are gone before release, including `data-unship-tweaks`, `data-unship-as`, and `data-unship-canvas` attributes.
 
 `check --readiness` is for agents before handing a comparison to a human: it statically verifies group structure and tweak-axis declarations, reporting `pass`, `fail`, or `uncertain`. Hard verdicts are only issued for literal plain-HTML markup; templated or dynamic markup — including Vue/Alpine/Angular visibility directives and Svelte control-flow blocks — is reported as `uncertain` and should be verified manually. Markup inside HTML comments and script bodies is ignored. Axis declarations with literal values are validated even in templated files, since the attribute value itself is statically certain.
 
@@ -152,7 +179,7 @@ If your team wants repo-local agent instructions:
 npx @unship/cli@latest init
 ```
 
-Targets: `codex`, `antigravity`, `claude`, `opencode`, or `all`.
+The default `portable` target installs Codex/shared, Claude, and OpenCode helpers. Individual targets: `codex`, `antigravity`, `claude`, `opencode`, `cursor`, `copilot`, `gemini`, `windsurf`, `cline`, and `roo`. Use `all` for all supported repo helpers except Roo, which is explicit-only.
 
 ## Troubleshooting
 

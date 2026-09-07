@@ -4,14 +4,20 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Add global-first harness install support for Cursor, Gemini CLI, Windsurf, Cline, and explicit Roo targets, with GitHub Copilot kept as repo-local guidance.
+- Accept positional harness names such as `install cursor gemini`, detect installed global harness homes by default, and fall back to the shared `.agents` skill when nothing is detected.
+- Expand repo-local `init` targets for Cursor, Copilot, Gemini CLI, Windsurf, Cline, and explicit Roo while keeping `init` default portable.
+- Simplify Canvas to native transforms, preserve explicit Keep choices across later tuning, invalidate stale cached frames after source changes, and contain keyboard focus in Canvas.
+- Detect Codex alongside other agent homes and retain the modern CLI/target-module structure when integrating expanded agent installation.
 - Wait for group-menu transitions in browser checks and close the browser even when the selection assertion fails.
 - Skip malformed tuning control definitions without breaking the picker, preserve zero as a numeric slider maximum, and expose swatch and segmented selection state to assistive technology.
 - Teach the bundled skill to author and settle tuning controls, run focused readiness checks, and prefer a verified local CLI for unpublished project testing.
 - Add a local mock workspace playground (`npm run demo`) covering variants, product states, and tuning-only exploration; keep it out of the published package.
+- Add Canvas for simultaneous local comparison: Groups opt into agent-chosen `stack`, `grid`, or responsive `matrix` Arrangements, native CSS transforms provide smooth bounded and cursor-relative navigation over a neutral dotted light/dark surface, unframed grid previews hug the rendered component, visible Frames prepare behind a compact loading spinner before one complete reveal, responsive toggles preserve the camera until explicit Fit, button zoom animates clear ten-point steps, warm reopen preserves the prepared workspace briefly, theme changes update in place, script-free snapshots preserve stylesheet and media-query context, and fixed-size tuning plus hold-to-Keep actions stay readable at every zoom.
 - Add tunable axes to the picker: options and groups can declare `data-unship-tweaks` controls (numeric and token-stepped sliders, toggles, segmented controls, color swatches) bound to CSS custom properties, with per-option value memory, first-touch default capture, click-readout reset, a modified indicator, and keep instructions that carry every current value. Groups with a single option render as tweak-only calibration docks.
 - Rework the toolbar into capability slots: the option counter sits beside the option label in every mode, chevrons render only when there is more than one option and mirror the label, the tune button anchors to the row edge behind a hairline divider, the group header gains a menu caret, and the tune panel morphs its height when axis composition changes across options or groups.
 - Add `unship check --readiness`: best-effort static verification of Unship comparison structure and tweak-axis declarations (`data-unship-tweaks`), with `pass`/`fail`/`uncertain` status so templated markup degrades to manual verification instead of false verdicts. The scanner ignores HTML comments and script bodies, treats Vue/Alpine/Angular visibility directives and Svelte control-flow blocks as dynamic, and stays linear-time on large instrumented files.
-- Make `unship check` detect `data-unship-tweaks` and `data-unship-as` attributes as cleanup residue.
+- Make `unship check` detect `data-unship-tweaks`, `data-unship-as`, and `data-unship-canvas` attributes as cleanup residue.
 - Add native Claude Code plugin packaging: a self-hosted marketplace manifest plus a dependency-free `plugin/` directory so `/plugin marketplace add mbenhard/unship` installs only the manifest and skill, with tests keeping manifest versions package-synced, the plugin skill copy byte-identical, and everything out of the npm tarball.
 - Document the cross-agent skills CLI install path (`npx skills add mbenhard/unship`) in the README.
 
@@ -37,6 +43,8 @@ All notable changes to Unship are documented here.
 - Refactor picker rendering internals to reuse a stable style node and shared snap geometry helpers without changing picker UX.
 - Document the public/local repo boundary in `.gitignore` so local planning docs, dogfood apps, artifacts, and agent workspace state stay private.
 - Remove the legacy `install-skill` command from the public CLI surface. Use `install --print-skill` when a manual skill file is needed for an unsupported harness.
+
+
 
 ## 0.1.3 - 2026-06-05
 

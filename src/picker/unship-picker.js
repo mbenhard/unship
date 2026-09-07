@@ -2,7 +2,20 @@
   if (window.__unshipPicker) return;
 
   const OPTION_ATTR = "data-unship-option";
+  const CANVAS_ATTR = "data-unship-canvas";
   const GROUP_SELECTOR = "[data-unship-pick]";
+  const CANVAS_LAYOUTS = new Set(["stack", "grid", "matrix"]);
+  const MATRIX_WIDTHS = [1280, 768, 390];
+  const CANVAS_ICONS = {
+    desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>',
+    responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="13" height="10" rx="1.8"></rect><path d="M6 18h5.5M9 15v3"></path><rect x="16.5" y="8" width="5" height="11" rx="1.5"></rect></svg>',
+    sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>',
+    moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z"></path></svg>'
+  };
+  const CANVAS_MIN_ZOOM = 0.05;
+  const CANVAS_MAX_ZOOM = 2;
+  const CANVAS_ZOOM_MOTION = { duration: 190, step: 0.1, pinch: 2.4 };
+  const CANVAS_CACHE_MS = 45_000;
   // Hold-to-keep timing: the commit timer equals the fill animation's delay
   // plus duration, so the pill is fully filled exactly when the copy fires.
   const HOLD_FILL_DELAY_MS = 120;
@@ -29,7 +42,7 @@
   let menuCloseTimer = null;
   let menuCloseAction = null;
   let placement = "bottom";
-  let rescanQueued = false;
+  let rescanFrame = 0;
   let renderedSignature = "";
   let lastSwitchDir = null;
   // Minimize, hold-to-keep, drag-snap, and scroll-to-group state. Placement is
@@ -52,6 +65,34 @@
   let panelAxes = [];
   const tweakDefaultsByElement = new WeakMap();
   const tweakValuesByKey = new Map();
+  let canvasOpen = false;
+  let canvasPreparing = false;
+  let canvasShell = null;
+  let canvasCloseTimer = null;
+  let canvasRevealTimer = null;
+  let canvasContentTimer = null;
+  let canvasCacheTimer = null;
+  let canvasDockEntering = false;
+  let canvasSnapshot = "";
+  let canvasDirty = false;
+  let canvasKeepQueue = Promise.resolve();
+  let canvasSourceIdentity = [];
+  let canvasZoom = 1;
+  let canvasTheme = "light";
+  let canvasPreviousOverflow = "";
+  let canvasCamera = null;
+  let canvasCursor = null;
+  let canvasZoomAnimation = null;
+  let canvasWheelMode = null;
+  let canvasWheelModeTimer = null;
+  let canvasPinchFrame = 0;
+  let canvasPinchDelta = 0;
+  let canvasPinchFocal = null;
+  let canvasPanGesture = null;
+  let canvasFrameTarget = null;
+  let canvasFrameHideTimer = null;
+  const canvasVisibleWidths = new Set([MATRIX_WIDTHS[0]]);
+  const canvasKeeps = new Map();
 
   const api = {
     version: "0.2.0",
@@ -61,7 +102,9 @@
   };
 
   function rescan() {
+    if (canvasShell) canvasDirty = true;
     groups = Array.from(document.querySelectorAll(GROUP_SELECTOR)).map(toGroup).filter(Boolean);
+    groups.forEach((group, index) => { group.index = index; });
     disambiguateGroupLabels(groups);
     if (activeGroupIndex >= groups.length) activeGroupIndex = Math.max(0, groups.length - 1);
     if (groups.length < 2) menuOpen = false;
@@ -70,10 +113,14 @@
   }
 
   function destroy() {
+    closeCanvas({ renderAfter: false });
     gestureCleanup?.();
     clearTimeout(menuCloseTimer);
     menuCloseAction = null;
     observer?.disconnect();
+    cancelAnimationFrame(rescanFrame);
+    clearTimeout(holdTimer);
+    clearTimeout(copiedTimer);
     document.removeEventListener("keydown", handleGlobalKeydown);
     window.visualViewport?.removeEventListener("resize", syncViewportBounds);
     window.visualViewport?.removeEventListener("scroll", syncViewportBounds);
@@ -98,7 +145,16 @@
         }))
       })),
       activeGroupIndex,
-      toolbarMode: groups.length === 0 ? "none" : groups.length === 1 ? "single" : "multi"
+      toolbarMode: groups.length === 0 ? "none" : groups.length === 1 ? "single" : "multi",
+      canvas: {
+        open: canvasOpen,
+        preparing: canvasPreparing,
+        cached: Boolean(canvasShell && !canvasOpen && !canvasPreparing),
+        theme: canvasTheme,
+        zoom: canvasZoom,
+        visibleWidths: Array.from(canvasVisibleWidths),
+        groups: groups.filter((group) => group.canvasLayout).map((group) => ({ label: group.displayLabel, layout: group.canvasLayout }))
+      }
     };
   }
 
@@ -114,6 +170,7 @@
     if (!options.length) return null;
 
     const label = element.getAttribute("data-unship-pick") || `Group ${groupIndex + 1}`;
+    const canvasHint = (element.getAttribute(CANVAS_ATTR) || "").trim();
     const activeOptionIndex =
       selectedIndexByGroup.get(element) ??
       restorePersistedSelection(groupIndex, label, options) ??
@@ -122,9 +179,11 @@
     return {
       element,
       index: groupIndex,
+      sourceIndex: groupIndex,
       label,
       displayLabel: label,
       options,
+      canvasLayout: CANVAS_LAYOUTS.has(canvasHint) ? canvasHint : "",
       activeOptionIndex: clamp(activeOptionIndex, options.length)
     };
   }
@@ -303,6 +362,15 @@
 
   function render() {
     if (!root) return;
+    if (canvasOpen) {
+      host.setAttribute("role", "dialog");
+      host.setAttribute("aria-modal", "true");
+      host.setAttribute("aria-label", "Unship Canvas");
+    } else {
+      host.removeAttribute("role");
+      host.removeAttribute("aria-modal");
+      host.removeAttribute("aria-label");
+    }
 
     const switchDir = lastSwitchDir;
     lastSwitchDir = null;
@@ -319,11 +387,23 @@
     const option = group.options[group.activeOptionIndex];
     panelAxes = axesForGroup(group);
     if (!panelAxes.length) panelOpen = false;
-    const mode = groups.length === 1 ? "single" : "multi";
+    const mode = canvasOpen ? "canvas" : groups.length === 1 ? "single" : "multi";
     const nextSignature = renderSignature(mode);
     if (nextSignature === renderedSignature) return;
     const entering = renderedSignature === "" || renderedSignature === "none";
     renderedSignature = nextSignature;
+    // Panel content can change size across options/groups; capture the open
+    // panel's height before the rebuild so it can morph instead of snapping.
+    const previousPanelHeight = root.querySelector(".dock.tuning .panel")?.offsetHeight ?? null;
+
+    if (canvasOpen) {
+      setToolbarHtml(`<div class="dock canvas-dock bottom${panelOpen ? " tuning" : ""}${canvasDockEntering ? " enter" : ""}" role="group" aria-label="Unship Canvas controls">
+        ${panel(group)}
+        <div class="row canvas-row">${canvasRowMarkup()}</div>
+      </div>`);
+      morphPanelHeight(previousPanelHeight);
+      return;
+    }
 
     // Minimized form: a small circular button holding the diamond mark.
     if (minimized) {
@@ -332,9 +412,6 @@
     }
 
     const swapClass = switchDir ? " swap" : "";
-    // Panel content can change size across options/groups; capture the open
-    // panel's height before the rebuild so it can morph instead of snapping.
-    const previousPanelHeight = root.querySelector(".dock.tuning .panel")?.offsetHeight ?? null;
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${panelOpen ? " tuning" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
       ${groups.length > 1 ? menu() : ""}
       ${panel(group, swapClass)}
@@ -373,7 +450,806 @@
           ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}
-        ${panelAxes.length ? tuneButton(group) : ""}`;
+        ${panelAxes.length ? tuneButton(group) : ""}
+        ${canvasGroups().length ? canvasButton() : ""}`;
+  }
+
+  function canvasGroups() {
+    return groups.filter((group) => group.canvasLayout);
+  }
+
+  function canvasButton() {
+    return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas">Canvas</button>`;
+  }
+
+  function canvasRowMarkup() {
+    const percent = Math.round(canvasZoom * 100);
+    const responsive = canvasResponsiveMarkup();
+    return `<button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Close Canvas"></button>
+      <i class="canvas-divider" aria-hidden="true"></i>
+      <button class="canvas-zoom nav" type="button" data-action="canvas-zoom-out" aria-label="Zoom out"></button>
+      <span class="canvas-zoom-value" aria-label="Canvas zoom ${percent}%">${percent}%</span>
+      <button class="canvas-zoom canvas-zoom-in nav" type="button" data-action="canvas-zoom-in" aria-label="Zoom in"></button>
+      <button class="canvas-fit" type="button" data-action="canvas-fit" aria-label="Fit Canvas">Fit</button>
+      ${responsive ? `<i class="canvas-divider" aria-hidden="true"></i>${responsive}` : ""}
+      ${canvasThemeMarkup()}`;
+  }
+
+  function canvasResponsiveMarkup() {
+    if (!canvasGroups().some((group) => group.canvasLayout === "matrix")) return "";
+    const responsive = canvasVisibleWidths.size > 1;
+    const action = responsive ? "Show desktop-only previews" : "Show responsive previews";
+    return `<button class="canvas-state-toggle canvas-responsive-toggle" type="button" data-action="canvas-responsive" aria-label="${action}" aria-pressed="${responsive}" title="${action}">
+      <span class="canvas-state-icon canvas-state-primary">${CANVAS_ICONS.desktop}</span>
+      <span class="canvas-state-icon canvas-state-secondary">${CANVAS_ICONS.responsive}</span>
+    </button>`;
+  }
+
+  function canvasThemeMarkup() {
+    const dark = canvasTheme === "dark";
+    const action = dark ? "Use light Canvas theme" : "Use dark Canvas theme";
+    return `<button class="canvas-state-toggle canvas-theme-toggle" type="button" data-action="canvas-theme" aria-label="${action}" aria-pressed="${dark}" title="${action}">
+      <span class="canvas-state-icon canvas-state-primary">${CANVAS_ICONS.sun}</span>
+      <span class="canvas-state-icon canvas-state-secondary">${CANVAS_ICONS.moon}</span>
+    </button>`;
+  }
+
+  function openCanvas() {
+    if (canvasOpen || canvasPreparing || !canvasGroups().length) return;
+    clearTimeout(canvasCloseTimer);
+    clearTimeout(canvasCacheTimer);
+    if (canvasShell) {
+      if (canReuseCanvas()) {
+        reopenCanvas();
+        return;
+      }
+      disposeCanvasCache();
+    }
+    canvasPreparing = true;
+    minimized = false;
+    menuOpen = false;
+    panelOpen = false;
+    canvasKeeps.clear();
+    canvasSnapshot = snapshotDocument();
+    canvasDirty = false;
+    canvasSourceIdentity = canvasIdentity();
+    canvasPreviousOverflow = document.documentElement.style.overflow;
+    canvasShell = buildCanvasShell();
+    canvasShell.inert = true;
+    canvasShell.setAttribute("aria-hidden", "true");
+    root.append(canvasShell);
+    setCanvasEntryPreparing(true);
+    initCanvasCamera();
+    document.addEventListener("keydown", handleCanvasKeydown);
+    clearTimeout(canvasRevealTimer);
+    canvasRevealTimer = setTimeout(() => revealCanvas(), 1800);
+    requestAnimationFrame(maybeRevealCanvas);
+  }
+
+  function canReuseCanvas() {
+    const current = canvasIdentity();
+    return !canvasDirty && current.length === canvasSourceIdentity.length && current.every((item, index) => item === canvasSourceIdentity[index]);
+  }
+
+  function canvasIdentity() {
+    return canvasGroups().flatMap((group) => [group.element, group.canvasLayout, ...group.options.map((option) => option.element)]);
+  }
+
+  function reopenCanvas() {
+    if (!canvasShell || !canvasCamera) return;
+    canvasOpen = true;
+    canvasPreviousOverflow = document.documentElement.style.overflow;
+    pauseObserver(() => { document.documentElement.style.overflow = "hidden"; });
+    canvasShell.classList.remove("leaving");
+    canvasShell.inert = false;
+    canvasShell.setAttribute("aria-hidden", "false");
+    canvasDockEntering = true;
+    renderedSignature = "";
+    render();
+    canvasDockEntering = false;
+    document.addEventListener("keydown", handleCanvasKeydown);
+    requestAnimationFrame(() => {
+      canvasShell?.classList.add("visible", "content-visible");
+      root?.querySelector(".canvas-close")?.focus({ preventScroll: true });
+    });
+  }
+
+  function setCanvasEntryPreparing(preparing) {
+    const button = root?.querySelector('[data-action="open-canvas"]');
+    if (!button) return;
+    button.classList.toggle("preparing", preparing);
+    button.toggleAttribute("aria-busy", preparing);
+    button.setAttribute("aria-disabled", String(preparing));
+    button.setAttribute("aria-label", preparing ? "Preparing Canvas" : "Open Canvas");
+    button.innerHTML = preparing ? '<span class="canvas-spinner" aria-hidden="true"></span>' : "Canvas";
+  }
+
+  function maybeRevealCanvas() {
+    if (!canvasPreparing || !canvasShell) return;
+    const frames = Array.from(canvasShell.querySelectorAll(".canvas-frame:not(.viewport-hidden)"));
+    if (frames.length && frames.every((frame) => frame.classList.contains("ready") || frame.classList.contains("failed"))) revealCanvas();
+  }
+
+  function revealCanvas() {
+    if (!canvasPreparing || !canvasShell) return;
+    clearTimeout(canvasRevealTimer);
+    canvasPreparing = false;
+    canvasOpen = true;
+    pauseObserver(() => { document.documentElement.style.overflow = "hidden"; });
+    fitCanvas({ animate: false });
+    canvasDockEntering = true;
+    renderedSignature = "";
+    render();
+    canvasDockEntering = false;
+    canvasShell.inert = false;
+    canvasShell.setAttribute("aria-hidden", "false");
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => {
+      canvasShell?.classList.add("visible");
+      clearTimeout(canvasContentTimer);
+      canvasContentTimer = setTimeout(() => {
+        canvasShell?.classList.add("content-visible");
+        root?.querySelector(".canvas-close")?.focus({ preventScroll: true });
+      }, reduceMotion ? 0 : 70);
+    });
+  }
+
+  function closeCanvas({ renderAfter = true } = {}) {
+    if (!canvasOpen && !canvasShell) return;
+    const wasPreparing = canvasPreparing;
+    canvasOpen = false;
+    canvasPreparing = false;
+    panelOpen = false;
+    clearTimeout(canvasRevealTimer);
+    clearTimeout(canvasContentTimer);
+    clearTimeout(canvasCacheTimer);
+    clearTimeout(canvasFrameHideTimer);
+    canvasFrameTarget = null;
+    canvasCursor = null;
+    stopCanvasZoomAnimation();
+    stopCanvasPinch();
+    clearTimeout(canvasWheelModeTimer);
+    canvasWheelMode = null;
+    canvasPanGesture = null;
+    const closingShell = canvasShell;
+    const wasVisible = closingShell?.classList.contains("visible");
+    closingShell?.classList.remove("content-visible");
+    closingShell?.classList.remove("visible");
+    closingShell?.classList.add("leaving");
+    if (closingShell) closingShell.inert = true;
+    closingShell?.setAttribute("aria-hidden", "true");
+    pauseObserver(() => { document.documentElement.style.overflow = canvasPreviousOverflow; });
+    document.removeEventListener("keydown", handleCanvasKeydown);
+    renderedSignature = "";
+    if (renderAfter && root) {
+      render();
+    }
+    const finish = () => {
+      if (canvasShell === closingShell) {
+        closingShell?.classList.remove("leaving");
+        if (!renderAfter || wasPreparing || !wasVisible) disposeCanvasCache();
+        else canvasCacheTimer = setTimeout(() => {
+          if (!canvasOpen && !canvasPreparing) disposeCanvasCache();
+        }, CANVAS_CACHE_MS);
+      }
+      if (renderAfter) root?.querySelector('[data-action="open-canvas"]')?.focus({ preventScroll: true });
+    };
+    clearTimeout(canvasCloseTimer);
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!renderAfter || reduceMotion || !wasVisible) finish();
+    else canvasCloseTimer = setTimeout(finish, 140);
+  }
+
+  function disposeCanvasCache() {
+    clearTimeout(canvasCacheTimer);
+    clearTimeout(canvasCloseTimer);
+    stopCanvasZoomAnimation();
+    stopCanvasPinch();
+    canvasCamera = null;
+    canvasShell?.remove();
+    canvasShell = null;
+    canvasSnapshot = "";
+    canvasSourceIdentity = [];
+  }
+
+  function snapshotDocument() {
+    const clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll("script,[data-unship-toolbar]").forEach((node) => node.remove());
+    const base = clone.ownerDocument.createElement("base");
+    base.href = location.href;
+    clone.querySelector("head")?.prepend(base);
+    return `<!doctype html>${clone.outerHTML}`;
+  }
+
+  function buildCanvasShell() {
+    const shell = document.createElement("div");
+    shell.className = "canvas-shell";
+    shell.dataset.theme = canvasTheme;
+    shell.innerHTML = `<div class="canvas-viewport" tabindex="-1"><div class="canvas-world"></div></div>
+      <div class="canvas-frame-toolbar" role="toolbar" aria-label="Canvas Frame actions" aria-hidden="true" inert>
+        <span class="canvas-option-name"></span>
+        <span class="canvas-frame-width"></span>
+        <button type="button" data-action="canvas-tune">Tune</button>
+        <button class="canvas-keep" type="button" data-action="canvas-keep">Hold to keep</button>
+      </div>`;
+    const world = shell.querySelector(".canvas-world");
+
+    for (const group of canvasGroups()) {
+      const section = document.createElement("section");
+      section.className = `canvas-group canvas-${group.canvasLayout}`;
+      section.dataset.group = String(group.index);
+      section.innerHTML = `<h2 class="canvas-group-name">${escapeHtml(group.displayLabel)}</h2><div class="canvas-options"></div>`;
+      const optionsNode = section.querySelector(".canvas-options");
+      const naturalWidth = canvasNaturalWidth(group);
+
+      group.options.forEach((option) => {
+        const optionRow = document.createElement("div");
+        optionRow.className = "canvas-option-row";
+        optionRow.dataset.option = String(option.index);
+        const widths = group.canvasLayout === "matrix" ? MATRIX_WIDTHS : [naturalWidth];
+        widths.forEach((width) => optionRow.append(buildCanvasFrame(group, option, width)));
+        optionsNode.append(optionRow);
+      });
+      world.append(section);
+    }
+    return shell;
+  }
+
+  function canvasNaturalWidth(group) {
+    const rect = group.element.getBoundingClientRect();
+    const optionRect = group.options[group.activeOptionIndex]?.element.getBoundingClientRect();
+    const measured = Math.round(group.canvasLayout === "grid" ? optionRect?.width : rect.width) || Math.round(rect.width) || window.innerWidth;
+    // ponytail: grid favors a readable component preview; add an explicit
+    // width hint only if real use shows this cap is too blunt.
+    return group.canvasLayout === "grid" ? Math.min(560, Math.max(280, measured)) : Math.min(1440, Math.max(320, measured));
+  }
+
+  function buildCanvasFrame(group, option, width) {
+    const frame = document.createElement("article");
+    frame.className = "canvas-frame";
+    frame.dataset.group = String(group.index);
+    frame.dataset.option = String(option.index);
+    frame.dataset.width = String(width);
+    if (group.canvasLayout === "matrix" && !canvasVisibleWidths.has(width)) {
+      frame.classList.add("viewport-hidden");
+      frame.setAttribute("aria-hidden", "true");
+    }
+    frame.style.width = `${width}px`;
+    frame.tabIndex = 0;
+    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press T to tune or Enter to keep`);
+    const iframe = document.createElement("iframe");
+    iframe.className = "canvas-iframe";
+    iframe.title = `${group.displayLabel}: ${option.label} at ${width} pixels`;
+    iframe.width = String(width);
+    iframe.tabIndex = -1;
+    iframe.dataset.group = String(group.index);
+    iframe.dataset.option = String(option.index);
+    iframe.setAttribute("sandbox", "allow-same-origin");
+    iframe.setAttribute("scrolling", "no");
+    iframe.addEventListener("load", () => prepareCanvasFrame(iframe));
+    iframe.srcdoc = canvasSnapshot;
+    frame.append(iframe);
+    return frame;
+  }
+
+  function prepareCanvasFrame(iframe) {
+    const doc = iframe.contentDocument;
+    const view = iframe.contentWindow;
+    if (!doc || !view) return;
+    const group = doc.querySelectorAll(GROUP_SELECTOR)[groups[Number(iframe.dataset.group)]?.sourceIndex];
+    const options = group ? Array.from(group.children).filter((child) => child.hasAttribute(OPTION_ATTR)) : [];
+    const option = options[Number(iframe.dataset.option)];
+    const sourceOption = groups[Number(iframe.dataset.group)]?.options[Number(iframe.dataset.option)]?.element;
+    if (!group || !option) {
+      iframe.closest(".canvas-frame")?.classList.add("failed");
+      maybeRevealCanvas();
+      return;
+    }
+
+    options.forEach((candidate) => {
+      candidate.hidden = candidate !== option;
+      if (candidate === option) {
+        const originalDisplay = sourceOption ? originalDisplayByOption.get(sourceOption) : "";
+        if (originalDisplay) candidate.style.display = originalDisplay;
+        else candidate.style.removeProperty("display");
+      }
+      else candidate.style.setProperty("display", "none", "important");
+    });
+    let current = group;
+    while (current?.parentElement && current !== doc.body) {
+      Array.from(current.parentElement.children).forEach((sibling) => {
+        if (sibling !== current) sibling.style.setProperty("opacity", "0", "important");
+      });
+      current = current.parentElement;
+    }
+    doc.documentElement.style.setProperty("scroll-behavior", "auto", "important");
+    doc.documentElement.style.setProperty("overflow", "hidden", "important");
+    doc.documentElement.style.setProperty("background", "transparent", "important");
+    doc.body.style.setProperty("background", "transparent", "important");
+    option.querySelectorAll("img").forEach((image) => { image.loading = "eager"; });
+    syncFrameTweaks(iframe);
+
+    let assetsReady = false;
+    const measure = () => {
+      doc.body.style.transform = "none";
+      const rect = group.getBoundingClientRect();
+      doc.body.style.transformOrigin = "0 0";
+      doc.body.style.transform = `translate(${-rect.left}px,${-rect.top}px)`;
+      const height = Math.max(48, Math.ceil(rect.height));
+      const nextHeight = `${height}px`;
+      if (iframe.style.height !== nextHeight) iframe.style.height = nextHeight;
+      view.scrollTo({ left: 0, top: 0, behavior: "auto" });
+      const frame = iframe.closest(".canvas-frame");
+      const wasReady = frame?.classList.contains("ready");
+      if (assetsReady) frame?.classList.add("ready");
+      if (assetsReady && !wasReady) maybeRevealCanvas();
+      if (canvasOpen) requestAnimationFrame(updateCanvasZoomLabel);
+    };
+    iframe.__unshipMeasure = measure;
+    requestAnimationFrame(() => requestAnimationFrame(measure));
+    const images = Array.from(option.querySelectorAll("img"));
+    Promise.allSettled([doc.fonts?.ready, ...images.map((image) => image.decode?.())]).then(() => {
+      assetsReady = true;
+      requestAnimationFrame(() => requestAnimationFrame(measure));
+    });
+  }
+
+  function syncFrameTweaks(iframe) {
+    const group = groups[Number(iframe.dataset.group)];
+    const doc = iframe.contentDocument;
+    const snapshotGroup = doc?.querySelectorAll(GROUP_SELECTOR)[group?.sourceIndex];
+    const snapshotOptions = snapshotGroup ? Array.from(snapshotGroup.children).filter((child) => child.hasAttribute(OPTION_ATTR)) : [];
+    const snapshotOption = snapshotOptions[Number(iframe.dataset.option)];
+    if (!group || !snapshotGroup || !snapshotOption) return;
+    const previous = group.activeOptionIndex;
+    group.activeOptionIndex = Number(iframe.dataset.option);
+    for (const axis of axesForGroup(group)) {
+      const target = axis.scope ? snapshotOption : snapshotGroup;
+      target.style.setProperty(axis.var, axisValue(group, axis));
+    }
+    group.activeOptionIndex = previous;
+    requestAnimationFrame(() => iframe.__unshipMeasure?.());
+  }
+
+  function syncCanvasTweaks(group) {
+    if (!canvasShell) return;
+    canvasShell.querySelectorAll(`.canvas-iframe[data-group="${group.index}"]`).forEach(syncFrameTweaks);
+  }
+
+  function toggleCanvasResponsive() {
+    const responsive = canvasVisibleWidths.size === 1;
+    const button = root?.querySelector(".canvas-responsive-toggle");
+    const action = responsive ? "Show desktop-only previews" : "Show responsive previews";
+    const revealedFrames = [];
+    const anchor = canvasShell?.querySelector(`.canvas-matrix .canvas-frame[data-width="${MATRIX_WIDTHS[0]}"]:not(.viewport-hidden)`)
+      || canvasShell?.querySelector(".canvas-frame:not(.viewport-hidden)");
+    const anchorBefore = anchor?.getBoundingClientRect();
+    canvasVisibleWidths.clear();
+    canvasVisibleWidths.add(MATRIX_WIDTHS[0]);
+    if (responsive) MATRIX_WIDTHS.slice(1).forEach((width) => canvasVisibleWidths.add(width));
+    if (button) {
+      button.setAttribute("aria-pressed", String(responsive));
+      button.setAttribute("aria-label", action);
+      button.title = action;
+    }
+    canvasShell?.querySelectorAll(".canvas-matrix .canvas-frame").forEach((frame) => {
+      const visible = canvasVisibleWidths.has(Number(frame.dataset.width));
+      const wasHidden = frame.classList.contains("viewport-hidden");
+      frame.classList.toggle("viewport-hidden", !visible);
+      frame.setAttribute("aria-hidden", String(!visible));
+      if (visible && wasHidden) revealedFrames.push(frame);
+    });
+    const world = canvasShell?.querySelector(".canvas-world");
+    if (anchor && anchorBefore && canvasCamera && world) {
+      const anchorAfter = anchor.getBoundingClientRect();
+      const scale = canvasCamera.scale;
+      const pan = canvasCamera;
+      const next = constrainCanvasPan(
+        pan.x + (anchorBefore.left - anchorAfter.left) / scale,
+        pan.y + (anchorBefore.top - anchorAfter.top) / scale,
+        scale
+      );
+      setCanvasTransform(next.x, next.y);
+    }
+    hideCanvasFrameToolbar();
+    requestAnimationFrame(() => {
+      revealedFrames.forEach((frame) => frame.querySelector(".canvas-iframe")?.__unshipMeasure?.());
+    });
+  }
+
+  function activateCanvasOption(groupIndex, optionIndex) {
+    const group = groups[groupIndex];
+    if (!group?.options[optionIndex]) return null;
+    activeGroupIndex = groupIndex;
+    group.activeOptionIndex = optionIndex;
+    applyGroupVisibility(group);
+    persistSelection(group);
+    panelAxes = axesForGroup(group);
+    return group;
+  }
+
+  function tuneCanvasOption(groupIndex, optionIndex) {
+    const group = activateCanvasOption(groupIndex, optionIndex);
+    if (!group || !panelAxes.length) return;
+    panelOpen = true;
+    renderedSignature = "";
+    render();
+  }
+
+  function keepCanvasOption(groupIndex, optionIndex) {
+    const group = activateCanvasOption(groupIndex, optionIndex);
+    if (!group) return;
+    const instruction = keepInstruction(group);
+    const shell = canvasShell;
+    // Serialize clipboard writes and capture the deliberate choice now.
+    // Tuning another option later must not change a previous Keep action.
+    canvasKeepQueue = canvasKeepQueue.then(async () => {
+      if (shell !== canvasShell || !canvasOpen) return;
+      const choices = new Map(canvasKeeps).set(groupIndex, instruction);
+      const text = Array.from(choices).sort(([a], [b]) => a - b).map(([, value]) => value).join(" ");
+      const ok = await copyText(text);
+      if (shell !== canvasShell) return;
+      if (ok) {
+        canvasKeeps.set(groupIndex, instruction);
+        shell.querySelectorAll(`.canvas-frame[data-group="${groupIndex}"]`).forEach((frame) => frame.classList.toggle("kept", Number(frame.dataset.option) === optionIndex));
+      }
+      liveRegion.textContent = ok ? `Copied ${canvasKeeps.size} Canvas ${canvasKeeps.size === 1 ? "choice" : "choices"}. Paste the keep instruction to your agent` : "Copy failed";
+    });
+    return canvasKeepQueue;
+  }
+
+  function initCanvasCamera() {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    const world = canvasShell?.querySelector(".canvas-world");
+    const toolbar = canvasShell?.querySelector(".canvas-frame-toolbar");
+    if (!viewport || !world || !toolbar) return;
+
+    canvasCamera = { x: 0, y: 0, scale: 1 };
+    viewport.addEventListener("pointerover", handleCanvasFramePointerOver);
+    viewport.addEventListener("pointerout", handleCanvasFramePointerOut);
+    viewport.addEventListener("focusin", handleCanvasFramePointerOver);
+    viewport.addEventListener("focusout", handleCanvasFramePointerOut);
+    viewport.addEventListener("pointerdown", handleCanvasPanStart);
+    viewport.addEventListener("pointermove", handleCanvasPanMove);
+    viewport.addEventListener("pointerup", handleCanvasPanEnd);
+    viewport.addEventListener("pointercancel", handleCanvasPanEnd);
+    viewport.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
+    toolbar.addEventListener("pointerenter", () => clearTimeout(canvasFrameHideTimer));
+    toolbar.addEventListener("pointerleave", scheduleCanvasFrameToolbarHide);
+  }
+
+  function setCanvasTransform(x, y, scale = canvasCamera.scale, animate = false) {
+    const world = canvasShell?.querySelector(".canvas-world");
+    if (!world) return;
+    canvasCamera = { x, y, scale };
+    world.style.transition = animate ? "transform 180ms ease-in-out" : "none";
+    world.style.transform = `scale(${scale}) translate(${x}px, ${y}px)`;
+    const originX = (world?.offsetWidth || 0) / 2;
+    const originY = (world?.offsetHeight || 0) / 2;
+    canvasZoom = scale;
+    canvasShell?.style.setProperty("--canvas-grid-size", `${Math.max(12, 24 * scale)}px`);
+    canvasShell?.style.setProperty("--canvas-grid-x", `${(1 - scale) * originX + x * scale}px`);
+    canvasShell?.style.setProperty("--canvas-grid-y", `${(1 - scale) * originY + y * scale}px`);
+    updateCanvasZoomLabel();
+    positionCanvasFrameToolbar();
+  }
+
+  function handleCanvasFramePointerOver(event) {
+    const frame = event.target.closest?.(".canvas-frame");
+    if (!frame || frame === canvasFrameTarget) return;
+    showCanvasFrameToolbar(frame);
+  }
+
+  function handleCanvasFramePointerOut(event) {
+    const frame = event.target.closest?.(".canvas-frame");
+    if (!frame || frame.contains(event.relatedTarget)) return;
+    scheduleCanvasFrameToolbarHide();
+  }
+
+  function showCanvasFrameToolbar(frame) {
+    clearTimeout(canvasFrameHideTimer);
+    canvasFrameTarget = frame;
+    const toolbar = canvasShell?.querySelector(".canvas-frame-toolbar");
+    if (!toolbar) return;
+    const group = groups[Number(frame.dataset.group)];
+    const option = group?.options[Number(frame.dataset.option)];
+    if (!group || !option) return;
+    toolbar.querySelector(".canvas-option-name").textContent = option.label;
+    toolbar.querySelector(".canvas-frame-width").textContent = `${frame.dataset.width}px`;
+    toolbar.querySelectorAll("button").forEach((button) => {
+      button.dataset.group = frame.dataset.group;
+      button.dataset.option = frame.dataset.option;
+    });
+    toolbar.inert = false;
+    toolbar.setAttribute("aria-hidden", "false");
+    toolbar.classList.add("visible");
+    positionCanvasFrameToolbar();
+  }
+
+  function positionCanvasFrameToolbar() {
+    const toolbar = canvasShell?.querySelector(".canvas-frame-toolbar");
+    if (!toolbar?.classList.contains("visible") || !canvasFrameTarget?.isConnected) return;
+    const frameRect = canvasFrameTarget.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - toolbarRect.width / 2 - 12, Math.max(toolbarRect.width / 2 + 12, frameRect.left + frameRect.width / 2));
+    const above = frameRect.top - toolbarRect.height - 10;
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${above >= 12 ? above : Math.min(window.innerHeight - toolbarRect.height - 12, frameRect.bottom + 10)}px`;
+  }
+
+  function scheduleCanvasFrameToolbarHide() {
+    clearTimeout(canvasFrameHideTimer);
+    canvasFrameHideTimer = setTimeout(hideCanvasFrameToolbar, 100);
+  }
+
+  function hideCanvasFrameToolbar() {
+    clearTimeout(canvasFrameHideTimer);
+    canvasFrameTarget = null;
+    const toolbar = canvasShell?.querySelector(".canvas-frame-toolbar");
+    if (!toolbar) return;
+    toolbar.classList.remove("visible");
+    toolbar.inert = true;
+    toolbar.setAttribute("aria-hidden", "true");
+  }
+
+  function canvasFocalPoint() {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    if (canvasCursor || !viewport) return canvasCursor;
+    const rect = viewport.getBoundingClientRect();
+    return { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
+  }
+
+  function setCanvasZoom(next, { focal = canvasFocalPoint() } = {}) {
+    if (!canvasCamera || !focal) return;
+    stopCanvasPinch();
+    const scale = Math.min(CANVAS_MAX_ZOOM, Math.max(CANVAS_MIN_ZOOM, Math.round(next * 20) / 20));
+    smoothCanvasZoom(scale, focal);
+  }
+
+  function stepCanvasZoom(direction) {
+    setCanvasZoom(canvasRequestedScale() + CANVAS_ZOOM_MOTION.step * Math.sign(direction));
+  }
+
+  function canvasRequestedScale() {
+    return canvasZoomAnimation?.targetScale ?? canvasCamera?.scale ?? canvasZoom;
+  }
+
+  function smoothCanvasZoom(next, focal) {
+    if (!canvasCamera) return;
+    const targetScale = Math.min(CANVAS_MAX_ZOOM, Math.max(CANVAS_MIN_ZOOM, next));
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      stopCanvasZoomAnimation();
+      applyCanvasFocalScale(targetScale, focal);
+      return;
+    }
+    const startScale = canvasCamera.scale;
+    if (Math.abs(targetScale - startScale) < 0.0005) return;
+    stopCanvasZoomAnimation();
+    canvasZoomAnimation = { targetScale, startScale, focal, frame: 0, startTime: performance.now() };
+    const tick = (now) => {
+      if (!canvasCamera || !canvasZoomAnimation) return;
+      const progress = Math.min(1, (now - canvasZoomAnimation.startTime) / CANVAS_ZOOM_MOTION.duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const scale = canvasZoomAnimation.startScale + (canvasZoomAnimation.targetScale - canvasZoomAnimation.startScale) * eased;
+      applyCanvasFocalScale(scale, canvasZoomAnimation.focal);
+      if (progress >= 1) {
+        canvasZoomAnimation = null;
+      }
+      else canvasZoomAnimation.frame = requestAnimationFrame(tick);
+    };
+    canvasZoomAnimation.frame = requestAnimationFrame(tick);
+  }
+
+  function stopCanvasZoomAnimation() {
+    if (!canvasZoomAnimation) return;
+    cancelAnimationFrame(canvasZoomAnimation.frame);
+    canvasZoomAnimation = null;
+  }
+
+  function queueCanvasPinch(delta, focal) {
+    canvasPinchDelta += delta;
+    canvasPinchFocal = focal;
+    if (canvasPinchFrame) return;
+    canvasPinchFrame = requestAnimationFrame(() => {
+      canvasPinchFrame = 0;
+      if (!canvasCamera || !canvasPinchFocal) return;
+      const { pinch } = CANVAS_ZOOM_MOTION;
+      const frameDelta = Math.min(36, Math.max(-36, canvasPinchDelta * pinch));
+      const scale = canvasCamera.scale;
+      const factor = Math.pow(2, -frameDelta / 300);
+      const next = Math.min(CANVAS_MAX_ZOOM, Math.max(CANVAS_MIN_ZOOM, scale * factor));
+      canvasPinchDelta = 0;
+      applyCanvasFocalScale(next, canvasPinchFocal);
+    });
+  }
+
+  function applyCanvasFocalScale(nextScale, focal) {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    const world = canvasShell?.querySelector(".canvas-world");
+    if (!viewport || !world || !canvasCamera) return;
+    const rect = viewport.getBoundingClientRect();
+    const scale = canvasCamera.scale;
+    const currentPan = canvasCamera;
+    const originX = world.offsetWidth / 2;
+    const originY = world.offsetHeight / 2;
+    const screenX = focal.clientX - rect.left;
+    const screenY = focal.clientY - rect.top;
+    const worldX = (screenX - originX) / scale - currentPan.x + originX;
+    const worldY = (screenY - originY) / scale - currentPan.y + originY;
+    const x = (screenX - originX) / nextScale - worldX + originX;
+    const y = (screenY - originY) / nextScale - worldY + originY;
+    const boundedPan = constrainCanvasPan(x, y, nextScale);
+    setCanvasTransform(boundedPan.x, boundedPan.y, nextScale);
+  }
+
+  function stopCanvasPinch() {
+    cancelAnimationFrame(canvasPinchFrame);
+    canvasPinchFrame = 0;
+    canvasPinchDelta = 0;
+    canvasPinchFocal = null;
+  }
+
+  function constrainCanvasPan(x, y, scale) {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    const world = canvasShell?.querySelector(".canvas-world");
+    if (!viewport || !world) return { x, y };
+    const width = world.offsetWidth;
+    const height = world.offsetHeight;
+    const screenWidth = width * scale;
+    const screenHeight = height * scale;
+    const screenLeft = (1 - scale) * width / 2 + x * scale;
+    const screenTop = (1 - scale) * height / 2 + y * scale;
+    const horizontalSlack = Math.min(360, Math.max(180, viewport.clientWidth * 0.28));
+    const topSlack = Math.min(280, Math.max(140, viewport.clientHeight * 0.2));
+    const bottomSlack = Math.min(420, Math.max(220, viewport.clientHeight * 0.3));
+    const minLeft = screenWidth <= viewport.clientWidth ? -horizontalSlack : viewport.clientWidth - screenWidth - horizontalSlack;
+    const maxLeft = screenWidth <= viewport.clientWidth ? viewport.clientWidth - screenWidth + horizontalSlack : horizontalSlack;
+    const minTop = screenHeight <= viewport.clientHeight ? -topSlack : viewport.clientHeight - screenHeight - bottomSlack;
+    const maxTop = screenHeight <= viewport.clientHeight ? viewport.clientHeight - screenHeight + bottomSlack : topSlack;
+    const left = Math.min(maxLeft, Math.max(minLeft, screenLeft));
+    const top = Math.min(maxTop, Math.max(minTop, screenTop));
+    return {
+      x: (left - (1 - scale) * width / 2) / scale,
+      y: (top - (1 - scale) * height / 2) / scale
+    };
+  }
+
+  function keepCanvasInBounds() {
+    if (!canvasCamera) return;
+    const scale = canvasCamera.scale;
+    const current = canvasCamera;
+    const pan = constrainCanvasPan(current.x, current.y, scale);
+    if (Math.abs(pan.x - current.x) < 0.1 && Math.abs(pan.y - current.y) < 0.1) return;
+    setCanvasTransform(pan.x, pan.y);
+  }
+
+  function handleCanvasPanStart(event) {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    if (!viewport || !canvasCamera || event.button !== 0) return;
+    stopCanvasZoomAnimation();
+    stopCanvasPinch();
+    canvasPanGesture = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pan: canvasCamera,
+      scale: canvasCamera.scale
+    };
+    viewport.setPointerCapture?.(event.pointerId);
+    viewport.classList.add("panning");
+    hideCanvasFrameToolbar();
+    event.preventDefault();
+  }
+
+  function handleCanvasPanMove(event) {
+    canvasCursor = { clientX: event.clientX, clientY: event.clientY };
+    if (!canvasPanGesture || canvasPanGesture.pointerId !== event.pointerId || !canvasCamera) return;
+    const x = canvasPanGesture.pan.x + (event.clientX - canvasPanGesture.clientX) / canvasPanGesture.scale;
+    const y = canvasPanGesture.pan.y + (event.clientY - canvasPanGesture.clientY) / canvasPanGesture.scale;
+    const pan = constrainCanvasPan(x, y, canvasPanGesture.scale);
+    setCanvasTransform(pan.x, pan.y);
+    event.preventDefault();
+  }
+
+  function handleCanvasPanEnd(event) {
+    if (!canvasPanGesture || canvasPanGesture.pointerId !== event.pointerId) return;
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    if (viewport?.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    viewport?.classList.remove("panning");
+    canvasPanGesture = null;
+  }
+
+  function fitCanvas({ animate = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches } = {}) {
+    const viewport = canvasShell?.querySelector(".canvas-viewport");
+    const world = canvasShell?.querySelector(".canvas-world");
+    if (!viewport || !world || !canvasCamera) return;
+    const width = world.scrollWidth || world.offsetWidth;
+    const height = world.scrollHeight || world.offsetHeight;
+    const scale = Math.min(1, Math.max(CANVAS_MIN_ZOOM, Math.min((viewport.clientWidth - 96) / Math.max(1, width), (viewport.clientHeight - 176) / Math.max(1, height))));
+    const desiredTop = Math.max(32, (viewport.clientHeight - height * scale) / 2);
+    const x = (viewport.clientWidth - width) / 2 / scale;
+    const y = (desiredTop - (1 - scale) * height / 2) / scale;
+    stopCanvasZoomAnimation();
+    stopCanvasPinch();
+    setCanvasTransform(x, y, scale, animate);
+  }
+
+  function updateCanvasZoomLabel() {
+    const label = root?.querySelector(".canvas-zoom-value");
+    if (label) {
+      const percent = Math.round(canvasZoom * 100);
+      label.textContent = `${percent}%`;
+      label.setAttribute("aria-label", `Canvas zoom ${percent}%`);
+    }
+  }
+
+  function toggleCanvasTheme() {
+    canvasTheme = canvasTheme === "light" ? "dark" : "light";
+    if (canvasShell) canvasShell.dataset.theme = canvasTheme;
+    const button = root?.querySelector('[data-action="canvas-theme"]');
+    if (button) {
+      const dark = canvasTheme === "dark";
+      const action = dark ? "Use light Canvas theme" : "Use dark Canvas theme";
+      button.setAttribute("aria-pressed", String(dark));
+      button.setAttribute("aria-label", action);
+      button.title = action;
+    }
+    renderedSignature = renderSignature("canvas");
+  }
+
+  function handleCanvasKeydown(event) {
+    if (event.defaultPrevented || (!canvasOpen && !canvasPreparing) || isTypingTarget(event.composedPath?.()[0] || event.target)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCanvas();
+    } else if (canvasOpen && (event.key === "+" || event.key === "=")) {
+      event.preventDefault();
+      stepCanvasZoom(1);
+    } else if (canvasOpen && event.key === "-") {
+      event.preventDefault();
+      stepCanvasZoom(-1);
+    } else if (canvasOpen && event.key === "0") {
+      event.preventDefault();
+      fitCanvas();
+    }
+  }
+
+  function handleCanvasWheel(event) {
+    if (!canvasOpen || !canvasCamera || !event.target.closest?.(".canvas-viewport")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY;
+    const focal = { clientX: event.clientX, clientY: event.clientY };
+    canvasCursor = focal;
+    if (event.ctrlKey) {
+      stopCanvasZoomAnimation();
+      // A pinch is a continuous gesture, so it must never inherit the
+      // transition used by button/fit zooms. Clear it synchronously before
+      // Chrome can deliver the next event in the same compositor frame.
+      queueCanvasPinch(delta, focal);
+      return;
+    }
+    const likelyTrackpad = event.deltaMode === 0 && (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 80);
+    const mode = canvasWheelMode === "pan" || likelyTrackpad ? "pan" : "zoom";
+    if (mode === "pan") {
+      canvasWheelMode = "pan";
+      clearTimeout(canvasWheelModeTimer);
+      canvasWheelModeTimer = setTimeout(() => { canvasWheelMode = null; }, 180);
+      stopCanvasZoomAnimation();
+      stopCanvasPinch();
+      const scale = canvasCamera.scale;
+      const pan = canvasCamera;
+      const next = constrainCanvasPan(pan.x - event.deltaX / scale, pan.y - event.deltaY / scale, scale);
+      setCanvasTransform(next.x, next.y);
+      hideCanvasFrameToolbar();
+      return;
+    }
+    clearTimeout(canvasWheelModeTimer);
+    canvasWheelMode = null;
+    stopCanvasPinch();
+    const strength = Math.min(0.18, Math.max(0.015, Math.abs(delta) * 0.0025));
+    const base = canvasZoomAnimation?.targetScale ?? canvasCamera.scale;
+    smoothCanvasZoom(base * Math.exp(-Math.sign(delta) * strength), focal);
   }
 
   function morphPanelHeight(previousHeight) {
@@ -399,24 +1275,24 @@
   }
 
   function setToolbarHtml(html) {
-    root.innerHTML = "";
+    Array.from(root.childNodes).forEach((node) => {
+      if (node !== styleNode && node !== canvasShell && node !== liveRegion) node.remove();
+    });
     if (!styleNode) {
       styleNode = document.createElement("style");
       styleNode.textContent = css();
     }
-    root.append(styleNode);
+    if (!styleNode.isConnected) root.append(styleNode);
+    if (canvasShell && !canvasShell.isConnected) root.append(canvasShell);
     if (html) {
       const template = document.createElement("template");
       template.innerHTML = html;
       root.append(template.content);
     }
-    root.append(liveRegion);
+    if (!liveRegion.isConnected) root.append(liveRegion);
   }
 
   function renderSignature(mode) {
-    // Live axis values stay out of the signature on purpose: slider drags
-    // write vars and readouts directly, so re-rendering mid-gesture would
-    // destroy the control under the pointer.
     return JSON.stringify({
       activeGroupIndex,
       menuOpen,
@@ -426,13 +1302,17 @@
       placement,
       minimized,
       copied,
+      canvasOpen,
+      canvasTheme,
+      canvasZoom,
       groups: groups.map((group) => {
         const activeOption = group.options[clamp(group.activeOptionIndex, group.options.length)];
         return {
           displayLabel: group.displayLabel,
           activeOptionIndex: group.activeOptionIndex,
           activeOptionLabel: activeOption?.label,
-          optionCount: group.options.length
+          optionCount: group.options.length,
+          canvasLayout: group.canvasLayout
         };
       })
     });
@@ -558,15 +1438,17 @@
     const bucket = tweakValuesByKey.get(key) || {};
     bucket[axis.var] = value;
     tweakValuesByKey.set(key, bucket);
-    axis.host.style.setProperty(axis.var, value);
+    pauseObserver(() => axis.host.style.setProperty(axis.var, value));
   }
 
   function resetAxis(group, axis) {
     const fallback = axisDefault(axis);
     const bucket = tweakValuesByKey.get(tweakKey(group, axis));
     if (bucket) delete bucket[axis.var];
-    if (fallback) axis.host.style.setProperty(axis.var, fallback);
-    else axis.host.style.removeProperty(axis.var);
+    pauseObserver(() => {
+      if (fallback) axis.host.style.setProperty(axis.var, fallback);
+      else axis.host.style.removeProperty(axis.var);
+    });
   }
 
   // Re-apply remembered values after visibility switches and framework
@@ -710,6 +1592,7 @@
     const max = Number(input.max);
     if (max > min) input.style.setProperty("--fill", `${((Number(input.value) - min) / (max - min)) * 100}%`);
     setAxisValue(group, axis, value);
+    syncCanvasTweaks(group);
     const readout = input.parentElement?.querySelector(".tweak-value");
     if (readout) readout.textContent = axisDisplay(axis, value);
     refreshTuneIndicator();
@@ -720,7 +1603,19 @@
     if (!button) return;
 
     const action = button.dataset.action;
-    if (action === "previous") navigateOption(-1);
+    if (action === "open-canvas") openCanvas();
+    else if (action === "close-canvas") closeCanvas();
+    else if (action === "canvas-zoom-out") stepCanvasZoom(-1);
+    else if (action === "canvas-zoom-in") stepCanvasZoom(1);
+    else if (action === "canvas-fit") fitCanvas();
+    else if (action === "canvas-theme") toggleCanvasTheme();
+    else if (action === "canvas-responsive") toggleCanvasResponsive();
+    else if (action === "canvas-tune") tuneCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
+    else if (action === "canvas-keep") {
+      if (button.dataset.held === "true") delete button.dataset.held;
+      else keepCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
+    }
+    else if (action === "previous") navigateOption(-1);
     else if (action === "next") navigateOption(1);
     else if (action === "toggle-menu") {
       if (menuOpen) closeMenu();
@@ -734,6 +1629,7 @@
       if (!group || !axis) return;
       const next = axisValue(group, axis) === axis.on ? axis.off : axis.on;
       setAxisValue(group, axis, next);
+      syncCanvasTweaks(group);
       button.classList.toggle("on", next === axis.on);
       button.setAttribute("aria-checked", String(next === axis.on));
       refreshTuneIndicator();
@@ -743,6 +1639,7 @@
       const choice = axis?.options?.[Number(button.dataset.option)];
       if (!group || !axis || !choice) return;
       setAxisValue(group, axis, choice.value);
+      syncCanvasTweaks(group);
       button.parentElement?.querySelectorAll("[data-action='pick-axis']").forEach((item) => {
         item.classList.toggle("selected", item === button);
         item.setAttribute("aria-pressed", String(item === button));
@@ -753,6 +1650,7 @@
       const axis = panelAxes[Number(button.dataset.axis)];
       if (!group || !axis) return;
       resetAxis(group, axis);
+      syncCanvasTweaks(group);
       renderedSignature = "";
       render();
       root.querySelector(".tune")?.focus({ preventScroll: true });
@@ -806,6 +1704,34 @@
   }
 
   function handleToolbarKeydown(event) {
+    if (canvasOpen) {
+      if (event.key === "Tab") {
+        const controls = Array.from(root.querySelectorAll('button,input,[tabindex="0"]')).filter((node) =>
+          !node.disabled && !node.closest('[inert],.viewport-hidden') &&
+          (!node.closest('.panel') || panelOpen) && node.getClientRects().length && getComputedStyle(node).visibility !== "hidden");
+        const next = wrap(controls.indexOf(root.activeElement) + (event.shiftKey ? -1 : 1), controls.length);
+        event.preventDefault();
+        controls[next]?.focus({ preventScroll: true });
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        if (panelOpen) {
+          panelOpen = false;
+          renderedSignature = "";
+          render();
+          root.querySelector(".canvas-close")?.focus({ preventScroll: true });
+        } else closeCanvas();
+      } else {
+        const frame = event.target.closest?.(".canvas-frame");
+        if (frame && (event.key === "t" || event.key === "T")) {
+          event.preventDefault();
+          tuneCanvasOption(Number(frame.dataset.group), Number(frame.dataset.option));
+        } else if (frame && event.key === "Enter") {
+          event.preventDefault();
+          keepCanvasOption(Number(frame.dataset.group), Number(frame.dataset.option));
+        }
+      }
+      return;
+    }
     // Focused tune controls own their keys (arrows adjust sliders, Space
     // flips switches); only Escape falls through to close the panel.
     if (event.target.closest?.(".panel")) {
@@ -850,7 +1776,7 @@
   }
 
   function handleGlobalKeydown(event) {
-    if (event.defaultPrevented || event.composedPath?.().includes(host) || root?.activeElement || isTypingTarget(event.target)) return;
+    if (canvasOpen || event.defaultPrevented || event.composedPath?.().includes(host) || root?.activeElement || isTypingTarget(event.target)) return;
 
     if (event.key === "ArrowLeft") navigateOption(-1);
     else if (event.key === "ArrowRight") navigateOption(1);
@@ -898,14 +1824,7 @@
   async function keepCurrent() {
     const group = groups[activeGroupIndex];
     if (!group) return;
-    const option = group.options[group.activeOptionIndex];
-    const axes = axesForGroup(group);
-    const values = axes.map((axis) => `${axis.label || axis.var} ${axisDisplay(axis, axisValue(group, axis))}`).join(", ");
-    const instruction = !axes.length
-      ? `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`
-      : group.options.length === 1
-        ? `Keep "${group.displayLabel}" with ${values}; bake these values in and remove the unship markup.`
-        : `Keep "${option.label}" for "${group.displayLabel}" with ${values}; bake these values in and remove the other unship options in that group.`;
+    const instruction = keepInstruction(group);
     const ok = await copyText(instruction);
     copied = ok ? "ok" : "fail";
     renderPreservingLabelFocus();
@@ -915,6 +1834,17 @@
       copied = false;
       renderPreservingLabelFocus();
     }, 1800);
+  }
+
+  function keepInstruction(group) {
+    const option = group.options[group.activeOptionIndex];
+    const axes = axesForGroup(group);
+    const values = axes.map((axis) => `${axis.label || axis.var} ${axisDisplay(axis, axisValue(group, axis))}`).join(", ");
+    return !axes.length
+      ? `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`
+      : group.options.length === 1
+        ? `Keep "${group.displayLabel}" with ${values}; bake these values in and remove the unship markup.`
+        : `Keep "${option.label}" for "${group.displayLabel}" with ${values}; bake these values in and remove the other unship options in that group.`;
   }
 
   function clearCopiedStatus() {
@@ -1000,6 +1930,11 @@
   // (cancels the hold); release early = nothing (leaves double-click free
   // for minimize).
   function handleLabelPointerDown(event) {
+    const canvasKeep = event.target.closest?.(".canvas-keep");
+    if (canvasKeep) {
+      handleCanvasKeepPointerDown(event, canvasKeep);
+      return;
+    }
     const label = event.target.closest?.(".label");
     if (event.button !== 0 || event.ctrlKey) return;
     if (!label || gesturePointerId !== null) return;
@@ -1078,6 +2013,40 @@
     document.addEventListener("pointercancel", cancel);
   }
 
+  function handleCanvasKeepPointerDown(event, button) {
+    if (event.button !== 0 || gesturePointerId !== null) return;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    gesturePointerId = pointerId;
+    button.classList.add("holding");
+    holdTimer = setTimeout(() => {
+      button.classList.remove("holding");
+      button.dataset.held = "true";
+      keepCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
+    }, HOLD_COMMIT_MS);
+    const cleanup = () => {
+      clearTimeout(holdTimer);
+      button.classList.remove("holding");
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", up);
+      gesturePointerId = null;
+      gestureCleanup = null;
+    };
+    const move = (next) => {
+      if (next.pointerId !== pointerId) return;
+      if (Math.hypot(next.clientX - startX, next.clientY - startY) >= 6) cleanup();
+    };
+    const up = (next) => {
+      if (next.pointerId === pointerId) cleanup();
+    };
+    gestureCleanup = cleanup;
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", up);
+  }
+
   // Snap-zone ghost: while dragging, a dashed outline previews the rest spot
   // of the zone the pointer is in, using the same thresholds and gutters the
   // release handler commits, so the preview and the landing always agree.
@@ -1111,11 +2080,15 @@
     ghost = null;
   }
 
-  function queueRescan() {
-    if (rescanQueued) return;
-    rescanQueued = true;
-    requestAnimationFrame(() => {
-      rescanQueued = false;
+  function queueRescan(records) {
+    if (canvasShell) canvasDirty = true;
+    // Text and presentation changes invalidate snapshots without rebuilding
+    // the picker; structural and option metadata changes still rescan.
+    if (records?.every((record) => record.type === "characterData" ||
+      (record.type === "attributes" && ["style", "class", "src", "href"].includes(record.attributeName)))) return;
+    if (rescanFrame) return;
+    rescanFrame = requestAnimationFrame(() => {
+      rescanFrame = 0;
       rescan();
     });
   }
@@ -1123,6 +2096,8 @@
   function pauseObserver(callback) {
     if (!observer) return callback();
 
+    const records = observer.takeRecords();
+    if (records.length) queueRescan(records);
     observer.disconnect();
     try {
       return callback();
@@ -1135,9 +2110,10 @@
   function observeDocument() {
     observer?.observe(document.documentElement, {
       childList: true,
+      characterData: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-unship-pick", OPTION_ATTR, "data-unship-tweaks", "hidden"]
+      attributeFilter: ["data-unship-pick", OPTION_ATTR, "data-unship-tweaks", CANVAS_ATTR, "hidden", "class", "style", "src", "href"]
     });
   }
 
@@ -1167,6 +2143,10 @@
     host.style.setProperty("--unship-max-width", `${Math.max(240, width - 20)}px`);
     host.style.setProperty("--unship-bottom", `${visibleBottom}px`);
     host.style.setProperty("--unship-top", `${visibleTop}px`);
+    if (canvasOpen) requestAnimationFrame(() => {
+      keepCanvasInBounds();
+      positionCanvasFrameToolbar();
+    });
   }
 
   function horizontalAnchorFor(x, viewportWidth) {
@@ -1323,7 +2303,7 @@
       .tune svg{display:block}
       .tune.modified::after{content:"";position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:#fff}
       .tuning .tune{background:rgba(255,255,255,.14)}
-      .nav{width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
+      .nav{position:relative;width:var(--nav);height:var(--nav);min-width:var(--nav);min-height:var(--nav);display:grid;place-items:center;font-size:var(--navfs);line-height:1;border-radius:999px;transition:transform .12s ease}
       .prev::before,.next::before{content:"";width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor}
       .prev::before{transform:rotate(225deg) translate(-1px,-1px)}
       .next::before{transform:rotate(45deg) translate(-1px,1px)}
@@ -1352,6 +2332,67 @@
       .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
       .label-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .option-count{flex:none;opacity:.7;font-variant-numeric:tabular-nums}
+      .canvas-enter,.canvas-fit{height:var(--h);padding:0 10px;border-radius:999px;white-space:nowrap;font-size:11px}
+      .canvas-enter{display:grid;place-items:center;box-sizing:border-box;min-width:59px;margin-left:5px;background:rgba(255,255,255,.12)}
+      .canvas-enter.preparing{opacity:.68;pointer-events:none}
+      .canvas-spinner{width:9px;height:9px;border:1.5px solid #ffffff59;border-top-color:#fff;border-radius:50%;animation:spin .45s linear infinite}
+      @keyframes spin{to{transform:rotate(1turn)}}
+      .canvas-enter:hover,.canvas-fit:hover,.canvas-state-toggle:hover{background:rgba(255,255,255,.17)}
+      .canvas-shell{--canvas-dot:rgba(17,17,17,.12);--canvas-grid-size:24px;--canvas-grid-x:0px;--canvas-grid-y:0px;position:fixed;inset:0;z-index:2147483645;background-color:#fff;background-image:radial-gradient(circle,var(--canvas-dot) 1px,transparent 1.15px);background-size:var(--canvas-grid-size) var(--canvas-grid-size);background-position:var(--canvas-grid-x) var(--canvas-grid-y);color:#171717;font:500 13px/1.3 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em;opacity:0;pointer-events:none;transition:opacity .1s linear,background-color .14s ease,color .14s ease}
+      .canvas-shell.visible{opacity:1;pointer-events:auto}
+      .canvas-shell.leaving{pointer-events:none}
+      .canvas-shell[data-theme="dark"]{--canvas-dot:rgba(255,255,255,.14);background-color:#101010;color:#f0f0ee}
+      .canvas-viewport{position:absolute;inset:0;overflow:hidden;box-sizing:border-box;cursor:grab;overscroll-behavior:contain;touch-action:none;user-select:none}
+      .canvas-viewport.panning{cursor:grabbing;user-select:none}
+      .canvas-world{display:flex;flex-direction:column;align-items:flex-start;gap:64px;width:max-content;min-width:calc(100vw - 128px);padding:64px 64px 152px;box-sizing:border-box;opacity:0;will-change:transform;transition:opacity .11s cubic-bezier(.16,1,.3,1)}
+      .canvas-shell.content-visible .canvas-world{opacity:1}
+      .canvas-group{display:flex;flex-direction:column;gap:14px;width:max-content;max-width:none}
+      .canvas-group-name{position:sticky;left:0;z-index:3;margin:0;font-size:13px;font-weight:500;line-height:1.2;letter-spacing:-.01em;color:#6f6f6b;transition:color .14s ease}
+      .canvas-shell[data-theme="dark"] .canvas-group-name{color:#aaa9a4}
+      .canvas-options{display:flex;flex-direction:column;align-items:flex-start;gap:28px}
+      .canvas-option-row{display:flex;align-items:flex-start;gap:18px;width:max-content}
+      .canvas-grid{width:min(1600px,calc(100vw - 88px))}
+      .canvas-grid .canvas-options{display:flex;flex-direction:row;flex-wrap:wrap;width:100%;align-items:flex-start}
+      .canvas-grid .canvas-option-row{display:flex}
+      .canvas-frame{position:relative;flex:none;min-height:64px;background:transparent;overflow:visible}
+      .canvas-frame:hover,.canvas-frame:focus-within{z-index:4}
+      .canvas-frame:focus-visible{outline:2px solid #111;outline-offset:4px}
+      .canvas-shell[data-theme="dark"] .canvas-frame:focus-visible{outline-color:#fff}
+      .canvas-frame::after{content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-radius:50%;background:#111;opacity:0;box-shadow:0 0 0 2px #fff}
+      .canvas-shell[data-theme="dark"] .canvas-frame::after{background:#fff;box-shadow:0 0 0 2px #111}
+      .canvas-frame.kept::after{opacity:1}
+      .canvas-iframe{display:block;width:100%;height:180px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .16s ease}
+      .canvas-frame.ready .canvas-iframe{opacity:1}
+      .canvas-frame.viewport-hidden{display:none}
+      .canvas-frame.failed{min-height:96px;background:rgba(127,127,127,.08)}
+      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:32px;padding:4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
+      .canvas-frame-toolbar.visible{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
+      .canvas-option-name{padding-left:9px;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+      .canvas-frame-width{padding:0 7px;opacity:.6;font-variant-numeric:tabular-nums}
+      .canvas-frame-toolbar button{position:relative;min-height:26px;padding:0 9px;border-radius:999px;overflow:hidden}
+      .canvas-frame-toolbar button:hover,.canvas-frame-toolbar button:focus-visible{background:rgba(255,255,255,.14)}
+      .canvas-keep.holding::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.16);transform-origin:left;transform:scaleX(0);animation:holdFill ${HOLD_FILL_MS}ms linear ${HOLD_FILL_DELAY_MS}ms forwards}
+      .canvas-dock{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;width:max-content;max-width:calc(100vw - 20px);left:50%!important}
+      .canvas-dock .panel{margin-bottom:0}
+      .canvas-dock.tuning .panel{margin-bottom:var(--gap)}
+      .canvas-row{gap:3px}
+      .canvas-close::before,.canvas-close::after,.canvas-zoom::before,.canvas-zoom-in::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:1.5px;background:currentColor;transform:translate(-50%,-50%)}
+      .canvas-close::before{transform:translate(-50%,-50%) rotate(45deg)}
+      .canvas-close::after{transform:translate(-50%,-50%) rotate(-45deg)}
+      .canvas-zoom-in::after{transform:translate(-50%,-50%) rotate(90deg)}
+      .canvas-divider{width:1px;height:22px;flex:none;background:rgba(255,255,255,.14)}
+      .canvas-state-toggle{position:relative;width:var(--h);height:var(--h);min-width:var(--h);padding:0;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.1);transition:background .16s ease,transform .12s ease}
+      .canvas-state-toggle:active{transform:scale(.9)}
+      .canvas-state-toggle[aria-pressed="true"]{background:#f5f5f3;color:#050505}
+      .canvas-state-icon{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .16s ease,transform .2s cubic-bezier(.32,.72,0,1)}
+      .canvas-state-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+      .canvas-responsive-toggle .canvas-state-secondary svg{width:20px;height:20px}
+      .canvas-state-primary{opacity:1;transform:rotate(0) scale(1)}
+      .canvas-state-secondary{opacity:0;transform:rotate(-28deg) scale(.6)}
+      .canvas-state-toggle[aria-pressed="true"] .canvas-state-primary{opacity:0;transform:rotate(28deg) scale(.6)}
+      .canvas-state-toggle[aria-pressed="true"] .canvas-state-secondary{opacity:1;transform:rotate(0) scale(1)}
+      .canvas-zoom-value{height:var(--h);min-width:46px;padding:0 8px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+      .canvas-fit{background:rgba(255,255,255,.1)}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
       @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
@@ -1366,6 +2407,8 @@
       .group-count-current.swap,.option-count-current.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       .tweak.swap{animation:swapIn .13s cubic-bezier(0,0,.2,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
+      @media (max-width:520px){.canvas-row{gap:2px}}
+      @media (max-width:340px){.canvas-fit{display:none}}
       @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
   }
 

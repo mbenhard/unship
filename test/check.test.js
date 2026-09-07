@@ -334,7 +334,7 @@ test("check reports orphaned tweak and presentation-hint attributes", async () =
   await mkdir(join(root, "src"), { recursive: true });
   await writeFile(
     join(root, "src", "Hero.html"),
-    '<section data-unship-tweaks=\'[{"type":"toggle"}]\'>\n<h1 data-unship-as="segmented">A</h1>\n</section>\n',
+    '<section data-unship-tweaks=\'[{"type":"toggle"}]\'>\n<h1 data-unship-as="segmented" data-unship-canvas="grid">A</h1>\n</section>\n',
     "utf8"
   );
 
@@ -343,7 +343,7 @@ test("check reports orphaned tweak and presentation-hint attributes", async () =
   assert.equal(result.ok, false);
   assert.deepEqual(
     result.diagnostics.map((item) => item.pattern).sort(),
-    ["data-unship-as", "data-unship-tweaks"]
+    ["data-unship-as", "data-unship-canvas", "data-unship-tweaks"]
   );
 });
 

@@ -29,6 +29,7 @@ Parse intent this way:
 - `flow` means compare a small source-contained path or step sequence, not a production experiment framework.
 - `system`, `tokens`, or `design system` means compare local component or style treatments that can be rendered in source.
 - `docs`, `README`, `CLI`, `DX`, or `terminal` means create a local rendered comparison artifact when the app itself is not the right surface. Do not treat raw Markdown files as directly comparable by the picker.
+- `canvas` means opt the requested Groups into simultaneous comparison with `data-unship-canvas`. Choose each Group's Arrangement from its rendered proportions: `stack` for wide, shallow sections; `grid` for compact components; `matrix` only when responsive widths should be compared together.
 - If the target is ambiguous, inspect the page/source first and choose the most likely match.
 
 ## Command Prefix
@@ -69,7 +70,7 @@ Keep verification proportional to the phase. Before the first handoff, do only c
 
 Do not run full release checks during ordinary variant creation unless the source cannot be edited safely without them. Full typecheck, build, browser automation, mobile smoke, `unship check`, and cleanup verification belong to picker setup changes, selected-option cleanup, or final shipping cleanup.
 
-If the target is ambiguous, inspect the page/source first and choose the most likely match. Use the rendered page only when the user asks for browser help, setup requires manual verification, or source alone is insufficient.
+Use the rendered page when the user asks for browser help, setup requires manual verification, or source is insufficient.
 
 ## Picker Setup
 
@@ -103,6 +104,7 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 - Include `Current` only when baseline comparison is useful.
 - Use 1-3 word labels, ideally under 18 characters.
 - Use inline mode for focused section, component, state, copy, or local comparison artifact work.
+- Use Canvas only when the user asks for it or simultaneous comparison is the explicit task.
 
 ## Inline Mode Safety
 
@@ -171,6 +173,24 @@ Do not build a custom switcher, segmented control, tab set, or app-level prefere
 ```
 
 If setup cannot patch the app automatically, inject the picker locally with `$UNSHIP snippet` or an equivalent dev-only script include.
+
+## Canvas Mode
+
+Canvas is the simultaneous companion to the normal one-at-a-time picker. Add one Arrangement hint to every Group that belongs on the Canvas:
+
+```html
+<section data-unship-pick="Header" data-unship-canvas="stack">…</section>
+<section data-unship-pick="Cards" data-unship-canvas="grid">…</section>
+<section data-unship-pick="Hero" data-unship-canvas="matrix">…</section>
+```
+
+- `stack` keeps wide, shallow Options underneath one another.
+- `grid` lets compact Options flow side by side and wrap.
+- `matrix` prepares every Option at 1280, 768, and 390 pixel viewport widths. Canvas opens with Desktop visible; its responsive toggle reveals Tablet and Mobile together.
+
+Choose the Arrangement yourself from the content; do not ask the user to operate layout controls. Keep the marked Group as the smallest self-contained source scope that renders truthfully. Canvas Frames are script-free snapshots, so a target that depends on canvas pixels, shadow DOM, or client JavaScript needs a smaller static preview surface.
+
+Canvas reuses declared tweaks and hold-to-Keep instructions. Do not build custom Canvas controls, annotation, sharing, ranking, or persistence into the explored source.
 
 ## Human Comparison Handoff
 

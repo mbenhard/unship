@@ -235,6 +235,22 @@ test("readiness fails an invalid data-unship-as value", () => {
   assert.equal(groups[0].findings[0].level, "fail");
 });
 
+test("readiness accepts Canvas Arrangements and fails invalid values", () => {
+  for (const layout of ["stack", "grid", "matrix"]) {
+    const groups = scanReadiness(
+      "src/App.html",
+      `<section data-unship-pick="Hero" data-unship-canvas="${layout}"><div data-unship-option="A">A</div><div data-unship-option="B" hidden>B</div></section>`
+    );
+    assert.deepEqual(groups[0].findings, []);
+  }
+
+  const invalid = scanReadiness(
+    "src/App.html",
+    '<section data-unship-pick="Hero" data-unship-canvas="masonry"><div data-unship-option="A">A</div></section>'
+  );
+  assert.deepEqual(invalid[0].findings.map((finding) => `${finding.level}:${finding.code}`), ["fail:canvas-value"]);
+});
+
 test("readiness notes an ignored hint on groups with more than 4 options", () => {
   const spans = ["A", "B", "C", "D", "E"]
     .map((label, index) => `  <span data-unship-option="${label}"${index ? " hidden" : ""}>x</span>`)

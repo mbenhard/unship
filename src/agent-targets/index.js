@@ -1,50 +1,35 @@
 const INIT_TARGETS = {
-  codex: [
-    skill(".agents/skills/unship/SKILL.md"),
-    pointer("AGENTS.md", "agents")
+  codex: [managed(".agents/skills/unship/SKILL.md"), pointer("AGENTS.md", "agents")],
+  claude: [managed(".claude/skills/unship/SKILL.md"), pointer("CLAUDE.md", "claude")],
+  opencode: [managed(".opencode/skills/unship/SKILL.md"), managed(".opencode/commands/unship.md", "opencodeCommand")],
+  cursor: [
+    managed(".agents/skills/unship/SKILL.md"),
+    managed(".cursor/commands/unship.md", "cursorCommand"),
+    managed(".cursor/rules/unship.mdc", "cursorRule")
   ],
-  antigravity: [
-    skill(".agents/skills/unship/SKILL.md"),
-    pointer("AGENTS.md", "agents")
-  ],
-  claude: [
-    skill(".claude/skills/unship/SKILL.md"),
-    pointer("CLAUDE.md", "claude")
-  ],
-  opencode: [
-    skill(".opencode/skills/unship/SKILL.md"),
-    command(".opencode/commands/unship.md", "opencodeCommand")
-  ]
+  copilot: [managed(".agents/skills/unship/SKILL.md"), managed(".github/instructions/unship.instructions.md", "copilotInstruction")],
+  gemini: [managed(".gemini/skills/unship/SKILL.md"), managed(".gemini/commands/unship.toml", "geminiCommand")],
+  windsurf: [managed(".windsurf/skills/unship/SKILL.md"), managed(".windsurf/workflows/unship.md", "windsurfWorkflow")],
+  cline: [managed(".cline/skills/unship/SKILL.md"), managed(".clinerules/workflows/unship.md", "clineWorkflow")],
+  roo: [managed(".roo/skills/unship/SKILL.md"), managed(".roo/commands/unship.md", "rooCommand")]
 };
-
-INIT_TARGETS.all = [
-  skill(".agents/skills/unship/SKILL.md"),
-  skill(".claude/skills/unship/SKILL.md"),
-  skill(".opencode/skills/unship/SKILL.md"),
-  command(".opencode/commands/unship.md", "opencodeCommand"),
-  pointer("AGENTS.md", "agents"),
-  pointer("CLAUDE.md", "claude")
-];
+INIT_TARGETS.antigravity = INIT_TARGETS.codex;
 
 export function initTargetFiles(target, templates) {
-  const files = INIT_TARGETS[target];
-  if (!files) throw new Error(`Unknown init target: ${target}`);
-  return files.map((file) => ({
-    path: file.path,
-    content: templates[file.template],
-    staleGuard: file.staleGuard,
-    forceOverwrite: file.forceOverwrite
-  }));
+  const names = target === "portable" ? ["codex", "claude", "opencode"]
+    : target === "all" ? Object.keys(INIT_TARGETS).filter((name) => name !== "roo") : [target];
+  const files = new Map();
+  for (const name of names) {
+    if (!INIT_TARGETS[name]) throw new Error(`Unknown init target: ${target}`);
+    for (const file of INIT_TARGETS[name]) files.set(file.path, file);
+  }
+  return Array.from(files.values(), ({ template, ...file }) => ({ ...file, content: templates[template] }));
 }
 
-function skill(path) {
-  return { path, template: "skill", staleGuard: true, forceOverwrite: true };
+function managed(path, template = "skill") {
+  return { path, template, staleGuard: true, forceOverwrite: true };
 }
 
 function pointer(path, template) {
   return { path, template, forceOverwrite: false };
-}
-
-function command(path, template) {
-  return { path, template, staleGuard: true, forceOverwrite: true };
 }

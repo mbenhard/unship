@@ -35,12 +35,12 @@ test("packed package is small and excludes legacy implementation paths", () => {
   assert.equal(result.status, 0, result.stderr);
   const pack = JSON.parse(result.stdout)[0];
   const files = pack.files.map((file) => file.path);
-  assert.equal(pack.size < 46_000, true, `package size ${pack.size} should stay under 46 KB`);
-  assert.equal(pack.unpackedSize < 165_000, true, `unpacked size ${pack.unpackedSize} should stay under 165 KB`);
+  assert.equal(pack.size < 64_000, true, `package size ${pack.size} should stay under 64 KB`);
+  assert.equal(pack.unpackedSize < 225_000, true, `unpacked size ${pack.unpackedSize} should stay under 225 KB`);
   // The picker is injected verbatim into consuming apps, so its uncompressed
   // weight matters independently of how well the tarball compresses.
   const pickerEntry = pack.files.find((file) => file.path === "src/picker/unship-picker.js");
-  assert.equal(pickerEntry.size < 64_000, true, `picker size ${pickerEntry.size} should stay under 64 KB`);
+  assert.equal(pickerEntry.size < 120_000, true, `picker size ${pickerEntry.size} should stay under 120 KB`);
   assert.deepEqual(files.sort(), EXPECTED_PACKED_FILES);
   assert.equal(files.some((file) => file.startsWith("src/bridge/")), false);
   assert.equal(files.some((file) => file.startsWith("src/core/")), false);
@@ -100,14 +100,38 @@ test("packed package smoke runs seamless install commands", async () => {
     CLAUDE_CONFIG_DIR: join(home, ".claude")
   };
   const bin = join(consumer, "node_modules", ".bin", "unship");
-  for (const args of [
+  const smokeCommands = [
     ["install", "--dry-run", "--json", "--no-update-check"],
     ["install", "--print-skill"],
+    ["install", "cursor", "gemini", "--dry-run", "--json", "--no-update-check"],
+    ["init", "--target", "all", "--force", "--json"],
+    ["init", "--target", "roo", "--force", "--json"],
     ["uninstall", "--dry-run", "--json"]
-  ]) {
+  ];
+  const results = new Map();
+  for (const args of smokeCommands) {
     const result = spawnSync(bin, args, { cwd: consumer, encoding: "utf8", env });
     assert.equal(result.status, 0, `${args.join(" ")}\n${result.stderr}\n${result.stdout}`);
-    if (args.includes("--print-skill")) assert.match(result.stdout, /name: unship/);
-    else assert.equal(JSON.parse(result.stdout).ok, true);
+    if (args.includes("--print-skill")) {
+      assert.match(result.stdout, /name: unship/);
+    } else {
+    const json = JSON.parse(result.stdout);
+    assert.equal(json.ok, true);
+    results.set(args.join(" "), json);
+    }
   }
+
+  const positional = results.get("install cursor gemini --dry-run --json --no-update-check");
+  assert.deepEqual(positional.harnesses.map((item) => item.id), ["cursor", "gemini"]);
+  assert.equal(JSON.stringify(positional).includes(".cursor/commands/unship.md"), true);
+  assert.equal(JSON.stringify(positional).includes(".gemini/commands/unship.toml"), true);
+
+  const initAll = results.get("init --target all --force --json");
+  assert.equal(initAll.written.includes(".cursor/commands/unship.md"), true);
+  assert.equal(initAll.written.includes(".github/instructions/unship.instructions.md"), true);
+  assert.equal(initAll.written.includes(".gemini/commands/unship.toml"), true);
+
+  const initRoo = results.get("init --target roo --force --json");
+  assert.equal(initRoo.written.includes(".roo/commands/unship.md"), true);
+  assert.match(await readFile(join(consumer, ".roo", "commands", "unship.md"), "utf8"), /Compare temporary local alternatives/);
 });

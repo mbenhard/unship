@@ -12,6 +12,7 @@ const TARGETS = [
     id: "agents",
     name: "Shared .agents skill",
     aliases: ["agents", "codex", "antigravity"],
+    detectPaths: [".codex", ".agents"],
     files: [{ role: "skill", relativePath: ".agents/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m }],
     legacy: [{ relativePath: ".agents/skills/unship-design/SKILL.md", marker: /patch-session|unship-design|Legacy Unship/i }]
   },
@@ -32,11 +33,77 @@ const TARGETS = [
     ]
   },
   {
+    id: "cursor",
+    name: "Cursor",
+    aliases: ["cursor"],
+    detectPath: ".cursor",
+    files: [
+      { role: "command", relativePath: ".cursor/commands/unship.md", template: "cursorCommand", staleMarker: /Use the Unship skill for this request/i }
+    ],
+    legacy: []
+  },
+  {
+    id: "gemini",
+    name: "Gemini CLI",
+    aliases: ["gemini", "gemini-cli"],
+    detectPath: ".gemini",
+    files: [
+      { role: "skill", relativePath: ".gemini/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "command", relativePath: ".gemini/commands/unship.toml", template: "geminiCommand", requiresRole: "skill", staleMarker: /Compare temporary local alternatives with Unship/i }
+    ],
+    legacy: [],
+    next: ["Run /commands reload in Gemini CLI if it is already open."]
+  },
+  {
+    id: "windsurf",
+    name: "Windsurf",
+    aliases: ["windsurf", "cascade"],
+    detectPath: ".codeium/windsurf",
+    files: [
+      { role: "skill", relativePath: ".codeium/windsurf/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "workflow", relativePath: ".codeium/windsurf/global_workflows/unship.md", template: "windsurfWorkflow", requiresRole: "skill", staleMarker: /Use the Unship skill for this request/i }
+    ],
+    legacy: []
+  },
+  {
+    id: "cline",
+    name: "Cline",
+    aliases: ["cline"],
+    detectPaths: [".cline", "Documents/Cline"],
+    files: [
+      { role: "skill", relativePath: ".cline/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "workflow", relativePath: "Documents/Cline/Workflows/unship.md", template: "clineWorkflow", requiresRole: "skill", staleMarker: /Use the Unship skill for this request/i }
+    ],
+    legacy: []
+  },
+  {
+    id: "copilot",
+    name: "GitHub Copilot",
+    aliases: ["copilot", "github-copilot", "github"],
+    manual: true,
+    files: [],
+    legacy: [],
+    next: ["GitHub Copilot loads Unship from repo-local instructions; run npx @unship/cli@latest init --target copilot."]
+  },
+  {
     id: "opencode",
     name: "OpenCode",
     aliases: ["opencode"],
     manual: true,
     files: [],
+    legacy: [],
+    next: ["OpenCode loads Unship from repo-local instructions; run npx @unship/cli@latest init --target opencode."]
+  },
+  {
+    id: "roo",
+    name: "Roo",
+    aliases: ["roo", "roo-code"],
+    explicitOnly: true,
+    detectPath: ".roo",
+    files: [
+      { role: "skill", relativePath: ".roo/skills/unship/SKILL.md", template: "skill", staleMarker: /^---\s*\nname:\s*unship\b/m },
+      { role: "command", relativePath: ".roo/commands/unship.md", template: "rooCommand", requiresRole: "skill", staleMarker: /Compare temporary local alternatives with Unship/i }
+    ],
     legacy: []
   }
 ];
@@ -95,7 +162,8 @@ async function buildContext(options) {
 async function buildInstallPlan(context) {
   const harnesses = [];
   const legacy = [];
-  for (const target of await selectedTargets(context)) {
+  const targets = await selectedTargets(context);
+  for (const target of targets) {
     if (target.manual) {
       harnesses.push(manualHarness(target));
       continue;
@@ -126,8 +194,10 @@ async function buildInstallPlan(context) {
       name: target.name,
       availability: await targetAvailability(context.home, target),
       detected: await targetDetected(context.home, target),
+      fallback: target.id === "agents" && targets.length === 1 && context.harnesses.length === 0 && !context.all && !await targetDetected(context.home, target),
       status: harnessStatus(files),
-      files
+      files,
+      ...(target.next?.length ? { next: target.next } : {})
     });
   }
   return {
@@ -138,7 +208,7 @@ async function buildInstallPlan(context) {
     harnesses,
     legacy,
     project: await planInstallProject(context),
-    next: nextActions({ harnesses, project: context.project })
+    next: nextActions({ harnesses })
   };
 }
 
@@ -181,12 +251,27 @@ async function buildUninstallPlan(context) {
 
 async function selectedTargets(context) {
   const requested = normalizeHarnesses(context.harnesses);
-  if (requested.length) return TARGETS.filter((target) => requested.includes(target.id));
-  if (context.all) return TARGETS.filter((target) => target.id === "agents" || target.id === "claude");
-  const selected = [TARGETS.find((target) => target.id === "agents")];
-  const claude = TARGETS.find((target) => target.id === "claude");
-  if (await targetDetected(context.home, claude)) selected.push(claude);
-  return selected.filter(Boolean);
+  if (requested.length) return requested.map((id) => TARGETS.find((target) => target.id === id)).filter(Boolean);
+  if (context.all) return TARGETS.filter((target) => !target.manual && !target.explicitOnly);
+
+  const detected = [];
+  for (const target of TARGETS) {
+    if (target.manual || target.explicitOnly) continue;
+    if (await targetDetected(context.home, target)) detected.push(target);
+  }
+
+  if (context.repair) {
+    const selected = new Set(detected.map((target) => target.id));
+    for (const target of TARGETS) {
+      if (target.manual || target.explicitOnly || selected.has(target.id)) continue;
+      if (await targetHasExistingFiles(context.home, target)) {
+        detected.push(target);
+        selected.add(target.id);
+      }
+    }
+  }
+
+  return detected.length ? detected : TARGETS.filter((target) => target.id === "agents");
 }
 
 function normalizeHarnesses(values) {
@@ -425,18 +510,25 @@ function manualHarness(target) {
     detected: false,
     status: "manual",
     files: [],
-    next: ["Manual setup required; run install --print-skill and place SKILL.md where this harness loads skills."]
+    next: target.next || ["Manual setup required; run install --print-skill and place SKILL.md where this harness loads skills."]
   };
 }
 
-function nextActions({ harnesses, project }) {
-  const next = ["Restart the agent so it reloads Unship."];
-  if (harnesses.some((item) => item.id === "agents" || item.id === "claude")) {
+function nextActions({ harnesses }) {
+  const next = [];
+  if (harnesses.some((item) => item.files?.length)) {
+    next.push("Restart the agent so it reloads Unship.");
+  }
+  const hasCommandHarness = harnesses.some((item) => item.files?.some((file) => file.role === "command" || file.role === "workflow"));
+  if (hasCommandHarness || harnesses.some((item) => item.id === "agents")) {
     next.push("Try /unship where available, or ask: use unship to compare 3 directions for the hero section.");
     next.push("If /unship is unavailable after restart, run npx @unship/cli@latest doctor --json and use the natural-language fallback.");
   }
-  if (project) next.push("Run npx @unship/cli@latest setup --json in the app repo to get the dev-only picker snippet.");
-  else next.push("Inside an app repo, run npx @unship/cli@latest setup --json to get the dev-only picker snippet.");
+  for (const harness of harnesses) {
+    if (harness.next?.length) next.push(...harness.next);
+  }
+  next.push("Inside an app repo, run npx @unship/cli@latest setup --json to get the dev-only picker snippet.");
+  next.push("Optional repo helpers can be added later with unship init.");
   return next;
 }
 
@@ -445,14 +537,33 @@ function operationWrites(operation) {
 }
 
 async function targetDetected(home, target) {
-  if (!target.detectPath) return true;
-  return exists(join(home, target.detectPath));
+  const paths = target.detectPaths || (target.detectPath ? [target.detectPath] : []);
+  if (!paths.length) return false;
+  for (const path of paths) {
+    if (await exists(join(home, path))) return true;
+  }
+  return false;
+}
+
+async function targetHasExistingFiles(home, target) {
+  const files = [
+    ...(target.files || []).map((file) => file.relativePath),
+    ...(target.legacy || []).map((file) => file.relativePath)
+  ];
+  for (const file of files) {
+    if (await exists(join(home, file))) return true;
+  }
+  return false;
 }
 
 async function targetAvailability(home, target) {
   if (target.manual) return "manual";
-  if (!target.detectPath) return await existsPath(home) ? "writable" : "unknown";
-  return await exists(join(home, target.detectPath)) ? "detected-loaded" : await existsPath(home) ? "writable" : "unknown";
+  const paths = target.detectPaths || (target.detectPath ? [target.detectPath] : []);
+  if (!paths.length) return await existsPath(home) ? "writable" : "unknown";
+  for (const path of paths) {
+    if (await exists(join(home, path))) return "detected-loaded";
+  }
+  return await existsPath(home) ? "writable" : "unknown";
 }
 
 function hasFailures(plan) {

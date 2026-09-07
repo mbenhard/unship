@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const port = Number(process.env.PORT || 4173);
 const routes = new Map([
   ["/", [new URL("playground.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/canvas", [new URL("canvas-fixture.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/unship-picker.js", [new URL("../src/picker/unship-picker.js", import.meta.url), "text/javascript; charset=utf-8"]]
 ]);
 const server = createServer(async (request, response) => {

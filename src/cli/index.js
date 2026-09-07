@@ -12,9 +12,10 @@ import { checkForUpdates } from "../update/index.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "help";
-const flags = parseFlags(args.slice(1));
+let flags = {};
 
 try {
+  flags = parseFlags(args.slice(1));
   if (command === "install") {
     const plan = await planInstall(installOptions(flags));
     if (plan.printSkill) {
@@ -51,7 +52,7 @@ try {
     printInstallResult(result, flags.json);
     if (!result.ok) process.exitCode = 1;
   } else if (command === "init") {
-    const result = await init({ target: flags.target || "all", force: Boolean(flags.force) });
+    const result = await init({ target: flags.target || "portable", force: Boolean(flags.force) });
     print(result, flags.json);
     if (!result.ok) process.exitCode = 1;
   } else if (command === "snippet") {
@@ -79,7 +80,7 @@ try {
     throw new Error(`Unknown command: ${command}. Use one of: install, uninstall, init, setup, snippet, check, doctor.`);
   }
 } catch (error) {
-  if (flags.json) {
+  if (flags.json || args.includes("--json")) {
     console.log(JSON.stringify({ ok: false, error: error.message }));
   } else {
     console.error(error.message);
@@ -299,11 +300,15 @@ function parsePorts(value) {
 }
 
 function installOptions(flags) {
+  const harnesses = [
+    ...(flags.harness ? String(flags.harness).split(",") : []),
+    ...(flags._ || [])
+  ];
   return {
     all: Boolean(flags.all),
     dryRun: Boolean(flags["dry-run"]),
     force: Boolean(flags.force),
-    harnesses: flags.harness ? String(flags.harness).split(",") : [],
+    harnesses,
     json: Boolean(flags.json),
     noProject: Boolean(flags["no-project"]),
     printSkill: Boolean(flags["print-skill"]),
@@ -332,15 +337,32 @@ function printInstallResult(result, json) {
     lines.push("Workflow: ask your agent for options, compare them in your local preview, pick a direction in chat, and have the agent clean up the unused variants.");
     lines.push("Before shipping: have the agent run npx @unship/cli@latest check --json.");
   }
+  if (label === "install" && result.harnesses?.length) {
+    const detectedNames = result.harnesses.filter((harness) => harness.detected).map((harness) => harness.name);
+    if (result.harnesses.some((harness) => harness.fallback)) {
+      lines.push(`No harness homes detected. Using ${new Intl.ListFormat("en").format(result.harnesses.map((harness) => harness.name))}.`);
+    } else {
+      const names = detectedNames.length ? detectedNames : result.harnesses.map((harness) => harness.name);
+      lines.push(`${detectedNames.length ? "Detected" : "Selected"} ${new Intl.ListFormat("en").format(names)}.`);
+    }
+  }
   for (const harness of result.harnesses || []) {
     lines.push(`${harness.name}: ${harness.status}`);
+    for (const file of harness.files || []) {
+      lines.push(`- ${file.status}: ${friendlyPath(file.path, result.home)}`);
+    }
   }
   for (const item of result.legacy || []) {
-    lines.push(`Legacy ${item.status}: ${item.path}`);
+    lines.push(`Legacy ${item.status}: ${friendlyPath(item.path, result.home)}`);
   }
   if (result.project) lines.push(`Project: ${result.project.status}`);
   appendNext(lines, result.next);
   console.log(lines.join("\n"));
+}
+
+function friendlyPath(path, home) {
+  if (!home) return path;
+  return path === home ? "~" : path.startsWith(`${home}/`) ? `~/${path.slice(home.length + 1)}` : path;
 }
 
 function appendNext(lines, next) {
@@ -418,12 +440,12 @@ function printHelp() {
 Iterate with your agent in the app, not in chat.
 
 Usage:
-  unship install [--yes|--dry-run|--json]
+  unship install [harness...] [--yes|--dry-run|--json]
   unship setup --json
   unship check [--readiness] [--json]
   unship doctor [--json]
   unship snippet [--inline|--json]
-  unship init [--target codex|claude|opencode|antigravity|all]
+  unship init [--target portable|all|<agent>]
   unship uninstall [--yes|--dry-run|--json]
   unship install --print-skill
 

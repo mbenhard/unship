@@ -7,7 +7,11 @@ const BUNDLED_PICKER = new URL("../picker/unship-picker.js", import.meta.url);
 const SKILL_PATHS = [
   ".agents/skills/unship/SKILL.md",
   ".claude/skills/unship/SKILL.md",
-  ".opencode/skills/unship/SKILL.md"
+  ".cline/skills/unship/SKILL.md",
+  ".gemini/skills/unship/SKILL.md",
+  ".opencode/skills/unship/SKILL.md",
+  ".roo/skills/unship/SKILL.md",
+  ".windsurf/skills/unship/SKILL.md"
 ];
 const PICKER_CANDIDATES = ["public/unship-picker.js", "static/unship-picker.js", "src/assets/unship-picker.js"];
 const SEARCH_EXTENSIONS = new Set([".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".astro", ".vue", ".svelte"]);

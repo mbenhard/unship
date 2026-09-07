@@ -18,6 +18,8 @@ Run `npm run demo` and open `http://127.0.0.1:4173`. Set `PORT` to use a differe
 
 The mock Fieldwork workspace covers three Welcome variants, Activity states, and a single-option Note card with all tuning control types across the page. Compare, tune, reset, switch groups, copy a keep instruction, drag, and minimize. The textarea lets you inspect clipboard output without sending anything. Reload resets choices and tuning, while toolbar placement remains local.
 
+Open Canvas from the picker to compare all directions at once. Welcome uses a responsive matrix; Activity and Note card use grids. The focused Canvas fixture is available at `/canvas`.
+
 The fixture and server live in `e2e/` and are excluded from the npm package.
 
 ## Local Package Testing
@@ -31,6 +33,7 @@ npm pack --pack-destination /tmp/unship-pack
 cd /path/to/consuming-app
 npm install -D /tmp/unship-pack/unship-cli-*.tgz
 ./node_modules/.bin/unship doctor --json
+./node_modules/.bin/unship install cursor gemini --dry-run --json
 ./node_modules/.bin/unship init --force --json
 ./node_modules/.bin/unship setup --json
 ```

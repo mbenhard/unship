@@ -107,9 +107,14 @@ Smoke test from the registry after the workflow succeeds:
 
 ```bash
 npm exec @unship/cli@latest -- install --dry-run --json --no-update-check
+npm exec @unship/cli@latest -- install cursor gemini --dry-run --json --no-update-check
 npm exec @unship/cli@latest -- doctor --json --no-update-check
 npm exec @unship/cli@latest -- snippet
 npm exec @unship/cli@latest -- setup --json
+
+smoke_dir="$(mktemp -d)"
+(cd "$smoke_dir" && npm exec @unship/cli@latest -- init --target all --force --json)
+(cd "$smoke_dir" && npm exec @unship/cli@latest -- init --target roo --force --json)
 ```
 
 After publishing, refresh this machine's installed agent files so local Codex and Claude Code load the new bundled skill after restart:

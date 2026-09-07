@@ -97,7 +97,7 @@ test("install-skill is not public product surface", async () => {
   assert.match(json.error, /Unknown command: install-skill/);
 });
 
-test("install dry-run json plans shared and claude targets inside temp home", async () => {
+test("install dry-run json detects claude inside temp home", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
   const home = join(cwd, "home");
   await mkdir(join(home, ".claude"), { recursive: true });
@@ -108,12 +108,145 @@ test("install dry-run json plans shared and claude targets inside temp home", as
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, true);
   assert.equal(json.dryRun, true);
-  assert.equal(json.harnesses.some((item) => item.id === "agents"), true);
-  assert.equal(json.harnesses.some((item) => item.id === "claude"), true);
-  assert.equal(json.harnesses.find((item) => item.id === "agents").status, "planned");
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["claude"]);
+  assert.equal(json.harnesses.find((item) => item.id === "claude").status, "planned");
   assert.equal(JSON.stringify(json).includes(home), true);
   assert.equal(JSON.stringify(json).includes(process.env.HOME), false);
   await assert.rejects(readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"));
+});
+
+test("install defaults to detected global homes and skips explicit-only roo", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".cursor"), { recursive: true });
+  await mkdir(join(home, ".gemini"), { recursive: true });
+  await mkdir(join(home, ".roo"), { recursive: true });
+
+  const result = await runCliWithHome(["install", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["cursor", "gemini"]);
+});
+
+test("install defaults to shared agents skill when no harness home is detected", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["agents"]);
+});
+
+test("install repair includes existing stale shared agents files alongside detected homes", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".cursor"), { recursive: true });
+  await writeFixture(join(home, ".agents", "skills", "unship", "SKILL.md"), "---\nname: unship\n---\nSTALE_MARKER_DO_NOT_KEEP\n");
+
+  const result = await runCliWithHome(["install", "--repair", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["agents", "cursor"]);
+  assert.equal(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), await readFile(new URL("../agent/skills/unship/SKILL.md", import.meta.url), "utf8"));
+  assert.doesNotMatch(await readFile(join(home, ".agents", "skills", "unship", "SKILL.md"), "utf8"), /STALE_MARKER_DO_NOT_KEEP/);
+});
+
+test("install accepts positional harness names", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "cursor", "gemini", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["cursor", "gemini"]);
+  assert.equal(JSON.stringify(json).includes(".cursor/commands/unship.md"), true);
+  assert.equal(JSON.stringify(json).includes(".gemini/commands/unship.toml"), true);
+});
+
+test("install reports unknown positional harness names clearly", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "space-cli", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 1);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.match(json.error, /Unknown install harness: space-cli/);
+});
+
+test("install cursor writes global Cursor command", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "cursor", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["cursor"]);
+  const command = await readFile(join(home, ".cursor", "commands", "unship.md"), "utf8");
+  assert.match(command, /Use the Unship skill/);
+  assert.match(command, /install --print-skill/);
+});
+
+test("install gemini writes global Gemini skill and command", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "gemini", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(join(home, ".gemini", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  const command = await readFile(join(home, ".gemini", "commands", "unship.toml"), "utf8");
+  assert.match(command, /description = "Compare temporary local alternatives with Unship"/);
+  assert.match(JSON.parse(result.stdout).next.join("\n"), /\/commands reload/);
+});
+
+test("install windsurf and cline write global skill and workflow files", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "windsurf", "cline", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(join(home, ".codeium", "windsurf", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  assert.match(await readFile(join(home, ".codeium", "windsurf", "global_workflows", "unship.md"), "utf8"), /# Unship/);
+  assert.match(await readFile(join(home, ".cline", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  assert.match(await readFile(join(home, "Documents", "Cline", "Workflows", "unship.md"), "utf8"), /# Unship/);
+});
+
+test("install copilot remains project-only manual guidance", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "copilot", "--dry-run", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.harnesses[0].id, "copilot");
+  assert.equal(json.harnesses[0].status, "manual");
+  assert.deepEqual(json.harnesses[0].files, []);
+  assert.match(json.harnesses[0].next.join("\n"), /init --target copilot/);
+});
+
+test("install roo writes explicit global Roo skill and command", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "roo", "--yes", "--json"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.deepEqual(json.harnesses.map((item) => item.id), ["roo"]);
+  assert.match(await readFile(join(home, ".roo", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  const command = await readFile(join(home, ".roo", "commands", "unship.md"), "utf8");
+  assert.match(command, /Compare temporary local alternatives with Unship/);
+  assert.match(command, /target, count, style, scope/);
 });
 
 test("install all yes writes shared and claude targets then reruns current", async () => {
@@ -151,6 +284,34 @@ test("install plain output groups next actions once", async () => {
   assert.match(result.stdout, /If \/unship is unavailable after restart/);
   assert.match(result.stdout, /natural-language fallback/);
   assert.equal((result.stdout.match(/^Next:/gm) || []).length, 1);
+});
+
+test("install dry-run plain output names detected harnesses and planned paths", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".cursor"), { recursive: true });
+  await mkdir(join(home, ".gemini"), { recursive: true });
+
+  const result = await runCliWithHome(["install", "--dry-run", "--no-update-check"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Detected Cursor and Gemini CLI/);
+  assert.match(result.stdout, /~\/\.cursor\/commands\/unship\.md/);
+  assert.match(result.stdout, /~\/\.gemini\/commands\/unship\.toml/);
+  assert.match(result.stdout, /Optional repo helpers.*unship init/s);
+});
+
+test("install dry-run plain output explains shared agents fallback", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+
+  const result = await runCliWithHome(["install", "--dry-run", "--no-update-check"], cwd, home);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /No harness homes detected\. Using Shared \.agents skill\./);
+  assert.doesNotMatch(result.stdout, /Detected Shared \.agents skill/);
+  const json = await runCliWithHome(["install", "--dry-run", "--json"], cwd, home);
+  assert.equal(JSON.parse(json.stdout).harnesses[0].fallback, true);
 });
 
 test("install claude plain output includes slash and fallback guidance", async () => {
@@ -406,6 +567,49 @@ test("init all writes shared skill plus claude and opencode shims", async () => 
   const command = await readFile(join(cwd, ".opencode", "commands", "unship.md"), "utf8");
   assert.match(command, /Compare temporary local alternatives with Unship/);
   assert.match(command, /local surface to compare/);
+  assert.match(await readFile(join(cwd, ".cursor", "commands", "unship.md"), "utf8"), /install --print-skill/);
+  assert.match(await readFile(join(cwd, ".cursor", "rules", "unship.mdc"), "utf8"), /alwaysApply: false/);
+  assert.match(await readFile(join(cwd, ".github", "instructions", "unship.instructions.md"), "utf8"), /excludeAgent: "code-review"/);
+  assert.match(await readFile(join(cwd, ".gemini", "commands", "unship.toml"), "utf8"), /\{\{args\}\}/);
+  assert.match(await readFile(join(cwd, ".windsurf", "workflows", "unship.md"), "utf8"), /# Unship/);
+  assert.match(await readFile(join(cwd, ".clinerules", "workflows", "unship.md"), "utf8"), /# Unship/);
+  await assert.rejects(readFile(join(cwd, ".roo", "commands", "unship.md"), "utf8"));
+});
+
+test("init cursor writes repo-local Cursor command and rule", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const result = spawnSync(process.execPath, [CLI, "init", "--target", "cursor", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.written.includes(".agents/skills/unship/SKILL.md"), true);
+  assert.match(await readFile(join(cwd, ".cursor", "commands", "unship.md"), "utf8"), /Use the Unship skill/);
+  assert.match(await readFile(join(cwd, ".cursor", "rules", "unship.mdc"), "utf8"), /temporary local alternatives/);
+});
+
+test("init roo is explicit and writes Roo files", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const result = spawnSync(process.execPath, [CLI, "init", "--target", "roo", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(join(cwd, ".roo", "skills", "unship", "SKILL.md"), "utf8"), /name: unship/);
+  assert.match(await readFile(join(cwd, ".roo", "commands", "unship.md"), "utf8"), /Compare temporary local alternatives/);
+});
+
+test("check stays clean after generated repo-local harness instructions", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const initAll = spawnSync(process.execPath, [CLI, "init", "--target", "all", "--json"], { cwd, encoding: "utf8" });
+  const initRoo = spawnSync(process.execPath, [CLI, "init", "--target", "roo", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(initAll.status, 0, initAll.stderr);
+  assert.equal(initRoo.status, 0, initRoo.stderr);
+
+  const result = spawnSync(process.execPath, [CLI, "check", "--json"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, true);
+  assert.deepEqual(json.diagnostics, []);
 });
 
 test("init does not overwrite without force", async () => {
@@ -444,6 +648,10 @@ test("README documents local trust and unship troubleshooting", async () => {
   assert.match(readme, /install --repair/);
   assert.match(readme, /Natural language still works/i);
   assert.match(readme, /install --print-skill/);
+  assert.match(readme, /Agent-assisted install/);
+  assert.match(readme, /install --dry-run/);
+  assert.match(readme, /install cursor gemini/);
+  assert.match(readme, /repo-local/);
 });
 
 test("unknown commands fail instead of printing help as success", () => {
@@ -453,6 +661,19 @@ test("unknown commands fail instead of printing help as success", () => {
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, false);
   assert.match(json.error, /Unknown command: next/);
+});
+
+test("unknown legacy setup flags fail without a stack trace", () => {
+  for (const flag of ["--scope", "--wizard", "--detect"]) {
+    const result = spawnSync(process.execPath, [CLI, "install", flag, "--json"], { encoding: "utf8" });
+
+    assert.equal(result.status, 1);
+    const json = JSON.parse(result.stdout);
+    assert.equal(json.ok, false);
+    assert.match(json.error, new RegExp(`Unknown flag: ${flag}`));
+    assert.equal(result.stderr, "");
+    assert.doesNotMatch(result.stdout, /Error:/);
+  }
 });
 
 test("snippet prints local picker script", () => {
@@ -609,6 +830,19 @@ test("doctor reports package, project setup state, and residue", async () => {
   assert.equal(json.project.devMountFound, true);
   assert.equal(json.residue.ok, false);
   assert.equal(json.residue.diagnostics.some((item) => item.file === "app/page.tsx"), true);
+});
+
+test("doctor treats Gemini skill as installed project instruction", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  await writeFixture(join(cwd, ".gemini", "skills", "unship", "SKILL.md"), "---\nname: unship\n---\nstale\n");
+
+  const result = spawnSync(process.execPath, [CLI, "doctor", "--json", "--no-update-check"], { cwd, encoding: "utf8" });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.project.skillInstalled, true);
+  assert.equal(json.project.skillFile, ".gemini/skills/unship/SKILL.md");
+  assert.equal(json.project.skillCurrent, false);
 });
 
 test("doctor json can disable update checks", async () => {
@@ -817,4 +1051,17 @@ test("check --readiness exits zero for uncertain-only results", async () => {
   assert.equal(result.status, 0);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.status, "uncertain");
+});
+
+test("install detects Codex alongside other agent homes", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "unship-cli-"));
+  const home = join(cwd, "home");
+  await mkdir(join(home, ".codex"), { recursive: true });
+  await mkdir(join(home, ".claude"), { recursive: true });
+  const result = await runCliWithHome(["install", "--dry-run", "--json"], cwd, home);
+  assert.equal(result.status, 0, result.stderr);
+  const plan = JSON.parse(result.stdout);
+  assert.deepEqual(plan.harnesses.map(h => h.id), ["agents", "claude"]);
+  assert.equal(plan.harnesses[0].detected, true);
+  assert.equal(plan.harnesses[0].fallback, false);
 });
