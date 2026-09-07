@@ -1,0 +1,29 @@
+name: Bug or workflow problem
+description: A picker bug, agent mistake, or unclear instruction.
+labels: [bug]
+body:
+  - type: input
+    id: context
+    attributes:
+      label: Your setup
+      placeholder: "Codex, Astro, Chrome on macOS; Unship 0.2.0"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you try?
+      description: Include the prompt or steps needed to reproduce it.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or relevant output
+      description: Optional. Remove private project details before sharing.

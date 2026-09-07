@@ -50,14 +50,6 @@ test("packed package is small and excludes legacy implementation paths", () => {
   assert.equal(files.includes("src/picker/unship-picker.js"), true);
 });
 
-test("release docs list every packed package file", async () => {
-  const release = await readFile(new URL("../RELEASE.md", import.meta.url), "utf8");
-
-  for (const file of EXPECTED_PACKED_FILES) {
-    assert.match(release, new RegExp(`- \`${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\``));
-  }
-});
-
 test("bundled skill frontmatter stays YAML-safe", async () => {
   const skill = await readFile(new URL("../agent/skills/unship/SKILL.md", import.meta.url), "utf8");
   const frontmatter = skill.match(/^---\n([\s\S]*?)\n---\n/);

@@ -1,50 +1,43 @@
 # Contributing
 
-Thanks for helping improve Unship.
-
-## Development
-
 ```bash
 npm ci
 npx playwright install chromium
 npm run verify
 ```
 
-Unship is intentionally small. Prefer direct code, no runtime dependencies, and tests that cover agent-facing behavior.
+Run `npm run demo` and open <http://127.0.0.1:4173>. The playground serves the current picker; refresh after edits. `/canvas` is the focused Canvas fixture. Set `PORT` to use another port.
 
-## Interactive Playground
+## Structure
 
-Run `npm run demo` and open `http://127.0.0.1:4173`. Set `PORT` to use a different port. The server binds to loopback only and serves the current checkout's picker without caching; refresh after edits.
+- `src/` — CLI, setup, installation, checks, and the injected picker.
+- `agent/` — bundled agent instructions.
+- `plugin/` — Claude Code skill distribution; keep its skill identical to `agent/skills/unship/SKILL.md`.
+- `test/` — behavior and package tests.
+- `e2e/` — browser checks and local preview fixtures; excluded from npm.
 
-The mock Fieldwork workspace covers Welcome variants, Activity states, and a single-option Note card. Compare options, switch groups, open Canvas, copy a keep instruction, drag, and minimize. The textarea lets you inspect clipboard output. Reload resets choices, while toolbar placement remains local.
-
-Open Canvas from the picker to compare all directions at once. Welcome uses a responsive matrix; Activity and Note card use grids. The focused Canvas fixture is available at `/canvas`.
-
-The fixture and server live in `e2e/` and are excluded from the npm package.
-
-## Local Package Testing
-
-Do not use the public registry as the source of truth while developing locally.
+## Test the local build
 
 ```bash
-mkdir -p /tmp/unship-pack
-npm pack --pack-destination /tmp/unship-pack
-
-cd /path/to/consuming-app
-npm install -D /tmp/unship-pack/unship-cli-*.tgz
-./node_modules/.bin/unship doctor --json
-./node_modules/.bin/unship install cursor gemini --dry-run --json
-./node_modules/.bin/unship init --force --json
-./node_modules/.bin/unship setup --json
+npm pack
+npm install -g ./unship-cli-0.2.0.tgz
+unship install --repair --yes --no-project
 ```
 
-## Pull Requests
+Before the global install, verify that the existing `unship` executable belongs to `@unship/cli`; preserve unrelated tools using that name. Reload the agent's skill afterward. Use this installed build throughout local testing.
 
-- Keep preview tooling local and temporary.
-- Treat `agent/skills/unship/SKILL.md` as product surface.
-- Add or update tests for CLI output, generated instructions, setup behavior, scanner behavior, and picker behavior when relevant.
-- Run `npm run verify` before asking for review.
+In a consuming app, prepare the runtime at its existing served path:
 
-## Release Changes
+```bash
+unship setup --out public/unship-picker.js --src /unship-picker.js --json
+```
 
-For release process details, see `RELEASE.md`.
+These paths are examples. Setup returns the dev-only script tag to mount once. Identical files are unchanged; differing files require `--force` and receive a backup. For embedded HTML use `setup --inline --json`. Reload or rebuild the actual preview after an update.
+
+Compare, iterate, choose, and clean up in a real app. Verify final cleanup with `unship check --json` and the app's build. Preserve recovery backups and unrelated changes.
+
+## Changes
+
+Prefer direct code and tests of observable behavior. Keep runtime dependencies at zero unless a concrete need justifies one. Treat the installed skill as part of the product and test instruction changes through realistic agent requests.
+
+Run `npm run verify` before review. See [release instructions](.github/RELEASING.md) for publishing and [terminology](CONTEXT.md) for shared names.

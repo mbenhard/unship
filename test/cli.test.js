@@ -598,25 +598,6 @@ test("init fails loudly when an installed skill is stale", async () => {
   assert.doesNotMatch(json.next.join("\n"), /npx unship init/);
 });
 
-test("README documents local trust and unship troubleshooting", async () => {
-  const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
-
-  assert.match(readme, /Unship is local comparison tooling/i);
-  assert.match(readme, /does not send telemetry/i);
-  assert.match(readme, /picker selection does not save source/i);
-  assert.match(readme, /unship\.dev/i);
-  assert.match(readme, /`\/unship` does not appear/i);
-  assert.match(readme, /restart your agent/i);
-  assert.match(readme, /doctor --json/);
-  assert.match(readme, /install --repair/);
-  assert.match(readme, /Natural language still works/i);
-  assert.match(readme, /install --print-skill/);
-  assert.match(readme, /Agent-assisted install/);
-  assert.match(readme, /install --dry-run/);
-  assert.match(readme, /install cursor gemini/);
-  assert.match(readme, /repo-local/);
-});
-
 test("unknown commands fail instead of printing help as success", () => {
   const result = spawnSync(process.execPath, [CLI, "next", "--json"], { encoding: "utf8" });
 

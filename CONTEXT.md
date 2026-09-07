@@ -1,36 +1,9 @@
-# Unship
+# Terminology
 
-Unship helps a person make temporary visual decisions among agent-created alternatives in a local product surface.
-
-## Language
-
-**Exploration**:
-A temporary visual decision task that may contain one or more Groups.
-_Avoid_: Session, project
-
-**Group**:
-A named comparison target within an Exploration, such as a header, hero, or footer. A Group contains one or more Options.
-_Avoid_: Exploration
-
-**Canvas**:
-A comparison mode that presents options simultaneously for visual judgment. It is not a freeform editor, feedback board, or shareable artifact.
-_Avoid_: Workspace, board
-
-**Option**:
-A candidate direction within a visual comparison.
-_Avoid_: Version, variation
-
-**Keep action**:
-A deliberate action that copies an instruction identifying the Option to retain. It does not itself change source or persist a product decision.
-_Avoid_: Save, commit
-
-**Arrangement**:
-The agent-selected spatial presentation of a Group's Options on Canvas, adapted to the available screen and the Options' proportions.
-_Avoid_: Lens, view mode
-
-**Responsive Matrix**:
-A Canvas presentation that renders Options at multiple target viewport sizes for simultaneous comparison.
-
-**Frame**:
-An isolated Canvas rendering of one Option at one target viewport width.
-_Avoid_: Card, artboard
+- **Exploration** — one temporary comparison task, containing one or more groups.
+- **Group** — a named target such as a hero or pricing card, containing options.
+- **Option** — one candidate direction.
+- **Canvas** — simultaneous comparison on a zoomable surface.
+- **Arrangement** — the agent-selected presentation: stack, grid, or responsive matrix.
+- **Frame** — a Canvas rendering of one option at one viewport width.
+- **Keep** — copy an instruction identifying the chosen option. The agent applies it to source after the user pastes or confirms the choice.
