@@ -94,7 +94,7 @@ Hand off the group and visible option labels, readiness checks, and whether runt
 
 When the user chooses, keep that option's real source, remove the losing options and `data-unship-*` attributes for that group. Keep the mount while other comparisons remain. If labels or “the second one” are ambiguous across groups or edits, clarify before deleting alternatives.
 
-For final cleanup, remove all temporary options, attributes, comments, script mounts, and unused picker files, including custom-named copies. Follow choices already supplied; do not choose a winner on the user's behalf. Run:
+For final cleanup, remove all temporary options, attributes, comments, script mounts, and unused picker files, including custom-named copies. Preserve recovery backups in `.unship/backups/` and pre-existing ignore rules; they are not comparison residue and do not need removal for a clean check or build. Do not delete the whole `.unship` directory as a cleanup shortcut. Follow choices already supplied; do not choose a winner on the user's behalf. Run:
 
 ```bash
 $UNSHIP check --json
