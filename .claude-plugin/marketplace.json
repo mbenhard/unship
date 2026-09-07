@@ -9,7 +9,7 @@
       "name": "unship",
       "displayName": "Unship",
       "source": "./plugin",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "description": "Tiny local picker for comparing agent-made alternatives in real source.",
       "author": { "name": "Marcus Benhard" },
       "homepage": "https://github.com/mbenhard/unship#readme",

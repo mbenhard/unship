@@ -2,8 +2,12 @@
 
 All notable changes to Unship are documented here.
 
-## Unreleased
+## 0.2.0 - Unreleased
 
+- Wait for group-menu transitions in browser checks and close the browser even when the selection assertion fails.
+- Skip malformed tuning control definitions without breaking the picker, preserve zero as a numeric slider maximum, and expose swatch and segmented selection state to assistive technology.
+- Teach the bundled skill to author and settle tuning controls, run focused readiness checks, and prefer a verified local CLI for unpublished project testing.
+- Add a local mock workspace playground (`npm run demo`) covering variants, product states, and tuning-only exploration; keep it out of the published package.
 - Add tunable axes to the picker: options and groups can declare `data-unship-tweaks` controls (numeric and token-stepped sliders, toggles, segmented controls, color swatches) bound to CSS custom properties, with per-option value memory, first-touch default capture, click-readout reset, a modified indicator, and keep instructions that carry every current value. Groups with a single option render as tweak-only calibration docks.
 - Rework the toolbar into capability slots: the option counter sits beside the option label in every mode, chevrons render only when there is more than one option and mirror the label, the tune button anchors to the row edge behind a hairline divider, the group header gains a menu caret, and the tune panel morphs its height when axis composition changes across options or groups.
 - Add `unship check --readiness`: best-effort static verification of Unship comparison structure and tweak-axis declarations (`data-unship-tweaks`), with `pass`/`fail`/`uncertain` status so templated markup degrades to manual verification instead of false verdicts. The scanner ignores HTML comments and script bodies, treats Vue/Alpine/Angular visibility directives and Svelte control-flow blocks as dynamic, and stays linear-time on large instrumented files.

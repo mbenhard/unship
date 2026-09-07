@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Unship playground · Fieldwork</title>
+  <style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #252a25; background: #f6f7f3; font-size: 14px; }
+    body { margin: 0; }
+    button, input, textarea { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 4px; }
+    :focus-visible { outline: 2px solid #386344; outline-offset: 5px; }
+    .test-banner { min-height: 42px; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 28px; background: #263d30; color: #f3f7ef; font-size: 12px; }
+    .test-banner b { margin-right: 10px; }
+    .test-banner span { opacity: .8; }
+    .app { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: calc(100vh - 42px); }
+    aside { padding: 30px 20px; border-right: 1px solid #e1e5dd; display: flex; flex-direction: column; gap: 30px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 650; letter-spacing: -.7px; padding: 0 8px; }
+    .brand-mark { font-size: 32px; line-height: 1; color: #45694c; }
+    .workspace { border: 1px solid #dfe4d9; padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 10px; background: #fff9; }
+    .avatar { width: 28px; height: 28px; display: inline-grid; place-items: center; background: #e0e6d8; color: #38543d; border-radius: 50%; font-size: 11px; font-weight: 600; }
+    .workspace small { display: block; color: #737d70; margin-top: 2px; }
+    .sidebar-nav { display: grid; gap: 6px; }
+    .sidebar-nav a { padding: 11px 12px; border-radius: 6px; color: #697264; }
+    .sidebar-nav a:first-child { background: #e8edde; color: #2f4d36; font-weight: 600; }
+    .sidebar-nav a span { margin-right: 10px; }
+    .sidebar-bottom { margin-top: auto; color: #74806f; font-size: 12px; padding: 8px; line-height: 1.7; }
+    .main { max-width: 1390px; width: 100%; padding: 26px 48px 120px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 34px; font-size: 12px; color: #75816e; }
+    .topline .avatar { margin-left: 12px; }
+    .hero { border: 1px solid #dce3d3; border-radius: 12px; overflow: hidden; background: #eef2e7; }
+    .hero-option { padding: var(--hero-pad) clamp(24px, 4vw, 46px); color: var(--ink); }
+    .eyebrow { display: var(--eyebrow); margin-bottom: 17px; font-size: 12px; color: inherit; opacity: .75; }
+    h1 { font-size: clamp(30px, 3.5vw, 48px); font-weight: 520; letter-spacing: -1.8px; line-height: 1.1; margin: 0 0 18px; }
+    .hero p { max-width: 470px; line-height: 1.65; opacity: .8; margin: 0; }
+    .hero-row { display: flex; justify-content: space-between; align-items: end; gap: 24px; }
+    .primary { display: inline-flex; white-space: nowrap; align-items: center; justify-content: center; gap: 24px; padding: 13px 18px; border: 0; border-radius: 6px; color: white; background: var(--ink, #36553e); font-size: 13px; font-weight: 500; }
+    .primary:hover { filter: brightness(1.1); text-decoration: none; }
+    .editorial { background: #eee8dc; }
+    .editorial h1 { font-family: Georgia, serif; font-weight: 400; letter-spacing: -1.6px; max-width: 530px; }
+    .editorial .hero-row { align-items: center; }
+    .momentum { background: #e9edf3; }
+    .momentum .hero-row { align-items: center; }
+    .metric { flex: 0 0 130px; border-left: 1px solid #bcc8d4; padding-left: 24px; }
+    .metric strong { font-size: 58px; line-height: 1; font-weight: 450; letter-spacing: -3px; }
+    .metric span { display: block; font-size: 12px; margin-top: 9px; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 32px 0 15px; }
+    h2 { font-size: 16px; font-weight: 600; letter-spacing: -.35px; margin: 0; }
+    .section-heading small { color: #788271; font-size: 12px; }
+    .project-list { border-top: 1px solid #dfe4d8; }
+    .project { display: grid; grid-template-columns: 44px minmax(0, 1fr) 110px 70px; align-items: center; gap: 14px; padding: 19px 0; border-bottom: 1px solid #e1e5dc; }
+    .project-symbol { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9px; background: #e6ebdf; font-family: Georgia, serif; font-size: 22px; }
+    .project:nth-child(2) .project-symbol { background: #ebe4d9; }
+    .project:nth-child(3) .project-symbol { background: #e1e7ed; }
+    .project strong { display: block; font-size: 13px; font-weight: 550; }
+    .project small { display: block; color: #7f8878; margin-top: 5px; font-size: 11px; }
+    .status { font-size: 11px; color: #50754d; }
+    .status.review { color: #96752f; }
+    .due { color: #808878; font-size: 12px; text-align: right; }
+    .lower { display: grid; grid-template-columns: 1.12fr 1fr; gap: 24px; margin-top: 30px; }
+    .lower h2 { margin-bottom: 15px; }
+    .activity, .card { min-height: 226px; padding: 24px; border: 1px solid #e0e4da; border-radius: 10px; background: #fcfcfa; }
+    .activity-item { display: flex; align-items: start; gap: 10px; padding: 10px 0; font-size: 12px; line-height: 1.5; }
+    .activity-item:first-child { padding-top: 0; }
+    .activity-item small { display: block; color: #87907e; margin-top: 3px; }
+    .empty { display: flex; align-items: center; justify-content: center; text-align: center; flex-direction: column; color: #65755f; }
+    .empty p { max-width: 240px; font-size: 12px; line-height: 1.7; }
+    .empty strong { font-size: 16px; font-weight: 500; }
+    .error { background: #fff8f3; color: #8d5234; border-color: #eadbcf; }
+    .card { padding: var(--card-pad); border-radius: var(--radius); text-align: var(--align); }
+    .card .note { font-size: 11px; color: var(--accent); margin-bottom: 17px; }
+    .card h3 { font-size: 21px; margin: 0 0 12px; font-weight: 500; letter-spacing: -.6px; }
+    .card p { color: #7a8272; line-height: 1.65; font-size: 12px; margin: 0 0 22px; }
+    .card a { color: var(--accent); font-size: 12px; font-weight: 600; }
+    .test-guide { border-top: 1px solid #dee3d5; margin-top: 44px; padding-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; font-size: 12px; color: #727e68; line-height: 1.7; }
+    .test-guide h2 { color: #3b4d34; margin-bottom: 10px; }
+    .test-guide ol { padding-left: 18px; margin: 0; }
+    .test-guide textarea { width: 100%; min-height: 105px; resize: vertical; padding: 12px; border: 1px solid #d5ddcc; background: #fff; color: #344d30; border-radius: 7px; font-size: 12px; }
+    .test-guide label { display: block; margin-bottom: 8px; }
+    @media(max-width:1000px) { .main { padding: 26px 28px 140px; } .app { grid-template-columns: 180px minmax(0,1fr); } .hero-row { flex-direction: column; align-items: start; } .hero-row .metric { display: none; } .lower { grid-template-columns: 1fr; } }
+    @media(max-width:640px) { .test-banner { padding: 10px 18px; } .test-banner span { display: none; } .app { display: block; } aside { padding: 16px 20px; border-right: 0; border-bottom: 1px solid #e1e5dd; } aside > :not(.brand) { display: none; } .main { padding: 22px 18px 180px; } .topline { margin-bottom: 24px; } .hero-option { padding: 28px 24px; } .project { grid-template-columns: 36px minmax(0,1fr) 70px; gap: 10px; } .project .status { display: none; } .test-guide { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="test-banner"><div><b>Unship __UNSHIP_VERSION__</b> Local playground</div><span>Mock workspace · use the floating picker to explore</span><a href="#try-it">How to test ↗</a></div>
+  <div class="app">
+    <aside>
+      <a class="brand" href="#"><span class="brand-mark">✳</span> Fieldwork</a>
+      <div class="workspace"><span class="avatar">S</span><div>Studio workspace<small>Personal plan</small></div></div>
+      <nav class="sidebar-nav" aria-label="Workspace"><a href="#overview"><span>◫</span> Overview</a><a href="#projects"><span>▧</span> Projects</a><a href="#activity"><span>◷</span> Activity</a><a href="#notes"><span>▤</span> Notes</a></nav>
+      <div class="sidebar-bottom">A little room for<br>your next good idea.</div>
+    </aside>
+    <main class="main" id="overview">
+      <div class="topline"><span>Workspace / Overview</span><span>Monday, September 7 <span class="avatar">MB</span></span></div>
+      <section class="hero" data-unship-pick="Welcome" style="--hero-pad: 40px;" data-unship-tweaks='[{"type":"slider","label":"Breathing room","var":"--hero-pad","min":24,"max":64,"step":4,"unit":"px"}]'>
+        <div class="hero-option" data-unship-option="Quiet start" style="--ink: #36553e; --eyebrow: block;" data-unship-tweaks='[{"type":"swatch","label":"Ink","var":"--ink","options":[{"label":"Fern","value":"#36553e"},{"label":"Slate","value":"#34465e"},{"label":"Clay","value":"#86513e"}]},{"type":"toggle","label":"Greeting","var":"--eyebrow","on":"block","off":"none"}]'>
+          <div class="eyebrow">GOOD MORNING, MARCUS</div>
+          <h1>Make room for<br>your best work.</h1>
+          <div class="hero-row"><p>Three projects in motion. A clear week ahead.<br>Pick up where the good ideas left off.</p><a class="primary" href="#projects">See your projects <span>↗</span></a></div>
+        </div>
+        <div class="hero-option editorial" data-unship-option="Studio journal" hidden style="--ink: #6a4b37; --eyebrow: block;" data-unship-tweaks='[{"type":"swatch","label":"Ink","var":"--ink","options":[{"label":"Umber","value":"#6a4b37"},{"label":"Fern","value":"#36553e"}]},{"type":"toggle","label":"Greeting","var":"--eyebrow","on":"block","off":"none"}]'>
+          <div class="eyebrow">FROM YOUR STUDIO</div>
+          <h1>A good week starts<br>with a little space.</h1>
+          <div class="hero-row"><p>Keep the big picture close and the next step simple. Your work is right where you left it.</p><a class="primary" href="#projects">Open the journal <span>↗</span></a></div>
+        </div>
+        <div class="hero-option momentum" data-unship-option="In motion" hidden style="--ink: #34465e; --eyebrow: block;" data-unship-tweaks='[{"type":"swatch","label":"Ink","var":"--ink","options":[{"label":"Slate","value":"#34465e"},{"label":"Fern","value":"#36553e"}]}]'>
+          <div class="eyebrow">THIS WEEK AT A GLANCE</div>
+          <div class="hero-row"><div><h1>Less keeping track.<br>More moving forward.</h1><p>The next milestone is closer than you think.<br>Three projects, one place to keep them moving.</p></div><div class="metric"><strong>3</strong><span>projects in motion</span></div></div>
+        </div>
+      </section>
+      <section id="projects">
+        <div class="section-heading"><h2>Your projects</h2><small>3 active projects</small></div>
+        <div class="project-list">
+          <div class="project"><div class="project-symbol">f</div><div><strong>Fieldwork identity</strong><small>Brand direction · 8 notes</small></div><span class="status">In progress</span><span class="due">Sep 12</span></div>
+          <div class="project"><div class="project-symbol">a</div><div><strong>Atelier website</strong><small>Web design · 12 notes</small></div><span class="status review">In review</span><span class="due">Sep 16</span></div>
+          <div class="project"><div class="project-symbol">m</div><div><strong>Monday newsletter</strong><small>Editorial · 4 notes</small></div><span class="status">In progress</span><span class="due">Sep 21</span></div>
+        </div>
+      </section>
+      <div class="lower">
+        <section id="activity"><h2>Recent activity</h2>
+          <div data-unship-pick="Activity">
+            <div class="activity" data-unship-option="Populated"><div class="activity-item"><span class="avatar">EL</span><div><b>Elena</b> added a new brand direction<small>Fieldwork identity · 24 minutes ago</small></div></div><div class="activity-item"><span class="avatar">MB</span><div><b>You</b> finished the homepage draft<small>Atelier website · 2 hours ago</small></div></div><div class="activity-item"><span class="avatar">JL</span><div><b>Jules</b> left a note on the opening story<small>Monday newsletter · Yesterday</small></div></div></div>
+            <div class="activity empty" data-unship-option="Empty" hidden><strong>A fresh page.</strong><p>Activity will appear here as your projects take shape. Start with a note or an idea.</p><a href="#notes">Write your first note ↗</a></div>
+            <div class="activity empty error" data-unship-option="Offline" hidden><strong>Activity is taking a break.</strong><p>We couldn’t load recent updates. Your projects are still here. Try again when you’re connected.</p><small>Preview of an offline state</small></div>
+          </div>
+        </section>
+        <section id="notes"><h2>A little inspiration</h2>
+          <div data-unship-pick="Note card">
+            <div class="card" data-unship-option="Current" style="--card-pad: 24px; --radius: 12px; --align: left; --accent: #36553e;" data-unship-tweaks='[{"type":"slider","label":"Spacing","var":"--card-pad","steps":[{"label":"Tight","value":"16px"},{"label":"Balanced","value":"24px"},{"label":"Airy","value":"36px"}]},{"type":"slider","label":"Corners","var":"--radius","min":0,"max":32,"step":4,"unit":"px"},{"type":"segmented","label":"Alignment","var":"--align","options":[{"label":"Left","value":"left"},{"label":"Center","value":"center"}]},{"type":"swatch","label":"Accent","var":"--accent","options":[{"label":"Fern","value":"#36553e"},{"label":"Clay","value":"#86513e"},{"label":"Slate","value":"#34465e"}]}]'>
+              <div class="note">FROM THE NOTEBOOK</div><h3>Leave something unfinished.</h3><p>A loose end can be an invitation.<br>Give tomorrow’s self a place to begin.</p><a href="#try-it">Make a note for later ↗</a>
+            </div>
+          </div>
+        </section>
+      </div>
+      <section class="test-guide" id="try-it">
+        <div><h2>Try the current Unship</h2><ol><li>Use the chevrons to compare the three Welcome directions.</li><li>Open Tune and change ink, greeting, or breathing room.</li><li>Use the group menu to try Activity and Note card.</li><li>Hold the option label to copy your choice. Paste it here or in Codex.</li><li>Drag the label to move the picker; double-click to minimize.</li></ol></div>
+        <div><label for="keep-note">Test the copied keep instruction</label><textarea id="keep-note" placeholder="Paste here to inspect the instruction. Nothing is sent or saved."></textarea><small>Tab to the label + Enter also copies. Reload resets variants and tuning; the picker remembers its position.</small></div>
+      </section>
+    </main>
+  </div>
+  <script src="/unship-picker.js" data-unship-dev></script>
+</body>
+</html>

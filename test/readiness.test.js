@@ -567,3 +567,11 @@ test("checkUnshipReadiness keeps pass status when only notes are present", async
   assert.equal(result.status, "pass");
   assert.equal(result.summary.noteCount, 1);
 });
+
+test("readiness rejects unusable numeric slider steps and units", () => {
+  for (const extra of [{ step: 0 }, { step: -1 }, { step: "2" }, { unit: {} }]) {
+    const axis = { type: "slider", label: "Offset", var: "--offset", min: -20, max: 0, ...extra };
+    const groups = scanReadiness("preview.html", `<section data-unship-pick="Offset"><div data-unship-option="Current" style="--offset: -8px;" data-unship-tweaks='${JSON.stringify([axis])}'>Card</div></section>`);
+    assert.deepEqual(groups[0].findings.map((finding) => finding.code), ["axis-shape"]);
+  }
+});

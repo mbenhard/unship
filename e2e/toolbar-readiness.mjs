@@ -122,7 +122,7 @@ try {
   await assertToolbarQuality(page, { viewportWidth: 1280, viewportHeight: 800, menuOpen: true });
 
   await page.getByRole("menuitem", { name: /pricing panel/i }).click();
-  await assert.equal((await state(page)).activeGroupIndex, 1);
+  await page.waitForFunction(() => window.__unshipPicker.getState().activeGroupIndex === 1);
   await page.getByRole("button", { name: /previous option/i }).click();
   await assertVisibleOption(page, "Pricing Panel", "Detailed");
 

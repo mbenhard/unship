@@ -190,8 +190,9 @@ test("picker survives removing the selected option during rescan", async () => {
   await browser.close();
 });
 
-test("picker group button opens a menu for choosing groups", async () => {
+test("picker group button opens a menu for choosing groups", async (t) => {
   const browser = await chromium.launch();
+  t.after(() => browser.close());
   const page = await browser.newPage();
   await page.setContent(`
     <section data-unship-pick="Hero">
@@ -208,7 +209,7 @@ test("picker group button opens a menu for choosing groups", async () => {
   await page.getByRole("menuitem", { name: /Active group Hero/ }).click();
   await page.getByRole("menuitem", { name: /Pricing, Simple/ }).waitFor({ state: "visible" });
   await page.getByRole("menuitem", { name: /Pricing, Simple/ }).click();
-  assert.equal((await page.evaluate(() => window.__unshipPicker.getState())).activeGroupIndex, 1);
+  await page.waitForFunction(() => window.__unshipPicker.getState().activeGroupIndex === 1);
   await browser.close();
 });
 

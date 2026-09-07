@@ -196,9 +196,13 @@ test("picking a group from the open menu keeps the collapse morph and refreshes 
     const host = page.locator("css=[data-unship-toolbar]");
 
     await host.evaluate((h) => h.shadowRoot.querySelector(".menuitem.current").click());
-    const menuBefore = await host.evaluate((h) => h.shadowRoot.querySelector(".menu"));
+    const menuBefore = await host.locator(".menu").elementHandle();
     await host.evaluate((h) => h.shadowRoot.querySelector('.menuitem[data-action="pick-group"]').click());
 
+    // The old surface survives while the menu collapses; the group changes
+    // only after that transition has finished.
+    assert.equal(await menuBefore.evaluate((menu) => menu.isConnected), true);
+    await page.waitForFunction(() => window.__unshipPicker.getState().activeGroupIndex === 1);
     const state = await host.evaluate((h) => {
       const root = h.shadowRoot;
       return {
@@ -312,4 +316,71 @@ test("multi-group mode shows the option counter beside the label with a header c
   } finally {
     await browser.close();
   }
+});
+
+test("invalid control shapes are skipped while valid axes and navigation still work", async () => {
+  await withPage(async (page) => {
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.evaluate(() => {
+      const option = document.querySelector('[data-unship-option="Essential"]');
+      option.setAttribute("data-unship-tweaks", JSON.stringify([
+        { type: "swatch", var: "--bad", options: {} },
+        { type: "segmented", var: "--bad", options: [null, { label: "B", value: "1" }] },
+        { type: "slider", var: "--bad", steps: [null, null] },
+        { type: "slider", var: "--bad", min: 0, max: 10, steps: [] },
+        { type: "slider", var: "--bad", min: 0, max: 10, step: -1 },
+        { type: "toggle", var: "--bad", on: {} },
+        { type: "slider", label: "Gap", var: "--gap", min: 8, max: 48, step: 4, unit: "px" }
+      ]));
+      window.__unshipPicker.rescan();
+    });
+    await page.getByRole("button", { name: "Tune Hero", exact: true }).click();
+    assert.deepEqual(await shadow(page).locator(".tweak-name").allTextContents(), ["Gap", "Padding"]);
+    await page.getByRole("button", { name: "Next option" }).click();
+    assert.equal(await page.evaluate(() => window.__unshipPicker.getState().groups[0].activeOptionIndex), 1);
+    assert.deepEqual(errors, []);
+  });
+});
+
+test("numeric sliders preserve a zero maximum", async () => {
+  await withPage(async (page) => {
+    await page.evaluate(() => {
+      const option = document.querySelector('[data-unship-option="Essential"]');
+      option.style.setProperty("--offset", "-8px");
+      option.setAttribute("data-unship-tweaks", JSON.stringify([
+        { type: "slider", label: "Offset", var: "--offset", min: -20, max: 0, step: 2, unit: "px" }
+      ]));
+      window.__unshipPicker.rescan();
+    });
+    await page.getByRole("button", { name: "Tune Hero", exact: true }).click();
+    const slider = page.getByRole("slider", { name: "Offset" });
+    assert.equal(await slider.getAttribute("max"), "0");
+    await slider.focus();
+    await page.keyboard.press("End");
+    assert.equal(await page.evaluate(() => document.querySelector('[data-unship-option="Essential"]').style.getPropertyValue("--offset")), "0px");
+  });
+});
+
+test("choice controls expose their selected state to assistive technology", async () => {
+  await withPage(async (page) => {
+    await page.evaluate(() => {
+      const option = document.querySelector('[data-unship-option="Essential"]');
+      const axes = JSON.parse(option.getAttribute("data-unship-tweaks"));
+      option.style.setProperty("--align", "left");
+      axes.push({ type: "segmented", label: "Alignment", var: "--align", options: [
+        { label: "Left", value: "left" }, { label: "Center", value: "center" }
+      ] });
+      option.setAttribute("data-unship-tweaks", JSON.stringify(axes));
+      window.__unshipPicker.rescan();
+    });
+    await page.getByRole("button", { name: "Tune Hero", exact: true }).click();
+    assert.equal(await page.getByRole("button", { name: "Accent: Sky", exact: true }).getAttribute("aria-pressed"), "true");
+    await page.getByRole("button", { name: "Accent: Ember", exact: true }).click();
+    assert.equal(await page.getByRole("button", { name: "Accent: Sky", exact: true }).getAttribute("aria-pressed"), "false");
+    assert.equal(await page.getByRole("button", { name: "Accent: Ember", exact: true }).getAttribute("aria-pressed"), "true");
+    await page.getByRole("button", { name: "Alignment: Center", exact: true }).click();
+    assert.equal(await page.getByRole("button", { name: "Alignment: Center", exact: true }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByRole("button", { name: "Alignment: Left", exact: true }).getAttribute("aria-pressed"), "false");
+  });
 });

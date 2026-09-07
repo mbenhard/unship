@@ -568,7 +568,7 @@ test("long group menus scroll immediately while the active header stays pinned",
       const header = root.querySelector(".menuitem.current").getBoundingClientRect();
       const list = root.querySelector(".menu-list");
       return {
-        headerTop: header.top,
+        headerTop: header.top - root.querySelector(".dock").getBoundingClientRect().top,
         scrollTop: list.scrollTop,
         scrollable: list.scrollHeight > list.clientHeight,
         overflowBelow: list.classList.contains("overflow-below")
@@ -589,7 +589,7 @@ test("long group menus scroll immediately while the active header stays pinned",
       const header = root.querySelector(".menuitem.current").getBoundingClientRect();
       const list = root.querySelector(".menu-list");
       return {
-        headerTop: header.top,
+        headerTop: header.top - root.querySelector(".dock").getBoundingClientRect().top,
         scrollTop: list.scrollTop,
         overflowAbove: list.classList.contains("overflow-above")
       };
@@ -599,7 +599,9 @@ test("long group menus scroll immediately while the active header stays pinned",
     assert.equal(before.scrollable, true);
     assert.equal(before.overflowBelow, true);
     assert.equal(after.scrollTop > 0, true);
-    assert.equal(after.headerTop, before.headerTop);
+    // Opening a bottom-anchored dock moves the whole dock. Scrolling must
+    // preserve the header position within it, including during that morph.
+    assert.ok(Math.abs(after.headerTop - before.headerTop) < 1);
     assert.equal(after.overflowAbove, true);
   } finally {
     await browser.close();

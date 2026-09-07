@@ -41,6 +41,27 @@ The package should publish only these files:
 
 The `files` array in `package.json` and `test/package-smoke.test.js` enforce this. The Claude Code plugin files in `.claude-plugin/` and `plugin/` stay out of the tarball; when bumping the package version, bump the `version` fields in `plugin/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` to match, and refresh `plugin/skills/unship/SKILL.md` whenever the bundled skill changes. `test/plugin-manifest.test.js` enforces both.
 
+## Before Publishing: Local Dogfood
+
+The checkout version may be ahead of npm. Build a tarball from this checkout and use it for testing; `@latest` still runs the published release.
+
+```bash
+npm run demo
+npm pack
+```
+
+After reviewing the playground, inspect `command -v unship` and its resolved target before installing globally. If that name belongs to an older or unrelated tool, preserve its executable or symlink under a different name before installing; do not blindly overwrite it with `--force`. Install that exact tarball on the testing machine (replace the filename when the version changes):
+
+```bash
+npm install -g ./unship-cli-0.2.0.tgz
+unship install --repair --dry-run --json --no-project --no-update-check
+unship install --repair --yes --no-project --no-update-check
+```
+
+Restart Codex or Claude Code to reload the skill. The skill prefers the project's local CLI, then a verified global CLI, then the registry. Existing project-local packages take precedence: update those explicitly with `npm install -D /absolute/path/to/unship-cli-0.2.0.tgz`, refresh stale project instructions with `unship init --force`, and remount stale picker snippets only when needed. Run `doctor --json --no-update-check` inside each consuming app, not inside Unship's own source/tests where residue is intentional.
+
+Validate a real project from comparison through keep-instruction cleanup before publishing. The version bump and local installation do not publish a package or update npm dist-tags.
+
 ## GitHub
 
 Create the public repo when ready:

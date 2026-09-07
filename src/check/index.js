@@ -499,7 +499,9 @@ function validAxisShape(axis) {
     const hasRange = axis.min !== undefined || axis.max !== undefined;
     if (hasSteps === hasRange) return false;
     if (hasSteps) return Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(isLabeledValue);
-    return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min;
+    return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min &&
+      (axis.step === undefined || (Number.isFinite(axis.step) && axis.step > 0)) &&
+      (axis.unit === undefined || typeof axis.unit === "string");
   }
   if (axis.type === "segmented") {
     return Array.isArray(axis.options) && axis.options.length >= 2 && axis.options.length <= 4 && axis.options.every(isLabeledValue);

@@ -54,7 +54,7 @@
   const tweakValuesByKey = new Map();
 
   const api = {
-    version: "0.1.7",
+    version: "0.2.0",
     rescan,
     destroy,
     getState
@@ -499,8 +499,26 @@
         typeof axis === "object" &&
         typeof axis.var === "string" &&
         axis.var.startsWith("--") &&
-        ["slider", "segmented", "toggle", "swatch"].includes(axis.type)
+        validAxisShape(axis)
     );
+  }
+
+  function validAxisShape(axis) {
+    const labeled = (entry) => entry && typeof entry.label === "string" && typeof entry.value === "string";
+    if (axis.type === "slider") {
+      const hasSteps = axis.steps !== undefined;
+      const hasRange = axis.min !== undefined || axis.max !== undefined;
+      if (hasSteps === hasRange) return false;
+      if (hasSteps) return Array.isArray(axis.steps) && axis.steps.length >= 2 && axis.steps.every(labeled);
+      return Number.isFinite(axis.min) && Number.isFinite(axis.max) && axis.max > axis.min &&
+        (axis.step === undefined || (Number.isFinite(axis.step) && axis.step > 0)) &&
+        (axis.unit === undefined || typeof axis.unit === "string");
+    }
+    if (axis.type === "segmented" || axis.type === "swatch") {
+      return Array.isArray(axis.options) && axis.options.length >= 2 &&
+        (axis.type !== "segmented" || axis.options.length <= 4) && axis.options.every(labeled);
+    }
+    return axis.type === "toggle" && typeof axis.on === "string" && typeof axis.off === "string";
   }
 
   // Option axes first, shared group axes below — the panel mirrors this order.
@@ -613,8 +631,8 @@
     }
     if (axis.type === "slider") {
       const number = parseFloat(value);
-      const min = Number(axis.min) || 0;
-      const max = Number(axis.max) || 100;
+      const min = axis.min;
+      const max = axis.max;
       const current = Number.isFinite(number) ? number : min;
       const fill = max > min ? ((current - min) / (max - min)) * 100 : 0;
       return `<input class="tweak-range" type="range" min="${min}" max="${max}" step="${Number(axis.step) || 1}" value="${current}" data-axis="${index}" style="--fill:${fill}%" aria-label="${label}">`;
@@ -627,14 +645,14 @@
       return `<span class="tweak-swatches">${(axis.options || [])
         .map(
           (option, optionIndex) =>
-            `<button class="tweak-swatch${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" style="--swatch:${escapeHtml(option.value)}" aria-label="${label}: ${escapeHtml(option.label)}"></button>`
+            `<button class="tweak-swatch${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" style="--swatch:${escapeHtml(option.value)}" aria-pressed="${option.value === value}" aria-label="${label}: ${escapeHtml(option.label)}"></button>`
         )
         .join("")}</span>`;
     }
     return `<span class="tweak-seg">${(axis.options || [])
       .map(
         (option, optionIndex) =>
-          `<button class="tweak-seg-item${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}">${escapeHtml(option.label)}</button>`
+          `<button class="tweak-seg-item${option.value === value ? " selected" : ""}" type="button" data-action="pick-axis" data-axis="${index}" data-option="${optionIndex}" aria-pressed="${option.value === value}" aria-label="${label}: ${escapeHtml(option.label)}">${escapeHtml(option.label)}</button>`
       )
       .join("")}</span>`;
   }
@@ -725,8 +743,10 @@
       const choice = axis?.options?.[Number(button.dataset.option)];
       if (!group || !axis || !choice) return;
       setAxisValue(group, axis, choice.value);
-      button.parentElement?.querySelectorAll(".selected").forEach((item) => item.classList.remove("selected"));
-      button.classList.add("selected");
+      button.parentElement?.querySelectorAll("[data-action='pick-axis']").forEach((item) => {
+        item.classList.toggle("selected", item === button);
+        item.setAttribute("aria-pressed", String(item === button));
+      });
       refreshTuneIndicator();
     } else if (action === "reset-axis") {
       const group = groups[activeGroupIndex];

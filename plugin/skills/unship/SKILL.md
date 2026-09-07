@@ -36,9 +36,10 @@ Parse intent this way:
 Choose the CLI prefix only when a CLI command is needed:
 
 - If `./node_modules/.bin/unship` exists, use `./node_modules/.bin/unship`.
+- Otherwise, if `command -v unship` finds an executable, resolve its path and verify its owning npm package metadata names `@unship/cli` before using it. A matching binary name alone is insufficient: older or unrelated tools can also be named `unship`. This preserves a verified local development install before it is published.
 - Otherwise use `npx -y @unship/cli@latest` so npm does not stop for an install prompt.
 
-Use the chosen prefix as `$UNSHIP` for every CLI call in this project. Do not assume a bare `unship` binary is on PATH.
+Use the chosen prefix as `$UNSHIP` for every CLI call in this project. Check availability before using a global binary. When working on Unship itself (`package.json` names `@unship/cli`), use `node src/cli/index.js` to test the checkout instead of fetching the published package.
 
 For status checks during normal prototyping, prefer:
 
@@ -106,6 +107,38 @@ When these conflict, explain the tradeoff briefly and choose the smallest safe i
 ## Inline Mode Safety
 
 Inactive options must safely coexist in the DOM. Avoid duplicate active IDs, submit controls, global scripts, analytics triggers, autoplay media, focus traps, destructive side effects, and stateful providers. If unsafe, reduce scope or explain that inline mode is not suitable.
+
+## Tuning Existing UI or Variants
+
+When the user asks to tune or calibrate an existing design, or a few continuous adjustments would help compare options, add a small set of meaningful `data-unship-tweaks` axes. Preserve the requested number of choices. A single direct option supports tuning without inventing alternatives.
+
+Declare axes as a JSON array on the option, or on the group for shared controls. Each axis needs a short `label`, a CSS custom property in `var`, and an inline default on the same element. Use that property in the rendered CSS so every control has a visible effect.
+
+- Numeric `slider`: finite `min` and `max` with `max > min`, positive `step`, and optional `unit`.
+- Token `slider`: at least two `steps`, each with a `label` and CSS `value`; do not also declare a numeric range.
+- `segmented`: two to four labeled `options` with CSS values.
+- `swatch`: at least two labeled color `options` with CSS values.
+- `toggle`: explicit CSS values for `on` and `off`.
+
+Defaults for token, segmented, swatch, and toggle controls must match a declared value. Use distinct labels and variables within each panel; put shared controls on the group, without shadowing their variables on options.
+
+```html
+<section data-unship-pick="Card">
+  <div data-unship-option="Soft" style="--card-pad: 24px; --card-accent: #275c45;"
+       data-unship-tweaks='[
+         {"type":"slider","label":"Padding","var":"--card-pad","min":12,"max":40,"step":4,"unit":"px"},
+         {"type":"swatch","label":"Accent","var":"--card-accent","options":[
+           {"label":"Fern","value":"#275c45"},{"label":"Ink","value":"#263b58"}
+         ]}
+       ]'>...</div>
+</section>
+```
+
+For literal HTML, use `$UNSHIP check --readiness --json --root <comparison-directory>` as the lightweight handoff check. A `fail` needs correction; `uncertain` needs source or rendered verification. Keep the root focused on the consuming preview, not Unship's own source or test fixtures.
+
+Tell the human to open Tune, adjust the controls, click a slider readout to reset it, and hold the option label (or press Enter while it is focused) to copy a keep instruction. Tuning is temporary browser state; it does not save source and resets on reload.
+
+When the human pastes a keep instruction, apply the stated values to the retained source before removing temporary markup. Resolve named token/color choices to their declared CSS values; ask only if the instruction is ambiguous. Keep remaining explorations mounted until final cleanup is requested.
 
 ## Hidden Option Safety
 
