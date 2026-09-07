@@ -13,7 +13,7 @@ test("toolbar fits mobile viewport and exposes title-only visible text", async (
     const box = await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".dock").getBoundingClientRect().toJSON());
     assert.equal(box.x >= 0, true);
     assert.equal(box.x + box.width <= 390, true);
-    assert.match(await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.textContent), /Hero: Current/);
+    assert.equal(await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent), "Current");
   } finally {
     await browser.close();
   }

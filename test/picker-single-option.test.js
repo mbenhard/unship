@@ -28,7 +28,7 @@ test("single-option groups render a keep label without navigation", async () => 
     assert.equal(state.prev, false);
     assert.equal(state.next, false);
     assert.equal(state.counter, false);
-    assert.equal(state.label, "Navigation");
+    assert.equal(state.label, "Current");
   } finally {
     await browser.close();
   }
@@ -79,7 +79,7 @@ test("retired control metadata cannot add controls or values to a Keep instructi
   } finally { await browser.close(); }
 });
 
-test("single-group Canvas keeps a full-width entry and separate group context", async () => {
+test("single-group Canvas keeps a full-width entry and shows only the option label", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
@@ -88,11 +88,11 @@ test("single-group Canvas keeps a full-width entry and separate group context", 
     const state = await host.evaluate(host => {
       const root = host.shadowRoot;
       const entry = root.querySelector('.canvas-enter');
-      return { entryWidth: entry.offsetWidth, headerWidth: entry.parentElement.offsetWidth, radius: getComputedStyle(entry).borderTopLeftRadius, group: root.querySelector('.solo-context').textContent, label: root.querySelector('.label-main').textContent, listIcon: Boolean(root.querySelector('.menu-caret')) };
+      return { entryWidth: entry.offsetWidth, headerWidth: entry.parentElement.offsetWidth, radius: getComputedStyle(entry).borderTopLeftRadius, group: Boolean(root.querySelector('.solo-context')), label: root.querySelector('.label-main').textContent, listIcon: Boolean(root.querySelector('.menu-caret')) };
     });
     assert.equal(state.entryWidth, state.headerWidth);
     assert.equal(state.radius, '999px');
-    assert.equal(state.group, 'Welcome');
+    assert.equal(state.group, false);
     assert.equal(state.label, 'Quiet start');
     assert.equal(state.listIcon, false);
     await page.getByRole('button', { name: 'Next option' }).click();

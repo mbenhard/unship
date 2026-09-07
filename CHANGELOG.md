@@ -4,6 +4,7 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Show only the option label in the navigation row; group names remain in the multi-group list and accessible descriptions.
 - Prepare runtime files directly with `setup --out`: exact-byte no-op checks, explicit replacement with backups, and shared inline/external snippet options.
 - Verify explicit copied or inline mounts with doctor; keep diagnostics offline by default and remove automatic npm update checks.
 - Preserve the chosen CLI build through repair instructions, add `--version`, and shorten the skill around the setup/compare/cleanup workflow.

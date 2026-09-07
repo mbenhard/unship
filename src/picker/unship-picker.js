@@ -403,27 +403,18 @@
   // than one option to compare. The label supports keep, drag and minimize.
   function rowMarkup(group, option, swapClass = "") {
     const comparable = group.options.length > 1;
-    const soloCanvas = groups.length === 1 && group.canvasLayout;
     const title =
       copied === "ok"
         ? "✓ Copied"
         : copied === "fail"
           ? "Couldn't copy. Try again"
-          : escapeHtml(
-              soloCanvas ? option.label : !comparable
-                ? groups.length === 1
-                  ? group.displayLabel
-                  : option.label
-                : groups.length === 1
-                  ? `${group.displayLabel}: ${option.label}`
-                  : option.label
-            );
+          : escapeHtml(option.label);
     const ariaLabel = comparable
       ? `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}, option ${group.activeOptionIndex + 1} of ${group.options.length}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`
-      : `${escapeHtml(group.displayLabel)}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
+      : `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}. Hold to keep this option, double-click to minimize, drag to move. Press Enter to keep, Shift plus Enter to minimize`;
     return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
         <button class="label" type="button" aria-label="${ariaLabel}">
-          ${soloCanvas ? `<span class="stack-label"><span class="solo-context">${escapeHtml(group.displayLabel)}</span><span class="label-main${swapClass}">${title}</span></span>` : `<span class="label-main${swapClass}">${title}</span>`}
+          <span class="label-main${swapClass}">${title}</span>
           ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
         </button>
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}`;
@@ -1887,8 +1878,6 @@
       .menu-header.has-canvas .menuitem.current{border-radius:20px 9px 9px 20px}
       .menu-header .canvas-enter{display:flex;gap:10px;width:90px;min-width:90px;margin:0;padding:0 12px;font-size:11px;font-weight:450;justify-content:space-between;border-radius:9px 20px 20px 9px}
       .menu-header.full-canvas .canvas-enter{width:100%;min-width:0;flex:1;border-radius:999px}
-      .stack-label{display:flex;flex-direction:column;min-width:0;text-align:left;gap:3px}
-      .solo-context{font-size:10px;font-weight:450;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .menu-header .menu-name{font-size:inherit;font-weight:inherit}
       .menu-name{font-size:11.5px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .menu-caret{opacity:.5;width:18px;height:18px;min-width:18px;margin-left:auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}

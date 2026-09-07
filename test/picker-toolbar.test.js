@@ -159,13 +159,13 @@ test("arrow buttons clear hold-to-copy status immediately", async () => {
     await page.getByRole("button", { name: /next option/i }).click();
     assert.equal(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      "Hero: Visual"
+      "Visual"
     );
 
     await page.getByRole("button", { name: /previous option/i }).click();
     assert.equal(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      "Hero: Current"
+      "Current"
     );
   } finally {
     await browser.close();
