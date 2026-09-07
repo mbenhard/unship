@@ -1871,9 +1871,8 @@
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
       button:focus-visible{outline:0;background:rgba(255,255,255,.12)}
-      .group-count{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}
-      .group-count,.option-count{display:inline-flex;align-items:baseline}
-      .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
+      .option-count{display:inline-flex;align-items:baseline}
+      .option-count-current{display:inline-block;min-width:1ch;text-align:right}
       .menu{display:block;margin-bottom:var(--gap);transition:margin-bottom var(--dur) var(--ease)}
       .dock.open>.menu{margin-bottom:0}
       .menu-list{display:block;position:relative;height:0;margin-top:0;overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;scrollbar-width:none;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
@@ -1881,12 +1880,10 @@
       .menu-list::-webkit-scrollbar{display:none}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
       .menuitem:first-child{margin-top:0}
-      .menu-list .menuitem:first-child{margin-top:0}
       .menuitem:hover{background:rgba(255,255,255,.12)}
       .dock:not(.open) .menuitem.current{margin-top:0;background:rgba(255,255,255,.12)}
       .dock:not(.open) .menuitem.current:hover{background:rgba(255,255,255,.17)}
       .open .menuitem.current{background:#f5f5f5;color:#000}
-      .open .menuitem.current .group-count{opacity:.55}
       .menu-header{display:flex;gap:4px;align-items:center}
       .menu-header .menuitem.current{flex:1;min-width:0;padding:0 12px;font-size:11px;font-weight:450}
       .menu-header.has-canvas .menuitem.current{border-radius:20px 9px 9px 20px}
@@ -1998,10 +1995,8 @@
       .canvas-zoom-value{font-size:11.5px;box-sizing:border-box;height:var(--h);width:40px;min-width:40px;flex:none;padding:0 4px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
       .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes dockInTop{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
-      @keyframes swapIn{from{opacity:0;transform:translate(var(--dx,0px),var(--dy,0px))}to{transform:none}}
+      @keyframes swapIn{from{opacity:0;transform:translateX(var(--dx,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
-      .dock.top.enter{animation-name:dockInTop}
       .dock[data-dir="next"] .row{--dx:8px}
       .dock[data-dir="prev"] .row{--dx:-8px}
       .label-main.swap,.option-count-current.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}

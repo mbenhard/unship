@@ -28,7 +28,7 @@ const TARGETS = [
       { role: "command", relativePath: ".claude/commands/unship.md", template: "claudeCommand", requiresRole: "skill", staleMarker: /Use the Unship skill for this request/i }
     ],
     legacy: [
-      { relativePath: ".claude/commands/unship.md", marker: /unship next|project companion skill|unship repair/i, replacementRole: "command" },
+      { relativePath: ".claude/commands/unship.md", marker: /unship next|project companion skill|unship repair/i },
       { relativePath: ".claude/commands/unship-batch.md", marker: /unship-batch|parallel task processing/i },
       { relativePath: ".claude/commands/unship-docs.md", marker: /unship-docs|project docs/i },
       { relativePath: ".claude/skills/unship-design/SKILL.md", marker: /patch-session|unship-design|Legacy Unship/i }

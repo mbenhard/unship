@@ -11,10 +11,10 @@ Make requested adjustments directly in source. Use the picker for discrete alter
 
 ## Command Prefix
 
-Choose one CLI for the request and retain it for every command:
+Choose one CLI for the comparison and reuse it across follow-ups:
 
 - In Unship's own repo (`package.json` names `@unship/cli`), use `node src/cli/index.js`.
-- Honor an explicitly requested build. Otherwise prefer `./node_modules/.bin/unship`, then a global executable whose owning npm package is verified as `@unship/cli`. A matching command name alone is insufficient.
+- Honor an explicitly requested build. Otherwise prefer `./node_modules/.bin/unship`, then a global executable whose owning npm package is verified as `@unship/cli`. Verify ownership by resolving the executable path and reading its package.json. Reuse that identity check while the chosen path and build remain unchanged.
 - Only if neither is available, use `npx -y @unship/cli@latest`.
 
 The examples below use `$UNSHIP` to mean that chosen command. Run from the consuming app root, especially in monorepos. Do not replace a deliberate project pin or unpublished local build with npm `@latest`. Package updates use the app's package manager; `install --repair` refreshes agent instructions, not project runtime files.
@@ -23,7 +23,7 @@ If `/unship` is unavailable after installation, continue from the natural-langua
 
 ## Variant Creation
 
-Inspect the requested source and its immediate design context. Ordinary prompts are enough to begin: `use unship to compare 4 hero directions`, explore empty/loading/error states, or compare button system treatments.
+Inspect the requested source and its immediate design context. In consuming apps, treat the generated picker as an asset: inspect surrounding app markup and use setup/doctor for the runtime, rather than reading its implementation.
 
 - A requested number means exactly that many choices unless the user says “plus current”. Otherwise create 2–4 meaningful alternatives with short, distinct labels.
 - Keep the smallest scope that lets the human judge the decision. Match the app's design language unless asked to depart from it. For copy comparisons, preserve structure and vary the message.
@@ -68,7 +68,7 @@ Doctor is optional troubleshooting, not a step in every iteration. Use `doctor -
 
 ## Canvas
 
-Use Canvas when requested or when simultaneous comparison is the explicit task. Add an arrangement to the relevant group:
+Canvas is opt-in: add it for requests mentioning Canvas, side-by-side or simultaneous previews. “Compare three options” alone uses the picker. Preserve Canvas in existing comparisons. Add an arrangement to the relevant group:
 
 ```html
 <section data-unship-pick="Header" data-unship-canvas="stack">...</section>
@@ -88,7 +88,7 @@ For literal source, run `$UNSHIP check --readiness --json --root <comparison-dir
 
 Do not start, open, or automate a browser by default. Use it when requested, when setup needs verification, or when source cannot establish readiness. Check expected controls and switching; the human judges the alternatives.
 
-Hand off the group and visible option labels, readiness checks, and whether runtime setup was reused or updated. Mention unresolved setup or cleanup work. Use the app's known preview URL; if no preview is running, use its normal development command when requested. Do not treat a detected localhost port as the correct app automatically.
+Hand off the known preview link and choice labels; mention checks briefly and setup details only when updated or unresolved. If no preview is running, use its normal dev command when requested. A detected port alone does not identify the app.
 
 ## Selection and Cleanup
 

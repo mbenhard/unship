@@ -216,7 +216,7 @@ async function assertToolbarQuality(page, { viewportWidth, viewportHeight, menuO
         right: box.right
       },
       parts,
-      visibleText: root.textContent.replace(/\s+/g, " ").trim()
+      visibleText: dock.innerText.replace(/\s+/g, " ").trim()
     };
   });
 

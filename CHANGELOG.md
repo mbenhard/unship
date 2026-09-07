@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Clarify CLI identity reuse, generated-runtime handling, and opt-in Canvas in the skill; remove unused picker CSS and installer metadata, and keep CSS out of visible-text QA reports.
+
 - Claim pinch gestures immediately during Canvas entry and over its controls; release browser zoom on exit. Hide animated group-list scrollbars, remove redundant copied checkmarks, and move frame-pill padding to the right.
 
 - Match option-name and counter motion, clarify copying choices into an AI chat, show visible Canvas copy feedback and checkmarks, and refine the frame pill spacing and moon icon.
