@@ -96,14 +96,17 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
     await page.setContent(slowPage, { waitUntil: "domcontentloaded" });
     const initial = await page.getByRole("button", { name: "Open Canvas" }).evaluate((button) => {
       button.click();
+      const pinch = new WheelEvent("wheel", { ctrlKey: true, deltaY: 50, cancelable: true, bubbles: true });
+      document.body.dispatchEvent(pinch);
       return {
+        pinchCaptured: pinch.defaultPrevented,
         label: button.textContent,
         icon: Boolean(button.querySelector(".canvas-entry-icon svg")),
         spinner: Boolean(button.querySelector(".canvas-spinner")),
         width: button.offsetWidth
       };
     });
-    assert.deepEqual(initial, { label: "Canvas", icon: true, spinner: false, width: 90 });
+    assert.deepEqual(initial, { pinchCaptured: true, label: "Canvas", icon: true, spinner: false, width: 90 });
     await page.locator(".canvas-entry-icon .canvas-spinner").waitFor();
     const preparing = await page.locator("[data-unship-toolbar]").evaluate((host) => {
       const root = host.shadowRoot;
@@ -127,6 +130,18 @@ test("Canvas keeps the native preview visible until its visible Frames are prepa
     await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelector(".canvas-shell.content-visible"));
     assert.equal(await page.evaluate(() => window.__unshipPicker.getState().canvas.open), true);
     assert.equal(await page.evaluate(() => document.documentElement.style.overflow), "hidden");
+    const pinchCaptured = () => page.evaluate(() => {
+      const event = new WheelEvent("wheel", { ctrlKey: true, deltaY: 50, cancelable: true, bubbles: true });
+      document.body.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    assert.equal(await pinchCaptured(), true, "pinch over toolbar/page is claimed while Canvas is open");
+    await page.getByRole("button", { name: "Back to page" }).click();
+    assert.equal(await pinchCaptured(), false, "page zoom returns on exit");
+    await page.getByRole("button", { name: "Open Canvas" }).click();
+    assert.equal(await pinchCaptured(), true, "cached reopen claims pinch immediately too");
+    await page.evaluate(() => window.__unshipPicker.destroy());
+    assert.equal(await pinchCaptured(), false, "destroy releases page zoom");
   } finally {
     releaseImages?.();
     await browser.close();
@@ -222,6 +237,7 @@ test("Canvas zoom stays anchored to the cursor and accumulates rapid controls", 
     const beforePinch = await worldAtPoint();
     await host.evaluate((node, cursor) => {
       node.shadowRoot.querySelector(".canvas-viewport").dispatchEvent(new WheelEvent("wheel", {
+          composed: true,
         bubbles: true,
         cancelable: true,
         clientX: cursor.x,
@@ -245,6 +261,7 @@ test("Canvas zoom stays anchored to the cursor and accumulates rapid controls", 
       const viewport = node.shadowRoot.querySelector(".canvas-viewport");
       for (let index = 0; index < 20; index += 1) {
         viewport.dispatchEvent(new WheelEvent("wheel", {
+          composed: true,
           bubbles: true,
           cancelable: true,
           clientX: cursor.x,
@@ -263,6 +280,7 @@ test("Canvas zoom stays anchored to the cursor and accumulates rapid controls", 
 
     await host.evaluate((node, cursor) => {
       node.shadowRoot.querySelector(".canvas-viewport").dispatchEvent(new WheelEvent("wheel", {
+          composed: true,
         bubbles: true,
         cancelable: true,
         clientX: cursor.x,
@@ -446,7 +464,7 @@ test("Canvas Keep actions accumulate one choice per Group", async () => {
     assert.match(copied, /Keep "Direct" for "Hero"/);
     const kept = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll(".canvas-frame.kept")).map((frame) => `${frame.dataset.group}:${frame.dataset.option}`));
     assert.deepEqual(kept, ["0:1", "1:1", "1:1", "1:1"]);
-    assert.equal(await page.locator(".canvas-keep").textContent(), "✓ Copied — paste into your AI chat");
+    assert.equal(await page.locator(".canvas-keep").textContent(), "Copied — paste into your AI chat");
     await host.evaluate((node) => node.shadowRoot.querySelector('.canvas-frame[data-group="0"][data-option="0"]').dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
     assert.equal(await page.locator(".canvas-keep").textContent(), "Hold to copy choice");
   });

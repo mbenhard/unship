@@ -111,7 +111,7 @@ Canvas presents every opted-in Group and Option on one bounded, zoomable surface
 <section data-unship-pick="Hero" data-unship-canvas="matrix">…</section>
 ```
 
-`stack` compares wide sections, `grid` compact components, and `matrix` every Option at 1280, 768, and 390 pixels. Open Canvas with the overlapping-frames icon. Matrix starts at Desktop; the responsive toggle reveals Tablet and Mobile without changing the camera. Fit reframes everything. Canvas prepares previews before revealing them and supports light/dark themes, pointer drag, trackpad pan, and cursor-relative pinch zoom with native CSS transforms. “Hold to copy choice” copies an instruction for the selected option. Paste it into your AI chat so the agent can apply the choice in source. A checkmark marks copied Canvas choices.
+`stack` compares wide sections, `grid` compact components, and `matrix` every Option at 1280, 768, and 390 pixels. Open Canvas with the overlapping-frames icon. Matrix starts at Desktop; the responsive toggle reveals Tablet and Mobile without changing the camera. Fit reframes everything. Canvas prepares previews before revealing them and supports light/dark themes, pointer drag, trackpad pan, and cursor-relative pinch zoom with native CSS transforms. “Hold to copy choice” copies an instruction for the selected option. Paste it into your AI chat so the agent can apply the choice in source.
 
 ## Good For
 

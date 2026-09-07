@@ -405,7 +405,7 @@
     const comparable = group.options.length > 1;
     const title =
       copied === "ok"
-        ? '<span>✓ Copied</span><span class="copy-next">Paste into your AI chat</span>'
+        ? '<span>Copied</span><span class="copy-next">Paste into your AI chat</span>'
         : copied === "fail"
           ? "Couldn't copy. Try again"
           : escapeHtml(option.label);
@@ -472,6 +472,7 @@
       disposeCanvasCache();
     }
     canvasPreparing = true;
+    document.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
     minimized = false;
     menuOpen = false;
     canvasKeeps.clear();
@@ -503,6 +504,7 @@
   function reopenCanvas() {
     if (!canvasShell || !canvasCamera) return;
     canvasOpen = true;
+    document.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
     canvasPreviousOverflow = document.documentElement.style.overflow;
     pauseObserver(() => { document.documentElement.style.overflow = "hidden"; });
     canvasShell.classList.remove("leaving");
@@ -595,6 +597,7 @@
     closingShell?.setAttribute("aria-hidden", "true");
     pauseObserver(() => { document.documentElement.style.overflow = canvasPreviousOverflow; });
     document.removeEventListener("keydown", handleCanvasKeydown);
+    document.removeEventListener("wheel", handleCanvasWheel, true);
     renderedSignature = "";
     if (renderAfter && root) {
       render();
@@ -859,7 +862,6 @@
     viewport.addEventListener("pointermove", handleCanvasPanMove);
     viewport.addEventListener("pointerup", handleCanvasPanEnd);
     viewport.addEventListener("pointercancel", handleCanvasPanEnd);
-    viewport.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
     toolbar.addEventListener("pointerenter", () => clearTimeout(canvasFrameHideTimer));
     toolbar.addEventListener("pointerleave", scheduleCanvasFrameToolbarHide);
   }
@@ -908,7 +910,7 @@
     });
     toolbar.querySelector(".canvas-keep").textContent = copyFailed
       ? "Couldn't copy. Try again"
-      : frame.classList.contains("kept") ? "✓ Copied — paste into your AI chat" : "Hold to copy choice";
+      : frame.classList.contains("kept") ? "Copied — paste into your AI chat" : "Hold to copy choice";
     toolbar.inert = false;
     toolbar.setAttribute("aria-hidden", "false");
     toolbar.classList.add("visible");
@@ -1164,9 +1166,13 @@
   }
 
   function handleCanvasWheel(event) {
-    if (!canvasOpen || !canvasCamera || !event.target.closest?.(".canvas-viewport")) return;
+    if (!canvasOpen && !canvasPreparing) return;
+    const target = event.composedPath()[0] || event.target;
+    if (!event.ctrlKey && !target.closest?.(".canvas-viewport")) return;
+    // Claim pinch from the entry click, before prepared previews take pointer input.
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (!canvasOpen || !canvasCamera) return;
     const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY;
     const focal = { clientX: event.clientX, clientY: event.clientY };
     canvasCursor = focal;
@@ -1870,8 +1876,9 @@
       .group-count-current,.option-count-current{display:inline-block;min-width:1ch;text-align:right}
       .menu{display:block;margin-bottom:var(--gap);transition:margin-bottom var(--dur) var(--ease)}
       .dock.open>.menu{margin-bottom:0}
-      .menu-list{display:block;position:relative;height:0;margin-top:0;overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.34) transparent;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
+      .menu-list{display:block;position:relative;height:0;margin-top:0;overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;scrollbar-width:none;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .12s ease,visibility 0s linear var(--dur)}
       .open .menu-list{height:var(--menu-list-height,0px);margin-top:var(--gap);opacity:1;visibility:visible;transition:height var(--dur) var(--ease),margin-top var(--dur) var(--ease),opacity .16s ease .04s,visibility 0s}
+      .menu-list::-webkit-scrollbar{display:none}
       .menuitem{display:flex;align-items:center;gap:.8em;width:100%;min-height:var(--h);max-height:var(--h);margin-top:var(--gap);padding:0 .85em 0 .95em;border-radius:var(--r);text-align:left;overflow:hidden;transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
       .menuitem:first-child{margin-top:0}
       .menu-list .menuitem:first-child{margin-top:0}
@@ -1956,14 +1963,11 @@
       .canvas-frame:hover,.canvas-frame:focus-within{z-index:4}
       .canvas-frame:focus-visible{outline:2px solid #111;outline-offset:4px}
       .canvas-shell[data-theme="dark"] .canvas-frame:focus-visible{outline-color:#fff}
-      .canvas-frame::after{content:"✓";position:absolute;right:8px;top:8px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#111;color:#fff;font:600 12px/1 system-ui;opacity:0;box-shadow:0 0 0 2px #fff}
-      .canvas-shell[data-theme="dark"] .canvas-frame::after{background:#fff;color:#111;box-shadow:0 0 0 2px #111}
-      .canvas-frame.kept::after{opacity:1}
       .canvas-iframe{display:block;width:100%;height:180px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .16s ease}
       .canvas-frame.ready .canvas-iframe{opacity:1}
       .canvas-frame.viewport-hidden{display:none}
       .canvas-frame.failed{min-height:96px;background:rgba(127,127,127,.08)}
-      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 4px 4px 8px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
+      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 8px 4px 4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
       .canvas-frame-toolbar.visible{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
       .canvas-option-name{padding-left:9px;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis}
       .canvas-frame-width{flex:none;padding:0 7px;opacity:.6;font-variant-numeric:tabular-nums}

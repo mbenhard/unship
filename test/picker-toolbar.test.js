@@ -65,7 +65,7 @@ test("holding the label copies a keep instruction for the agent", async () => {
     ]);
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      /✓ Copied/
+      /Copied/
     );
   } finally {
     await browser.close();
@@ -117,7 +117,7 @@ test("Enter on the label copies the keep instruction and Shift+Enter minimizes",
     await page.waitForFunction(() => window.__copied.length === 1);
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      /✓ Copied/
+      /Copied/
     );
 
     await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label").focus());
@@ -153,7 +153,7 @@ test("arrow buttons clear hold-to-copy status immediately", async () => {
     await page.mouse.up();
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),
-      /✓ Copied/
+      /Copied/
     );
 
     await page.getByRole("button", { name: /next option/i }).click();
@@ -567,7 +567,8 @@ test("long group menus scroll immediately while the active header stays pinned",
         headerTop: header.top - root.querySelector(".dock").getBoundingClientRect().top,
         scrollTop: list.scrollTop,
         scrollable: list.scrollHeight > list.clientHeight,
-        bottomOverlay: getComputedStyle(list, "::after").content
+        bottomOverlay: getComputedStyle(list, "::after").content,
+        scrollbar: getComputedStyle(list).scrollbarWidth
       };
     });
     const listCenter = await page.locator("[data-unship-toolbar]").evaluate((host) => {
@@ -594,6 +595,7 @@ test("long group menus scroll immediately while the active header stays pinned",
     assert.equal(before.scrollTop, 0);
     assert.equal(before.scrollable, true);
     assert.equal(before.bottomOverlay, "none");
+    assert.equal(before.scrollbar, "none");
     assert.equal(after.scrollTop > 0, true);
     // Opening a bottom-anchored dock moves the whole dock. Scrolling must
     // preserve the header position within it, including during that morph.
