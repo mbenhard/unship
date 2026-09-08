@@ -1463,7 +1463,7 @@
 
   function keepInstruction(group) {
     const option = group.options[group.activeOptionIndex];
-    return `Keep "${option.label}" for "${group.displayLabel}" and remove the other unship options in that group.`;
+    return `Unship selection: "${option.label}" for "${group.displayLabel}".`;
   }
 
   function clearCopiedStatus() {

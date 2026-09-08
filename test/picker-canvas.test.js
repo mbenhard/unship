@@ -483,8 +483,8 @@ test("Canvas Keep actions accumulate one choice per Group", async () => {
       root.querySelector(".canvas-frame-toolbar .canvas-keep")?.click();
     });
     const copied = await page.evaluate(() => window.__copied.at(-1));
-    assert.match(copied, /Keep "B" for "Header"/);
-    assert.match(copied, /Keep "Direct" for "Hero"/);
+    assert.match(copied, /Unship selection: "B" for "Header"/);
+    assert.match(copied, /Unship selection: "Direct" for "Hero"/);
     const kept = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll(".canvas-frame.kept")).map((frame) => `${frame.dataset.group}:${frame.dataset.option}`));
     assert.deepEqual(kept, ["0:1", "1:1", "1:1", "1:1"]);
     assert.equal(await page.locator(".canvas-keep").textContent(), "Copied — paste into your AI chat");
@@ -515,8 +515,8 @@ test("Canvas keeps an explicit choice even when source selection changes later",
     await act(0, 1, "keep");
     await page.waitForFunction(() => window.__copied.length === 2);
     const text = await page.evaluate(() => window.__copied.at(-1));
-    assert.match(text, /Keep "Direct" for "Hero"/);
-    assert.doesNotMatch(text, /Keep "Proof"/);
+    assert.match(text, /Unship selection: "Direct" for "Hero"/);
+    assert.doesNotMatch(text, /Unship selection: "Proof"/);
   });
 });
 
@@ -569,7 +569,7 @@ test("Canvas resolves valid groups after an empty group", async () => {
     await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async text => { window.__copied = text; } } }));
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => Boolean(window.__copied));
-    assert.match(await page.evaluate(() => window.__copied), /Keep "Proof" for "Hero"/);
+    assert.match(await page.evaluate(() => window.__copied), /Unship selection: "Proof" for "Hero"/);
   } finally { await browser.close(); }
 });
 

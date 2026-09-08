@@ -4,7 +4,7 @@
 
 Compare alternatives in your app with your coding agent.
 
-Ask for UI, copy, or state variations. Browse them with the local picker, copy your choice, and paste it into your AI chat. The agent keeps the chosen source and removes the rest.
+Ask for UI, copy, or state variations. Browse them with the local picker, copy your choice, and paste it into your AI chat. The agent follows your direction in source.
 
 A single injected script. No runtime dependencies, accounts, or telemetry.
 
@@ -29,7 +29,7 @@ Use Unship to compare three hero copy directions, including the current one.
 
 Canvas is always available in the picker to see the alternatives together. Previews load when you open it; no extra command or prompt is needed.
 
-Hold an option to copy your choice, then paste into your AI chat to apply it. You can also tell the agent which label to keep. Copying a choice does not edit source.
+Tell the agent what to change or keep, or hold an option to copy its selection into your AI chat. Copying identifies the option; your instructions determine what happens next.
 
 The agent handles setup and cleanup. Keep Unship out of production builds.
 

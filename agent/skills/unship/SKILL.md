@@ -5,7 +5,7 @@ description: "Compare agent-made local alternatives in the real app: UI, copy, s
 
 # Unship
 
-Unship is local comparison tooling: create temporary alternatives in real source, let the human compare them in the browser, then settle the chosen source. The script runs locally and does not send telemetry. Picker selection does not save source or make a product decision; the agent applies the human's choice.
+Unship is local comparison tooling: create temporary alternatives in real source, let the human compare them in the browser, and follow their direction in source. The script runs locally and does not send telemetry. Picker selection does not save source or make a product decision; the agent applies the human's choice.
 
 Make requested adjustments directly in source. Use the picker for discrete alternatives, not live parameter controls.
 
@@ -28,7 +28,7 @@ Inspect the requested source and its immediate design context. In consuming apps
 - A requested number means exactly that many choices unless the user says “plus current”. Otherwise create 2–4 meaningful alternatives with short, distinct labels.
 - Keep the smallest scope that lets the human judge the decision. Match the app's design language unless asked to depart from it. For copy comparisons, preserve structure and vary the message.
 - For docs or CLI output, make a local rendered preview; the picker cannot compare raw files.
-- Reuse independent comparisons. Settle overlapping work according to an existing user choice; ask only when the desired winner or scope is ambiguous.
+- Reuse existing comparisons where they still serve the request; preserve unrelated comparisons.
 - If no app source or preview shell exists yet, create it before mounting the picker.
 
 Do not build a custom switcher, tab set, or preference system. Use this markup contract, with direct child options and exactly one initially visible:
@@ -92,7 +92,9 @@ Hand off the known preview link and choice labels; mention checks briefly and se
 
 ## Selection and Cleanup
 
-When the user chooses, keep that option's real source, remove the losing options and `data-unship-*` attributes for that group. Keep the mount while other comparisons remain. If labels or “the second one” are ambiguous across groups or edits, clarify before deleting alternatives.
+Interpret typed feedback and copied selections using the conversation. A copied selection identifies an option; it does not itself request deletion. Only discard alternatives or finalize a comparison when that intent is clear from the user's instructions.
+
+When finalizing a group, keep the chosen option's real source and remove its losing options and `data-unship-*` attributes. Keep the mount while other comparisons remain. If the target or intent is ambiguous, clarify before deleting alternatives.
 
 For final cleanup, remove all temporary options, attributes, comments, script mounts, and unused picker files, including custom-named copies. Preserve recovery backups in `.unship/backups/` and pre-existing ignore rules; they are not comparison residue and do not need removal for a clean check or build. Do not delete the whole `.unship` directory as a cleanup shortcut. Follow choices already supplied; do not choose a winner on the user's behalf. Run:
 

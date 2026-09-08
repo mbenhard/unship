@@ -61,7 +61,7 @@ test("holding the label copies a keep instruction for the agent", async () => {
     await page.mouse.up();
 
     assert.deepEqual(await page.evaluate(() => window.__copied), [
-      'Keep "Current" for "Hero" and remove the other unship options in that group.'
+      'Unship selection: "Current" for "Hero".'
     ]);
     assert.match(
       await page.locator("css=[data-unship-toolbar]").evaluate((host) => host.shadowRoot.querySelector(".label-main").textContent),

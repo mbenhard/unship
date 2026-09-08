@@ -78,7 +78,7 @@ test("retired control metadata cannot add controls or values to a Keep instructi
     await page.getByRole('button', {name:'Next option',exact:true}).click();
     await toolbar.locator('.label').press('Enter');
     await page.waitForFunction(() => Boolean(window.__copied));
-    assert.equal(await page.evaluate(() => window.__copied), 'Keep "B" for "Hero" and remove the other unship options in that group.');
+    assert.equal(await page.evaluate(() => window.__copied), 'Unship selection: "B" for "Hero".');
     assert.equal(await page.locator('[data-unship-pick]').evaluate(el => el.style.getPropertyValue('--space')), '16px');
   } finally { await browser.close(); }
 });
