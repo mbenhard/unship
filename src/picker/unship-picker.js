@@ -1963,7 +1963,7 @@
       .canvas-frame.ready .canvas-iframe{opacity:1}
       .canvas-frame.viewport-hidden{display:none}
       .canvas-frame.failed{min-height:96px;background:rgba(127,127,127,.08)}
-      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 8px 4px 4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
+      .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 6px 4px 4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
       .canvas-frame-toolbar.visible{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
       .canvas-option-name{padding-left:9px;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis}
       .canvas-frame-width{flex:none;padding:0 7px;opacity:.6;font-variant-numeric:tabular-nums}

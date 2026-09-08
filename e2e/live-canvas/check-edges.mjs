@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {writeFile} from 'node:fs/promises';
+const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:1100}});
+const errors=[];let requests=0;page.on('pageerror',e=>errors.push(e.message));page.on('request',()=>requests++);
+await page.goto(process.env.UNSHIP_LIVE_URL || 'http://127.0.0.1:4173/live-canvas');
+await page.waitForFunction(()=>window.iframeLoads===2 && window.__unshipPicker?.getState().groups.length===1);
+const first=page.locator('[data-unship-option="Quiet start"]');
+const child=first.locator('iframe').contentFrame();
+await child.locator('button').click();
+await page.evaluate(()=>{window.savedChild=document.querySelector('[data-unship-option] iframe').contentWindow;window.savedAnim=document.querySelector('.pulse i').getAnimations()[0];});
+const baseline=await page.evaluate(()=>({mounts:demoMounts,loads:iframeLoads,connections:shadowConnects}));
+const requestsBefore=requests;
+async function open(){await page.getByRole('button',{name:'Open Canvas',exact:true}).click();await page.waitForFunction(()=>{const r=document.querySelector('[data-unship-toolbar]').shadowRoot;return window.__unshipPicker.getState().canvas.open && r.querySelector('.canvas-shell').classList.contains('content-visible') && getComputedStyle(r.querySelector('.canvas-shell')).opacity==='1';});}
+async function close(){await page.getByRole('button',{name:'Back to page',exact:true}).click();await page.getByRole('button',{name:'Open Canvas',exact:true}).waitFor();}
+await open();
+await child.locator('button').click();
+await first.locator('input').fill('Still the same form');
+await page.getByRole('button',{name:'Zoom out',exact:true}).click();
+await page.waitForTimeout(220);
+const zoom=await page.evaluate(()=>{const e=document.querySelector('[data-live-option]'),f=document.querySelector('[data-unship-toolbar]').shadowRoot.querySelector('.canvas-frame');return {element:e.getBoundingClientRect().width,frame:f.getBoundingClientRect().width};});
+assert.ok(Math.abs(zoom.element-zoom.frame)<1);
+const panBefore=await first.boundingBox();await page.mouse.move(30,300);await page.mouse.down();await page.mouse.move(90,340,{steps:4});await page.mouse.up();await page.waitForTimeout(50);const panAfter=await first.boundingBox();assert.ok(Math.abs(panAfter.x-panBefore.x)>5);
+const pinch=await page.evaluate(()=>{const event=new WheelEvent('wheel',{ctrlKey:true,deltaY:20,cancelable:true,bubbles:true});document.body.dispatchEvent(event);return event.defaultPrevented;});assert.equal(pinch,true);
+await page.evaluate(()=>__liveCanvasProbe.setWidth(390));await page.waitForTimeout(60);
+const widthOnly=await first.evaluate(n=>({width:n.offsetWidth,viewport:innerWidth,media:getComputedStyle(n.querySelector('.media-status'),'::after').content,container:getComputedStyle(n.querySelector('.container-status'),'::after').content}));
+assert.equal(widthOnly.width,390);assert.match(widthOnly.media,/desktop/);assert.match(widthOnly.container,/narrow/);
+const zoomOnly=await page.evaluate(()=>{document.documentElement.style.zoom='3';const n=document.querySelector('.media-status');const value={viewport:innerWidth,matches:matchMedia('(max-width:600px)').matches,media:getComputedStyle(n,'::after').content};document.documentElement.style.zoom='';return value;});
+await page.screenshot({path:'.unship/live-canvas/narrow-cards.png',fullPage:true});
+await first.locator('.portal-toggle').click();
+const portal=await page.locator('.portal-menu').evaluate(n=>{const r=n.getBoundingClientRect();return {exists:true,receivesPointer:document.elementFromPoint(r.x+5,r.y+5)===n};});
+assert.equal(portal.exists,true);assert.equal(portal.receivesPointer,false);
+await first.locator('.portal-toggle').click();
+await close();
+for(let i=0;i<3;i++){await open();await close();}
+const after=await page.evaluate(()=>({mounts:demoMounts,loads:iframeLoads,connections:shadowConnects,sameChild:savedChild===document.querySelector('[data-unship-option] iframe').contentWindow,childCount:savedChild.count,sameAnimation:savedAnim===document.querySelector('.pulse i').getAnimations()[0],input:document.querySelector('[data-unship-option] input').value,popovers:document.querySelectorAll('[data-live-option]').length}));
+assert.equal(after.mounts,baseline.mounts);assert.equal(after.loads,baseline.loads);assert.equal(after.connections,baseline.connections);assert.equal(after.sameChild,true);assert.equal(after.childCount,2);assert.equal(after.input,'Still the same form');assert.equal(after.popovers,0);
+assert.equal(requests,requestsBefore);
+await page.setViewportSize({width:390,height:844});
+const actualMobile=await first.evaluate(n=>({viewport:innerWidth,media:getComputedStyle(n.querySelector('.media-status'),'::after').content}));assert.match(actualMobile.media,/mobile/);
+await open();await page.getByRole('button',{name:'Fit Canvas',exact:true}).click();await page.waitForTimeout(220);await page.screenshot({path:'.unship/live-canvas/mobile.png',fullPage:true});await close();
+assert.deepEqual(errors,[]);
+const result={baseline,after,additionalRequests:requests-requestsBefore,zoomTracksFrame:zoom,panDelta:panAfter.x-panBefore.x,pinchCaptured:pinch,widthOnly,cssZoom:zoomOnly,actualMobile,portalLimitation:portal,errors};
+await writeFile('.unship/live-canvas/edge-results.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));await browser.close();

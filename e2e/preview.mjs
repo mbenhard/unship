@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const port = Number(process.env.PORT || 4173);
 const routes = new Map([
+  ["/live-canvas", [new URL("live-canvas/index.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/live-canvas-picker.js", [new URL("../.unship/live-canvas/picker.js", import.meta.url), "text/javascript; charset=utf-8"]],
+  ["/live-canvas-app.js", [new URL("../.unship/live-canvas/app.js", import.meta.url), "text/javascript; charset=utf-8"]],
   ["/", [new URL("playground.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/motion", [new URL("motion-study.html", import.meta.url), "text/html; charset=utf-8"]],
   ["/canvas", [new URL("canvas-fixture.html", import.meta.url), "text/html; charset=utf-8"]],

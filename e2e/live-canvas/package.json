@@ -1,0 +1,10 @@
+{
+  "name": "unship-live-canvas-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "esbuild": "0.25.9",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  }
+}

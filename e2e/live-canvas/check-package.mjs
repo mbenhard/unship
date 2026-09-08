@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+import { candidateVersion } from './compile.mjs';
+const root = new URL('../../', import.meta.url);
+execFileSync(process.execPath,[fileURLToPath(new URL('pack.mjs',import.meta.url))],{cwd:root});
+const archive=fileURLToPath(new URL(`.unship/releases/${candidateVersion}/unship-cli-${candidateVersion}.tgz`,root));
+const temp=await mkdtemp(join(tmpdir(),'unship-live-package-'));
+let browser,server;
+try {
+  execFileSync('npm',['install','--prefix',join(temp,'tools'),'--ignore-scripts','--no-audit','--no-fund',archive],{encoding:'utf8'});
+  const cli=join(temp,'tools/node_modules/@unship/cli/src/cli/index.js');
+  const app=join(temp,'app');await mkdir(app);
+  const run=(...args)=>JSON.parse(execFileSync(process.execPath,[cli,...args,'--json'],{cwd:app,encoding:'utf8'}));
+  assert.equal(run('version').version,candidateVersion);
+  // Exercise old generated asset replacement and recovery, as in an existing app.
+  await mkdir(join(app,'public'));await writeFile(join(app,'public/unship-picker.js'),'// old generated asset\n');
+  const prepared=run('setup','--out','public/unship-picker.js','--src','/unship-picker.js','--force');
+  assert.equal(prepared.picker.current,true);
+  const skill=execFileSync(process.execPath,[cli,'install','--print-skill'],{cwd:app,encoding:'utf8'});
+  assert.match(skill,/original live options/);assert.doesNotMatch(skill,/frames are script-free snapshots|responsive toggle reveals/);
+  const runtime=await readFile(join(app,'public/unship-picker.js'),'utf8');
+  assert.doesNotMatch(runtime,/__liveCanvasProbe/);
+  const html=`<!doctype html><style>[hidden]{display:none!important}.card{padding:24px;background:#fff;min-height:180px}body{font:16px system-ui}</style><section data-unship-pick="Fresh project"><div class="card" data-unship-option="One"><button id="counter">Count 0</button></div><div class="card" data-unship-option="Two" hidden><input value="Editable"></div></section><script>window.node=document.querySelector('#counter');window.count=0;node.onclick=()=>node.textContent='Count '+(++count);</script><script src="/unship-picker.js" data-unship-dev></script>`;
+  server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/unship-picker.js'?'text/javascript':'text/html');res.end(req.url==='/unship-picker.js'?runtime:html);});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  browser=await chromium.launch();const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.waitForFunction(version=>window.__unshipPicker?.version===version,candidateVersion);
+  await page.locator('#counter').click();
+  await page.getByRole('button',{name:'Open Canvas',exact:true}).click();
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-live-option]')).visibility==='visible');
+  await page.locator('#counter').click();
+  assert.equal(await page.evaluate(()=>node===document.querySelector('#counter') && count===2),true);
+  assert.equal(await page.getByRole('button',{name:'Show responsive previews'}).count(),0);
+  await page.locator('input').fill('Changed in Canvas');
+  await page.locator('#counter').hover();
+  await page.locator('.canvas-frame-toolbar.visible').waitFor();
+  assert.equal(await page.locator('.canvas-frame-toolbar').evaluate(n=>getComputedStyle(n).paddingRight),'6px');
+  await page.getByRole('button',{name:'Back to page',exact:true}).click();
+  assert.equal(await page.locator('input').inputValue(),'Changed in Canvas');
+  assert.equal(await page.locator('[data-unship-option="Two"]').evaluate(n=>n.hidden),true);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: packed CLI, stale-asset update, matching skill, version, live state, copy-pill inset, and restoration in a fresh app.');
+} finally {
+  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));await rm(temp,{recursive:true,force:true});
+}
