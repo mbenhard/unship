@@ -80,7 +80,7 @@ test("toolbar uses CSS chevrons instead of font arrow glyphs", async () => {
   }
 });
 
-test("toolbar animates only the changing counter number", async () => {
+test("toolbar slides the name and complete counter as one unit", async () => {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
@@ -103,8 +103,9 @@ test("toolbar animates only the changing counter number", async () => {
         text: root.querySelector(".option-count").textContent.trim(),
         currentText: root.querySelector(".option-count-current").textContent.trim(),
         totalText: root.querySelector(".option-count-total").textContent.trim(),
-        currentAnimates: root.querySelector(".option-count-current").classList.contains("swap"),
-        totalAnimates: root.querySelector(".option-count-total").classList.contains("swap"),
+        sharedUnit: root.querySelector(".choice-unit.swap").contains(root.querySelector(".label-main")) && root.querySelector(".choice-unit.swap").contains(root.querySelector(".option-count")),
+        duration: getComputedStyle(root.querySelector(".choice-unit")).animationDuration,
+        childAnimations: [".label-main", ".option-count-current", ".option-count-total"].map(selector => getComputedStyle(root.querySelector(selector)).animationName),
         nextDx: getComputedStyle(root.querySelector(".option-count-current")).getPropertyValue("--dx").trim()
       };
     });
@@ -112,15 +113,18 @@ test("toolbar animates only the changing counter number", async () => {
     assert.equal(counter.text, "2/3");
     assert.equal(counter.currentText, "2");
     assert.equal(counter.totalText, "3");
-    assert.equal(counter.currentAnimates, true);
-    assert.equal(counter.totalAnimates, false);
-    assert.equal(counter.nextDx, "8px");
+    assert.equal(counter.sharedUnit, true);
+    assert.equal(counter.duration, "0.18s");
+    assert.deepEqual(counter.childAnimations, ["none", "none", "none"]);
+    assert.equal(counter.nextDx, "6px");
 
     await page.getByRole("button", { name: /previous option/i }).click();
     const previousDx = await page.locator("css=[data-unship-toolbar]").evaluate((host) =>
       getComputedStyle(host.shadowRoot.querySelector(".option-count-current")).getPropertyValue("--dx").trim()
     );
-    assert.equal(previousDx, "-8px");
+    assert.equal(previousDx, "-6px");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal(await page.locator(".choice-unit").evaluate(unit => getComputedStyle(unit).animationName), "none");
   } finally {
     await browser.close();
   }

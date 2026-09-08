@@ -414,8 +414,10 @@
       : `${escapeHtml(group.displayLabel)}, ${escapeHtml(option.label)}. Hold to copy this choice, then paste into your AI chat. Double-click to minimize, drag to move. Press Enter to copy, Shift plus Enter to minimize`;
     return `${comparable ? '<button class="prev nav" type="button" data-action="previous" aria-label="Previous option"></button>' : ""}
         <button class="label" type="button" aria-label="${ariaLabel}" title="Hold to copy choice, then paste into your AI chat">
-          <span class="label-main${swapClass}${copied === "ok" ? " copy-status" : ""}">${title}</span>
-          ${comparable && !copied ? counterMarkup("option-count", group, swapClass) : ""}
+          <span class="choice-unit${swapClass}">
+            <span class="label-main${copied === "ok" ? " copy-status" : ""}">${title}</span>
+            ${comparable && !copied ? counterMarkup("option-count", group) : ""}
+          </span>
         </button>
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}`;
   }
@@ -1251,8 +1253,8 @@
     });
   }
 
-  function counterMarkup(className, group, swapClass = "") {
-    return `<span class="${className}"><span class="${className}-current${swapClass}">${group.activeOptionIndex + 1}</span><span class="${className}-slash">/</span><span class="${className}-total">${group.options.length}</span></span>`;
+  function counterMarkup(className, group) {
+    return `<span class="${className}"><span class="${className}-current">${group.activeOptionIndex + 1}</span><span class="${className}-slash">/</span><span class="${className}-total">${group.options.length}</span></span>`;
   }
 
   // The active group stays pinned as the menu header. Other groups live in a
@@ -1925,6 +1927,7 @@
       .dock.snapping{transition:left .22s var(--ease),bottom .22s var(--ease),top .22s var(--ease)}
       .label:hover,.label:focus{background:transparent;box-shadow:none;outline:0}
       .label:focus-visible{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
+      .choice-unit{display:inline-flex;align-items:center;justify-content:center;gap:.55em;min-width:0;max-width:100%}
       .label-main{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .label-main.copy-status{display:grid;gap:1px;line-height:1.2;white-space:normal}
       .copy-next{font-size:10px;opacity:.7}
@@ -1993,9 +1996,9 @@
       @keyframes dockIn{from{opacity:0;transform:translateX(-50%) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
       @keyframes swapIn{from{opacity:0;transform:translateX(var(--dx,0px))}to{transform:none}}
       .dock.enter{animation:dockIn .2s cubic-bezier(0,0,.2,1)}
-      .dock[data-dir="next"] .row{--dx:8px}
-      .dock[data-dir="prev"] .row{--dx:-8px}
-      .label-main.swap,.option-count-current.swap{animation:swapIn .11s cubic-bezier(0,0,.2,1)}
+      .dock[data-dir="next"] .row{--dx:6px}
+      .dock[data-dir="prev"] .row{--dx:-6px}
+      .choice-unit.swap{animation:swapIn .18s cubic-bezier(.2,.75,.25,1)}
       @media (pointer:coarse),(max-width:520px){.dock{--h:40px;--nav:40px;--navfs:20px;width:min(344px,var(--unship-max-width,calc(100vw - 20px)))}}
       @media (max-width:520px){.canvas-row{gap:2px}}
       @media (max-width:340px){.canvas-fit{display:none}}

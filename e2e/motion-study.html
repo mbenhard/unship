@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Unship · Picker motion</title>
+  <style>
+    *{box-sizing:border-box}[hidden]{display:none!important}
+    body{margin:0;background:#f5f3ec;color:#272c26;font:15px/1.55 system-ui,-apple-system,sans-serif}
+    main{max-width:900px;margin:auto;padding:34px 28px 150px}
+    nav{display:flex;justify-content:space-between;font-size:12px;color:#73796d;margin-bottom:48px}
+    a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}
+    .eyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#74806e}
+    h1{font-size:clamp(32px,5vw,48px);line-height:1.1;font-weight:550;letter-spacing:-.045em;margin:12px 0 18px}
+    .intro{max-width:590px;color:#73796d;margin-bottom:35px}
+    .study-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+    h2{font-size:20px;font-weight:550;letter-spacing:-.03em;margin:0}
+    .timing{font:11px ui-monospace,monospace;color:#7b8177}
+    .description{color:#73796d;max-width:610px;margin:0 0 24px}
+    .stage{height:390px;overflow:hidden;border:1px solid #dedfd4;border-radius:22px;background:#eae6da}
+    iframe{display:block;border:0;width:66.6667%;height:260px;transform:scale(1.5);transform-origin:top left}
+    .footer{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:18px;font-size:12px;color:#73796d}
+    button{font:inherit;cursor:pointer}
+    .replay{flex:none;background:#fff9;border:1px solid #d7dacf;border-radius:999px;padding:10px 16px;color:#384c3c}
+    .replay:hover{background:#fff}.replay:focus-visible,a:focus-visible{outline:2px solid #547458;outline-offset:4px}
+    .note{font-size:12px;color:#81877b;margin-top:30px;max-width:660px}
+    @media(max-width:600px){main{padding:22px 18px 160px}nav{margin-bottom:32px}.stage{height:280px}iframe{width:100%;height:280px;transform:none}.footer{align-items:start}.timing{font-size:10px}.intro{margin-bottom:28px}}
+  </style>
+</head>
+<body>
+<main>
+  <nav><a href="/">unship / studies</a><span>Picker motion · 01</span></nav>
+  <div class="eyebrow">Label + position</div>
+  <h1>One choice. One motion.</h1>
+  <p class="intro">The name and position belong together. Compare the original transition with three ways to make them move as a single unit.</p>
+  <section data-unship-pick="Picker motion">
+    <article data-unship-option="Original" data-motion="current">
+      <div class="study-heading"><h2>Original · separate pieces</h2><span class="timing">110 ms / horizontal</span></div>
+      <p class="description">The name and current number slide in separately. The slash and total stay still, so the counter feels detached.</p>
+      <div class="stage"><iframe title="Current motion · interactive picker"></iframe></div>
+      <div class="footer"><button class="replay" type="button">Play sequence ↗</button><span>Try the arrows inside the sample.<br>The bottom picker changes the motion treatment.</span></div>
+    </article>
+    <article data-unship-option="Shared slide" data-motion="slide" hidden>
+      <div class="study-heading"><h2>Shared slide</h2><span class="timing">180 ms / 6 px</span></div>
+      <p class="description">The name and entire counter arrive together from the direction of travel. Familiar, with a little more room to see the movement. My first choice.</p>
+      <div class="stage"><iframe title="Shared slide · interactive picker"></iframe></div>
+      <div class="footer"><button class="replay" type="button">Play sequence ↗</button><span>One shared movement, including the slash and total.<br>Previous reverses the direction.</span></div>
+    </article>
+    <article data-unship-option="Quiet fade" data-motion="fade" hidden>
+      <div class="study-heading"><h2>Quiet fade</h2><span class="timing">140 ms / opacity</span></div>
+      <p class="description">The whole choice fades in without travelling. The least distracting option, especially when clicking through quickly.</p>
+      <div class="stage"><iframe title="Quiet fade · interactive picker"></iframe></div>
+      <div class="footer"><button class="replay" type="button">Play sequence ↗</button><span>No competing directions.<br>A small acknowledgement of the new choice.</span></div>
+    </article>
+    <article data-unship-option="Soft settle" data-motion="settle" hidden>
+      <div class="study-heading"><h2>Soft settle</h2><span class="timing">200 ms / 2 px + scale</span></div>
+      <p class="description">The name and counter gently settle into place together. A little more tactile, without a spring or bounce.</p>
+      <div class="stage"><iframe title="Soft settle · interactive picker"></iframe></div>
+      <div class="footer"><button class="replay" type="button">Play sequence ↗</button><span>A subtle lift and scale on the entire choice.<br>Both directions use the same movement.</span></div>
+    </article>
+  </section>
+  <p class="note">Each sample uses the real Unship picker. Desktop previews are enlarged 1.5× to make the motion easier to judge. Reduced-motion preferences are respected. Motion plays in these live samples; Canvas snapshots are static.</p>
+</main>
+<script>
+  // Retain the study alternatives around the selected production motion.
+  function applyMotion(mode) {
+    document.querySelector('[data-motion-fallback]')?.remove();
+    const root = document.querySelector('[data-unship-toolbar]').shadowRoot;
+    if (mode === 'slide') return;
+    root.querySelector('style').textContent += `
+      @keyframes study-fade{from{opacity:0}to{opacity:1}}
+      @keyframes study-settle{from{opacity:0;transform:translateY(2px) scale(.975)}to{opacity:1;transform:none}}
+      .choice-unit.swap{animation:${mode==='current'?'none':`study-${mode} ${mode==='fade'?'140':'200'}ms cubic-bezier(.2,.75,.25,1)`}}
+      ${mode==='current' ? `.dock[data-dir="next"] .row{--dx:8px}.dock[data-dir="prev"] .row{--dx:-8px}.choice-unit.swap .label-main,.choice-unit.swap .option-count-current{animation:swapIn .11s cubic-bezier(0,0,.2,1)}` : ''}
+      @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+    `;
+  }
+  let staticToolbar = '';
+  function sampleDocument(mode, live = false) {
+    return `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+      *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:#eae6da;color:#3b4b3d;font:13px/1.5 system-ui,sans-serif;padding:28px 30px}small{font-size:9px;color:#82907a;letter-spacing:.12em}h1{font:400 28px/1.15 Georgia,serif;letter-spacing:-.04em;margin:13px 0 8px}p{color:#7b8875;font-size:11px;margin:0}
+      </style></head><body><small>FIELDWORK / 01</small><section data-unship-pick="Welcome">
+      <div data-unship-option="Quiet start"><h1>A little room to begin.</h1><p>A space for the things taking shape.</p></div>
+      <div data-unship-option="Studio journal" hidden><h1>A little room to begin.</h1><p>A space for the things taking shape.</p></div>
+      <div data-unship-option="Room for something good" hidden><h1>A little room to begin.</h1><p>A space for the things taking shape.</p></div>
+      </section>${staticToolbar}${live ? `<script src="/unship-picker.js" data-unship-dev><\/script><script>(${applyMotion.toString()})(${JSON.stringify(mode)})<\/script>` : ''}</body></html>`;
+  }
+  const articles = [...document.querySelectorAll('article[data-motion]')];
+  let replayTimer;
+  function activeSample() {
+    const article = articles.find(article => !article.hidden);
+    if (staticToolbar && article && !article.querySelector('iframe').dataset.live) {
+      article.querySelector('iframe').dataset.live = 'true';
+      article.querySelector('iframe').srcdoc = sampleDocument(article.dataset.motion, true);
+    }
+    return article;
+  }
+  function stopReplay() {
+    clearTimeout(replayTimer);
+    for (const button of document.querySelectorAll('.replay')) button.textContent = 'Play sequence ↗';
+  }
+  new MutationObserver(() => { stopReplay(); activeSample(); }).observe(document.querySelector('[data-unship-pick]'), { attributes:true, subtree:true, attributeFilter:['hidden'] });
+  document.querySelectorAll('.replay').forEach(button => button.addEventListener('click', () => {
+    const wasPlaying = button.textContent.startsWith('Stop');
+    stopReplay();
+    if (wasPlaying) return;
+    const article = activeSample();
+    const root = article.querySelector('iframe').contentDocument?.querySelector('[data-unship-toolbar]')?.shadowRoot;
+    if (!root?.querySelector('.next')) return;
+    button.textContent = 'Stop sequence';
+    let step = 0;
+    const advance = () => {
+      if (article.hidden || !root.querySelector('.next')) { stopReplay(); return; }
+      root.querySelector(step < 3 ? '.next' : '.prev').click();
+      if (++step < 6) replayTimer = setTimeout(advance, 1000); else stopReplay();
+    };
+    advance();
+  }));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopReplay(); });
+  document.addEventListener('DOMContentLoaded', () => {
+    // Plain HTML survives Canvas's script-free iframe snapshots. The live
+    // sample removes it after its real picker mounts, so it never duplicates UI.
+    const root = document.querySelector('[data-unship-toolbar]').shadowRoot;
+    const dock = root.querySelector('.dock').cloneNode(true);
+    dock.classList.remove('enter');
+    dock.removeAttribute('data-dir');
+    dock.querySelector('.label-main').textContent = 'Quiet start';
+    dock.querySelector('.option-count-current').textContent = '1';
+    dock.querySelector('.option-count-total').textContent = '3';
+    dock.querySelector('.label').removeAttribute('aria-label');
+    staticToolbar = `<div data-motion-fallback inert><style>${root.querySelector('style').textContent}</style>${dock.outerHTML}</div>`;
+    for (const article of articles) article.querySelector('iframe').srcdoc = sampleDocument(article.dataset.motion);
+    activeSample();
+  });
+</script>
+<script src="/unship-picker.js" data-unship-dev></script>
+</body>
+</html>
