@@ -1151,15 +1151,6 @@
     if (event.key === "Escape") {
       event.preventDefault();
       closeCanvas();
-    } else if (canvasOpen && (event.key === "+" || event.key === "=")) {
-      event.preventDefault();
-      stepCanvasZoom(1);
-    } else if (canvasOpen && event.key === "-") {
-      event.preventDefault();
-      stepCanvasZoom(-1);
-    } else if (canvasOpen && event.key === "0") {
-      event.preventDefault();
-      fitCanvas();
     }
   }
 

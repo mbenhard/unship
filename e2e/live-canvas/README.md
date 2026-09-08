@@ -26,7 +26,7 @@ To produce a local installable candidate, commit the intended source and run:
 node e2e/live-canvas/pack.mjs
 ```
 
-This creates `.unship/releases/0.2.0-live.1/unship-cli-0.2.0-live.1.tgz`. It includes the live runtime and matching skill, with a source revision and runtime hash in package metadata. It has no fixture dependencies and is marked private to prevent accidental publishing. The normal package and plugin remain on the existing renderer until the experiment is accepted.
+This creates `.unship/releases/0.2.0-live.2/unship-cli-0.2.0-live.2.tgz`. It includes the live runtime and matching skill, with a source revision and runtime hash in package metadata. It has no fixture dependencies and is marked private to prevent accidental publishing. The normal package and plugin remain on the existing renderer until the experiment is accepted.
 
 Install the tarball with `npm install -g <tarball>`, then use that executable for `unship install --repair --yes --no-project`. Existing projects still need their generated asset refreshed with `setup --out <existing-path> --src <existing-url> --force --json`; reload the browser afterward. Setup saves a backup. Preserve deliberate project pins. Downgrading uses the previous tarball followed by the same skill repair and asset refresh.
 

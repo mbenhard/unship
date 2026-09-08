@@ -6,7 +6,7 @@ npx playwright install chromium
 npm run verify
 ```
 
-Run `npm run demo` and open <http://127.0.0.1:4173>. The playground serves the current picker; refresh after edits. `/canvas` is the focused Canvas fixture. Set `PORT` to use another port.
+The visual studies have been removed. For live Canvas development, see the [reproducible fixture and candidate build](e2e/live-canvas/README.md). Set `PORT` to use another preview port.
 
 ## Structure
 

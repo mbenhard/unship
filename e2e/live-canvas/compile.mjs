@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-export const candidateVersion = '0.2.0-live.1';
+export const candidateVersion = '0.2.0-live.2';
 
 export async function compileLivePicker({ probe = false } = {}) {
   let source = await readFile(new URL('../../src/picker/unship-picker.js', import.meta.url), 'utf8');

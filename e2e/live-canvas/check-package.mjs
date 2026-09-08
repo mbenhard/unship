@@ -1,3 +1,4 @@
+import { checkCanvasShortcuts } from '../../test/helpers/canvas-shortcuts.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -42,6 +43,7 @@ try {
   await page.locator('#counter').hover();
   await page.locator('.canvas-frame-toolbar.visible').waitFor();
   assert.equal(await page.locator('.canvas-frame-toolbar').evaluate(n=>getComputedStyle(n).paddingRight),'6px');
+  await checkCanvasShortcuts(page);
   await page.getByRole('button',{name:'Back to page',exact:true}).click();
   assert.equal(await page.locator('input').inputValue(),'Changed in Canvas');
   assert.equal(await page.locator('[data-unship-option="Two"]').evaluate(n=>n.hidden),true);

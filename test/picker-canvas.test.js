@@ -1,3 +1,4 @@
+import { checkCanvasShortcuts } from './helpers/canvas-shortcuts.js';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -611,4 +612,8 @@ test("Canvas preserves grid sibling space when isolating a group", async () => {
   } finally {
     await browser.close();
   }
+});
+
+test("Canvas leaves keyboard zoom and browser tab shortcuts alone", async () => {
+  await withCanvas(checkCanvasShortcuts);
 });
