@@ -1,3 +1,5 @@
+![Unship - iterate with your agent in the app, not in chat](https://raw.githubusercontent.com/mbenhard/unship/main/.github/assets/cover.png)
+
 # Unship
 
 Compare alternatives in your app with your coding agent.
