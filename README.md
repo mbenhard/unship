@@ -27,11 +27,7 @@ Restart your agent or reload its skills. If detection misses your agent, name it
 Use Unship to compare three hero copy directions, including the current one.
 ```
 
-For side-by-side or responsive previews:
-
-```text
-Use Unship Canvas to compare three pricing-card layouts at desktop and mobile sizes.
-```
+Canvas is always available in the picker to see the alternatives together. Previews load when you open it; no extra command or prompt is needed.
 
 Hold an option to copy your choice, then paste into your AI chat to apply it. You can also tell the agent which label to keep. Copying a choice does not edit source.
 

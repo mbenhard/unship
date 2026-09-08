@@ -17,7 +17,7 @@ const PAGE = `
   @media(max-width:500px){.hero>[data-unship-option]{grid-template-columns:1fr;min-height:360px}}
 </style>
 <main>
-  <header class="header" data-unship-pick="Header" data-unship-canvas="stack">
+  <header class="header" data-unship-pick="Header">
     <div data-unship-option="A">Header A</div><div data-unship-option="B" hidden>Header B</div>
   </header>
   <section class="hero" data-unship-pick="Hero" data-unship-canvas="matrix" style="--gap:32px">
@@ -45,7 +45,30 @@ async function withCanvas(callback) {
   }
 }
 
-test("Canvas renders every opted-in option using the agent Arrangements", async () => {
+test("Canvas is available for plain comparisons and builds previews only on entry", async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(PAGE.replace(/ data-unship-canvas="[^"]+"/g, ""));
+    assert.equal(await page.getByRole("button", { name: "Open Canvas" }).count(), 1);
+    assert.equal(await page.locator(".canvas-shell, .canvas-frame, iframe").count(), 0);
+    assert.deepEqual(await page.evaluate(() => window.__unshipPicker.getState().canvas.groups), [
+      { label: "Header", layout: "stack" },
+      { label: "Hero", layout: "stack" },
+      { label: "Cards", layout: "stack" }
+    ]);
+    await page.getByRole("button", { name: "Open Canvas" }).click();
+    await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]").shadowRoot.querySelectorAll(".canvas-frame.ready").length === 6);
+    assert.equal(await page.locator(".canvas-group").count(), 3);
+    await page.getByRole("button", { name: "Back to page" }).click();
+    await page.getByRole("button", { name: "Open Canvas" }).waitFor();
+    assert.deepEqual(await page.locator("[data-unship-option]:not([hidden])").allTextContents(), ["Header A", "Proof", "Local"]);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("Canvas includes unhinted groups alongside explicit arrangements", async () => {
   await withCanvas(async (page) => {
     const state = await page.locator("[data-unship-toolbar]").evaluate((host) => {
       const root = host.shadowRoot;

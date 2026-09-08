@@ -4,7 +4,9 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
-- Clarify CLI identity reuse, generated-runtime handling, and opt-in Canvas in the skill; remove unused picker CSS and installer metadata, and keep CSS out of visible-text QA reports.
+- Make Canvas available for every comparison by default, with lazy previews and optional layout hints.
+
+- Clarify CLI identity reuse and generated-runtime handling in the skill; remove unused picker CSS and installer metadata, and keep CSS out of visible-text QA reports.
 
 - Claim pinch gestures immediately during Canvas entry and over its controls; release browser zoom on exit. Hide animated group-list scrollbars, remove redundant copied checkmarks, and move frame-pill padding to the right.
 

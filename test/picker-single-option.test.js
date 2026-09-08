@@ -29,6 +29,10 @@ test("single-option groups render a keep label without navigation", async () => 
     assert.equal(state.next, false);
     assert.equal(state.counter, false);
     assert.equal(state.label, "Current");
+    assert.equal(await page.locator(".canvas-frame").count(), 0);
+    await page.getByRole("button", { name: "Open Canvas" }).click();
+    await page.locator(".canvas-frame.ready").waitFor();
+    assert.equal(await page.locator(".canvas-frame").count(), 1);
   } finally {
     await browser.close();
   }
@@ -83,7 +87,7 @@ test("single-group Canvas keeps a full-width entry and shows only the option lab
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
-    await page.setContent(`<section data-unship-pick="Welcome" data-unship-canvas="grid"><div data-unship-option="Quiet start">A</div><div data-unship-option="Studio journal" hidden>B</div></section><script>${picker}</script>`);
+    await page.setContent(`<section data-unship-pick="Welcome"><div data-unship-option="Quiet start">A</div><div data-unship-option="Studio journal" hidden>B</div></section><script>${picker}</script>`);
     const host = page.locator('[data-unship-toolbar]');
     const state = await host.evaluate(host => {
       const root = host.shadowRoot;

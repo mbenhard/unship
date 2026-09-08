@@ -68,7 +68,7 @@ Doctor is optional troubleshooting, not a step in every iteration. Use `doctor -
 
 ## Canvas
 
-Canvas is opt-in: add it for requests mentioning Canvas, side-by-side or simultaneous previews. “Compare three options” alone uses the picker. Preserve Canvas in existing comparisons. Add an arrangement to the relevant group:
+Canvas is built into every comparison. The human can open it from the picker without a special prompt or setup. Previews are created only when opened. Groups use `stack` by default; optionally set an arrangement to suit the content:
 
 ```html
 <section data-unship-pick="Header" data-unship-canvas="stack">...</section>

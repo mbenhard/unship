@@ -141,7 +141,7 @@
         theme: canvasTheme,
         zoom: canvasZoom,
         visibleWidths: Array.from(canvasVisibleWidths),
-        groups: groups.filter((group) => group.canvasLayout).map((group) => ({ label: group.displayLabel, layout: group.canvasLayout }))
+        groups: groups.map((group) => ({ label: group.displayLabel, layout: group.canvasLayout }))
       }
     };
   }
@@ -171,7 +171,7 @@
       label,
       displayLabel: label,
       options,
-      canvasLayout: CANVAS_LAYOUTS.has(canvasHint) ? canvasHint : "",
+      canvasLayout: CANVAS_LAYOUTS.has(canvasHint) ? canvasHint : "stack",
       activeOptionIndex: clamp(activeOptionIndex, options.length)
     };
   }
@@ -392,7 +392,7 @@
 
     const swapClass = switchDir ? " swap" : "";
     setToolbarHtml(`<div class="dock ${mode} ${placement} ${menuOpen ? "open" : ""}${entering ? " enter" : ""}"${switchDir ? ` data-dir="${switchDir}"` : ""} role="group" aria-label="Unship variant picker">
-      ${groups.length > 1 ? menu() : group.canvasLayout ? `<div class="menu"><div class="menu-header full-canvas">${canvasButton()}</div></div>` : ""}
+      ${groups.length > 1 ? menu() : `<div class="menu"><div class="menu-header full-canvas">${canvasButton()}</div></div>`}
       <div class="row"${menuOpen ? " inert" : ""}>
         ${rowMarkup(group, option, swapClass)}
       </div>
@@ -420,10 +420,6 @@
         ${comparable ? '<button class="next nav" type="button" data-action="next" aria-label="Next option"></button>' : ""}`;
   }
 
-  function canvasGroups() {
-    return groups.filter((group) => group.canvasLayout);
-  }
-
   function canvasButton() {
     return `<button class="canvas-enter" type="button" data-action="open-canvas" aria-label="Open Canvas" title="Open Canvas"><span>Canvas</span><span class="canvas-entry-icon" aria-hidden="true">${CANVAS_ICONS.frames}</span></button>`;
   }
@@ -442,7 +438,7 @@
   }
 
   function canvasResponsiveMarkup() {
-    if (!canvasGroups().some((group) => group.canvasLayout === "matrix")) return "";
+    if (!groups.some((group) => group.canvasLayout === "matrix")) return "";
     const responsive = canvasVisibleWidths.size > 1;
     const action = responsive ? "Show desktop-only previews" : "Show responsive previews";
     return `<button class="canvas-state-toggle canvas-responsive-toggle" type="button" data-action="canvas-responsive" aria-label="${action}" aria-pressed="${responsive}" title="${action}">
@@ -461,7 +457,7 @@
   }
 
   function openCanvas() {
-    if (canvasOpen || canvasPreparing || !canvasGroups().length) return;
+    if (canvasOpen || canvasPreparing || !groups.length) return;
     clearTimeout(canvasCloseTimer);
     clearTimeout(canvasCacheTimer);
     if (canvasShell) {
@@ -498,7 +494,7 @@
   }
 
   function canvasIdentity() {
-    return canvasGroups().flatMap((group) => [group.element, group.canvasLayout, ...group.options.map((option) => option.element)]);
+    return groups.flatMap((group) => [group.element, group.canvasLayout, ...group.options.map((option) => option.element)]);
   }
 
   function reopenCanvas() {
@@ -651,7 +647,7 @@
       </div>`;
     const world = shell.querySelector(".canvas-world");
 
-    for (const group of canvasGroups()) {
+    for (const group of groups) {
       const section = document.createElement("section");
       section.className = `canvas-group canvas-${group.canvasLayout}`;
       section.dataset.group = String(group.index);
@@ -1271,7 +1267,7 @@
       })
       .join("");
 
-    return `<div class="menu" role="menu"><div class="menu-header${canvasGroups().length ? " has-canvas" : ""}" role="none"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><svg class="menu-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/><path d="M6 12h12"/><path d="M6 12h12"/></svg></button>${canvasGroups().length ? canvasButton() : ""}</div><div class="menu-list" role="none">${items}</div></div>`;
+    return `<div class="menu" role="menu"><div class="menu-header has-canvas" role="none"><button class="menuitem current" type="button" role="menuitem" aria-current="true" data-action="toggle-menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Active group ${escapeHtml(current.displayLabel)}"><span class="menu-name">${escapeHtml(current.displayLabel)}</span><svg class="menu-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/><path d="M6 12h12"/><path d="M6 12h12"/></svg></button>${canvasButton()}</div><div class="menu-list" role="none">${items}</div></div>`;
   }
 
   function handleMenuWheel(event) {
