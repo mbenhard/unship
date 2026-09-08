@@ -1,13 +1,11 @@
 ---
 name: unship
-description: "Compare agent-made local alternatives in the real app: UI, copy, states, small flows, design-system treatments, rendered docs or DX previews. Use for Unship setup, Canvas comparisons, selection, and cleanup."
+description: "Compare agent-made alternatives in a local browser preview with Unship. Use for comparison setup, iteration, Canvas, selection, cleanup, and Unship installation or update troubleshooting."
 ---
 
 # Unship
 
-Unship is local comparison tooling: create temporary alternatives in real source, let the human compare them in the browser, and follow their direction in source. The script runs locally and does not send telemetry. Picker selection does not save source or make a product decision; the agent applies the human's choice.
-
-Make requested adjustments directly in source. Use the picker for discrete alternatives, not live parameter controls.
+Create temporary alternatives in app source and use Unship's existing picker and Canvas for comparison controls. The human compares them in the browser; follow their direction in source. Picker selection does not save source.
 
 ## Command Prefix
 
@@ -23,15 +21,13 @@ If `/unship` is unavailable after installation, continue from the natural-langua
 
 ## Variant Creation
 
-Inspect the requested source and its immediate design context. In consuming apps, treat the generated picker as an asset: inspect surrounding app markup and use setup/doctor for the runtime, rather than reading its implementation.
+In consuming apps, treat the generated picker as an asset: inspect the app source and use setup/doctor for the runtime, rather than reading its implementation.
 
 - A requested number means exactly that many choices unless the user says “plus current”. Otherwise create 2–4 meaningful alternatives with short, distinct labels.
-- Keep the smallest scope that lets the human judge the decision. Match the app's design language unless asked to depart from it. For copy comparisons, preserve structure and vary the message.
 - For docs or CLI output, make a local rendered preview; the picker cannot compare raw files.
 - Reuse existing comparisons where they still serve the request; preserve unrelated comparisons.
-- If no app source or preview shell exists yet, create it before mounting the picker.
 
-Do not build a custom switcher, tab set, or preference system. Use this markup contract, with direct child options and exactly one initially visible:
+Use this markup contract, with direct child options and exactly one initially visible:
 
 ```html
 <section data-unship-pick="Hero">
@@ -58,7 +54,7 @@ $UNSHIP setup --out public/unship-picker.js --src /unship-picker.js --json
 
 The paths above are examples: choose the app's actual served file and URL. Reuse an existing destination; do not add a second mount. Setup creates a missing file, leaves identical bytes untouched, and reports differing content without overwriting it. For a known old generated picker, repeat with `--force`; replacement saves a backup. Preserve custom modifications and resolve them deliberately before replacement. Require `picker.current: true` after preparation.
 
-Setup prepares the file, not the app shell. Add the returned small script tag once in a dev-only shell. Do not ship the mount or runtime. Respect framework script ordering: in Next.js App Router, use a valid root-document script placement or an appropriate async include, rather than a synchronous `next/script` in an arbitrary component.
+Setup prepares the file, not the app shell. Add the returned small script tag once in a dev-only shell; keep the runtime and agent instructions out of production builds. Respect framework script ordering: in Next.js App Router, use a valid root-document script placement or an appropriate async include, rather than a synchronous `next/script` in an arbitrary component.
 
 If the preview serves built output or caches an old script, rebuild/reload as needed and verify the served file matches the selected runtime. Reinjecting a script does not replace an already-running singleton. Report unresolved browser freshness honestly.
 
@@ -78,7 +74,7 @@ Canvas is built into every comparison. The human can open it from the picker wit
 
 Choose `stack` for wide, shallow options, `grid` for compact components, and `matrix` for responsive comparison at 1280, 768, and 390 pixels. Matrix opens at Desktop; the responsive toggle reveals Tablet and Mobile. Choose the arrangement from the content rather than asking the user to manage layout controls.
 
-Canvas frames are script-free snapshots. For content dependent on canvas pixels, shadow DOM, or client JavaScript, use a smaller static preview that represents the decision faithfully. Keep the marked group self-contained. Use the existing Canvas and Keep controls; do not add annotation, sharing, ranking, or persistence systems.
+Canvas frames are script-free snapshots. For content dependent on canvas pixels, shadow DOM, or client JavaScript, use a smaller static preview that represents the decision faithfully. Keep the marked group self-contained.
 
 ## Verification and Handoff
 
@@ -86,9 +82,9 @@ Keep verification proportional to the phase. During creation, check the expected
 
 For literal source, run `$UNSHIP check --readiness --json --root <comparison-directory>`. Resolve failures; check uncertain dynamic markup manually. A result with zero groups does not verify the requested comparison. Full release checks belong to setup changes, selected-source cleanup, or shipping, not ordinary variant edits.
 
-Do not start, open, or automate a browser by default. Use it when requested, when setup needs verification, or when source cannot establish readiness. Check expected controls and switching; the human judges the alternatives.
+Reuse the app's running preview. If none is available, start its normal dev server when needed to deliver the requested comparison. Use browser automation when requested or when source checks cannot establish readiness; verify controls and switching.
 
-Hand off the known preview link and choice labels; mention checks briefly and setup details only when updated or unresolved. If no preview is running, use its normal dev command when requested. A detected port alone does not identify the app.
+Hand off the working preview link and choice labels. Mention checks briefly and state any unresolved blocker.
 
 ## Selection and Cleanup
 
@@ -102,4 +98,4 @@ For final cleanup, remove all temporary options, attributes, comments, script mo
 $UNSHIP check --json
 ```
 
-Do not claim final cleanup until the check is clean. Run the app's relevant checks/build for the settled source. Preserve unrelated project changes and keep the runtime/instructions out of the production artifact.
+Do not claim final cleanup until the check is clean. Run the app's relevant checks/build for the settled source. Preserve unrelated project changes.

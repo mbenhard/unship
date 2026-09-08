@@ -4,6 +4,8 @@ All notable changes to Unship are documented here.
 
 ## 0.2.0 - Unreleased
 
+- Simplify the comparison skill and reuse running previews, starting a dev server only when needed to deliver the requested comparison.
+
 - Copy selections without deletion instructions; let conversational intent determine iteration and final cleanup.
 
 - Make Canvas available for every comparison by default, with lazy previews and optional layout hints.
