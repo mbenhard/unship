@@ -6,7 +6,7 @@ npx playwright install chromium
 npm run verify
 ```
 
-The visual studies have been removed. For live Canvas development, see the [reproducible fixture and candidate build](e2e/live-canvas/README.md). Set `PORT` to use another preview port.
+For stateful Canvas development, see the [React browser fixture](e2e/live-canvas/README.md). It exercises the shipped runtime. Set `PORT` to use another preview port.
 
 ## Structure
 

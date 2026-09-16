@@ -107,7 +107,7 @@ test("readiness reports uncertain when the group range has low confidence", () =
 
 
 test("readiness accepts Canvas Arrangements and fails invalid values", () => {
-  for (const layout of ["stack", "grid", "matrix"]) {
+  for (const layout of ["stack", "grid"]) {
     const groups = scanReadiness(
       "src/App.html",
       `<section data-unship-pick="Hero" data-unship-canvas="${layout}"><div data-unship-option="A">A</div><div data-unship-option="B" hidden>B</div></section>`

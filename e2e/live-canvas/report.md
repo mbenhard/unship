@@ -1,3 +1,7 @@
+# Historical feasibility report
+
+This records the original prototype. The 0.2 release integrates live Canvas into the shipped runtime and adds a return-to-page fallback for detected external overlays. Run the current regression suite for release evidence; the limitations and packaging description below are historical.
+
 # Live Canvas feasibility test
 
 ## Result

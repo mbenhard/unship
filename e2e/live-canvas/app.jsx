@@ -17,7 +17,7 @@ function Option({name,hidden}) {
   {expanded&&<p className="details">This content was created by React while the original component stayed mounted.</p>}
   <canvas ref={canvas} width="240" height="60"/><live-badge/>
   <iframe title={`${name} embedded widget`} style={{width:'100%',height:54,border:'1px solid #cbd7c5',borderRadius:8}} srcDoc={'<html><body style="margin:8px;font:12px system-ui"><button onclick="this.textContent=++window.count">Embedded count 0</button><script>window.count=0;parent.iframeLoads=(parent.iframeLoads||0)+1;</script></body></html>'}/>
-  <button className="portal-toggle" onClick={()=>setPortal(v=>!v)}>Portal menu · known limitation</button>
+  <button className="portal-toggle" onClick={()=>setPortal(v=>!v)}>Open portal menu</button>
   {portal&&createPortal(<div className="portal-menu" style={{position:'fixed',left:30,top:30,zIndex:2147483647,background:'white',padding:20,border:'1px solid'}}>Menu outside component</div>,document.body)}
   <div className="responsive-panel"><span className="media-status"></span><span className="container-status"></span></div>
   <div className="pulse" aria-label="CSS animation"><i/></div>

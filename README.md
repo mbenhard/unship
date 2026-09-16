@@ -6,7 +6,7 @@ Compare alternatives in your app with your coding agent.
 
 Ask for UI, copy, or state variations. Browse them with the local picker, copy your choice, and paste it into your AI chat. The agent follows your direction in source.
 
-A single injected script. No runtime dependencies, accounts, or telemetry.
+A single injected script. No runtime dependencies, accounts, or telemetry. Free and MIT licensed.
 
 ## Install
 
@@ -19,7 +19,7 @@ unship install
 
 Restart your agent or reload its skills. If detection misses your agent, name it: `unship install codex`, `unship install claude`, or `unship install cursor`.
 
-**0.2 is unreleased.** npm installs the published version. To try this checkout, follow [local installation](CONTRIBUTING.md#test-the-local-build).
+**New in 0.2:** live Canvas, broader agent installation, and safer picker updates. See the [release notes](CHANGELOG.md).
 
 ## Use
 
@@ -27,7 +27,11 @@ Restart your agent or reload its skills. If detection misses your agent, name it
 Use Unship to compare three hero copy directions, including the current one.
 ```
 
-Canvas is always available in the picker to see the alternatives together. Previews load when you open it; no extra command or prompt is needed.
+Open **Canvas** from the picker to compare alternatives together. Pan, zoom, switch the Canvas theme, and interact with the original components. State and event handlers stay with the actual app; Canvas does not clone or restart it.
+
+Use stacked sections or a grid of smaller components. All options share your browser viewport, so resize the browser for responsive testing. Canvas requires the Popover API. App-owned option-root popovers/dialogs stay on the page, and detected external overlays return you there. Custom portals and cross-origin iframe gestures may need page-level testing.
+
+![Live Canvas compares the original running components](https://raw.githubusercontent.com/mbenhard/unship/main/.github/assets/canvas.png)
 
 Tell the agent what to change or keep, or hold an option to copy its selection into your AI chat. Copying identifies the option; your instructions determine what happens next.
 

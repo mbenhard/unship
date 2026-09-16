@@ -2,44 +2,30 @@
 
 All notable changes to Unship are documented here.
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-09-16
 
-- Move the option name and complete counter together with the selected Shared slide motion.
+### Live Canvas
 
-- Simplify the comparison skill and reuse running previews, starting a dev server only when needed to deliver the requested comparison.
+- Compare the original, running options together in a zoomable Canvas, available from every comparison. DOM parents, component state, event handlers, canvas pixels, and existing iframe instances are preserved.
+- Arrange wide sections in a stack or compact components in a grid. Pan with a trackpad, zoom with pinch or on-screen controls, fit the comparison, and switch light/dark Canvas themes.
+- Remove snapshot rendering and the responsive matrix. All options share the real browser viewport; resize the browser to test viewport media queries.
+- Preserve browser keyboard shortcuts. Canvas no longer intercepts keyboard zoom keys.
+- Restore styles and visibility on exit, handle removed options, and return to the page for detected external overlays. Option roots with app-owned popovers/dialogs remain page comparisons.
+- Respect native scrolling inside live options and relay wheel gestures from accessible embedded frames. Cross-origin iframe gestures cannot be relayed.
 
-- Copy selections without deletion instructions; let conversational intent determine iteration and final cleanup.
+### Picker and agent workflow
 
-- Make Canvas available for every comparison by default, with lazy previews and optional layout hints.
+- Copy a named choice without embedding deletion instructions. Your chat instructions determine whether the agent iterates or finalizes the source.
+- Accumulate one copied selection per group in Canvas, with visible copy feedback.
+- Refine picker motion, option counters, group menus, frame controls, and narrow-preview behavior.
+- Add global-first installation for Cursor, Gemini CLI, Windsurf, Cline, and explicit Roo; retain project-local Copilot guidance and the Claude Code plugin.
+- Prepare external runtime assets with exact-byte checks, explicit replacement, and recovery backups. Doctor checks explicit copied/inline mounts offline by default.
+- Add comparison-readiness checks, preserve deliberate CLI versions, and simplify setup, iteration, and cleanup instructions.
+- Remove experimental tuning controls. Agents make design adjustments directly in source.
 
-- Clarify CLI identity reuse and generated-runtime handling in the skill; remove unused picker CSS and installer metadata, and keep CSS out of visible-text QA reports.
+### Compatibility
 
-- Claim pinch gestures immediately during Canvas entry and over its controls; release browser zoom on exit. Hide animated group-list scrollbars, remove redundant copied checkmarks, and move frame-pill padding to the right.
-
-- Match option-name and counter motion, clarify copying choices into an AI chat, show visible Canvas copy feedback and checkmarks, and refine the frame pill spacing and moon icon.
-
-- Keep recovery backups and pre-existing ignore rules during agent-led comparison cleanup.
-- Show only the option label in the navigation row; group names remain in the multi-group list and accessible descriptions.
-- Prepare runtime files directly with `setup --out`: exact-byte no-op checks, explicit replacement with backups, and shared inline/external snippet options.
-- Verify explicit copied or inline mounts with doctor; keep diagnostics offline by default and remove automatic npm update checks.
-- Preserve the chosen CLI build through repair instructions, add `--version`, and shorten the skill around the setup/compare/cleanup workflow.
-- Detect custom-named dev mounts during cleanup; remove readiness guidance for retired inline controls and share installed-instruction path definitions.
-- Preserve recovery copies when replacing agent instructions, report detected homes without claiming skills are loaded, and return failure for blocked command installation.
-- Add a packed-package comparison/update/cleanup lifecycle test; reuse Chromium across DOM tests while keeping each test in an isolated context.
-
-- Add Canvas for simultaneous comparison with `stack`, `grid`, and responsive `matrix` arrangements, script-free snapshots, native pan/zoom, light/dark themes, and warm reopen caching.
-- Preserve explicit Keep choices and cumulative clipboard output, invalidate stale snapshots after source changes, and contain keyboard focus in Canvas.
-- Add the attached Canvas tab, matching group/Canvas labels, List / Close menu animation, right-aligned Back to page control, and compact Canvas spacing.
-- Give single-group Canvas a full-width row; reduce label sizes and entry-icon opacity, and use an optically aligned return-to-page icon with hover feedback.
-- Keep the Canvas label stable during preparation, showing an icon-only spinner after 200 ms; remove menu fades, hide variant controls in expanded group lists, and size menus for short previews.
-- Remove experimental tuning controls and their runtime, state, metadata validation, and authoring instructions. Design adjustments happen directly in source through the agent. Cleanup still detects retired markup.
-- Add global-first installation for Cursor, Gemini CLI, Windsurf, Cline, and explicit Roo, with Copilot as repo-local guidance; detect Codex alongside other agent homes.
-- Accept positional harness names such as `install cursor gemini` and expand repo-local targets while retaining the portable default.
-- Add `check --readiness` for comparison structure and presentation hints, with conservative handling of dynamic templates and framework visibility directives.
-- Keep the option counter beside the label; show navigation only when a group has multiple options.
-- Update bundled skills to use focused readiness checks and a verified local CLI during unpublished testing.
-- Add the local Fieldwork demo (`npm run demo`), kept outside the npm package.
-- Add the Claude Code plugin distribution and cross-agent skills CLI installation documentation.
+Canvas needs a browser with the Popover API. Custom portals, nested overlays, and cross-origin iframe input should be checked on the page. Unship remains temporary local development tooling; remove its source markup and runtime before shipping a consuming app.
 
 ## 0.1.7 - 2026-06-07
 

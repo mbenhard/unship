@@ -38,7 +38,7 @@ async function withCanvas(callback) {
     await page.getByRole("button", { name: "Open Canvas" }).click();
     await page.waitForFunction(() => {
       const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
-      return root?.querySelectorAll(".canvas-frame.ready").length === 10;
+      return root?.querySelectorAll(".canvas-frame.ready").length === 6;
     });
     return await callback(page);
   } finally {
@@ -69,149 +69,6 @@ test("Canvas is available for plain comparisons and builds previews only on entr
   }
 });
 
-test("Canvas includes unhinted groups alongside explicit arrangements", async () => {
-  await withCanvas(async (page) => {
-    const state = await page.locator("[data-unship-toolbar]").evaluate((host) => {
-      const root = host.shadowRoot;
-      return {
-        groups: Array.from(root.querySelectorAll(".canvas-group-name")).map((node) => node.textContent),
-        frames: root.querySelectorAll(".canvas-frame").length,
-        matrixWidths: Array.from(root.querySelectorAll('.canvas-group[data-group="1"] .canvas-frame')).map((frame) => frame.dataset.width),
-        visibleMatrixWidths: Array.from(root.querySelectorAll('.canvas-group[data-group="1"] .canvas-frame:not(.viewport-hidden)')).map((frame) => frame.dataset.width),
-        responsiveControl: (() => { const button = root.querySelector('.canvas-responsive-toggle'); return [button.title, button.getAttribute("aria-pressed")]; })(),
-        gridFrameWidth: root.querySelector('.canvas-group[data-group="2"] .canvas-frame').style.width,
-        frameChrome: (() => { const style = getComputedStyle(root.querySelector('.canvas-group[data-group="2"] .canvas-frame')); return [style.backgroundColor, style.borderTopWidth, style.boxShadow]; })(),
-        canvasBackground: getComputedStyle(root.querySelector(".canvas-shell")).backgroundColor,
-        snapshotBackgrounds: (() => { const doc = root.querySelector(".canvas-frame iframe").contentDocument; return [getComputedStyle(doc.documentElement).backgroundColor, getComputedStyle(doc.body).backgroundColor]; })(),
-        scripts: Array.from(root.querySelectorAll("iframe")).map((frame) => frame.contentDocument.scripts.length),
-        camera: root.querySelector(".canvas-world").style.transform,
-        globalPanzoom: typeof window.Panzoom
-      };
-    });
-    assert.deepEqual(state.groups, ["Header", "Hero", "Cards"]);
-    assert.equal(state.frames, 10);
-    assert.deepEqual(state.matrixWidths, ["1280", "768", "390", "1280", "768", "390"]);
-    assert.deepEqual(state.visibleMatrixWidths, ["1280", "1280"]);
-    assert.deepEqual(state.responsiveControl, ["Show responsive previews", "false"]);
-    assert.equal(state.gridFrameWidth, "320px");
-    assert.deepEqual(state.frameChrome, ["rgba(0, 0, 0, 0)", "0px", "none"]);
-    assert.equal(state.canvasBackground, "rgb(255, 255, 255)");
-    assert.deepEqual(state.snapshotBackgrounds, ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
-    assert.deepEqual(state.scripts, Array(10).fill(0));
-    assert.match(state.camera, /^scale\(/);
-    assert.equal(state.globalPanzoom, "undefined");
-  });
-});
-
-test("Canvas keeps the native preview visible until its visible Frames are prepared", async () => {
-  const browser = await launchBrowser();
-  let releaseImages;
-  const imageGate = new Promise((resolve) => { releaseImages = resolve; });
-  try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    await page.route("https://unship.test/slow.svg", async (route) => {
-      await imageGate;
-      await route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><path fill="#ddd" d="M0 0h8v8H0z"/></svg>' });
-    });
-    const slowPage = PAGE.replace(
-      '<div data-unship-option="Proof">Proof</div>',
-      '<div data-unship-option="Proof"><img src="https://unship.test/slow.svg" alt="">Proof</div>'
-    );
-    await page.setContent(slowPage, { waitUntil: "domcontentloaded" });
-    const initial = await page.getByRole("button", { name: "Open Canvas" }).evaluate((button) => {
-      button.click();
-      const pinch = new WheelEvent("wheel", { ctrlKey: true, deltaY: 50, cancelable: true, bubbles: true });
-      document.body.dispatchEvent(pinch);
-      return {
-        pinchCaptured: pinch.defaultPrevented,
-        label: button.textContent,
-        icon: Boolean(button.querySelector(".canvas-entry-icon svg")),
-        spinner: Boolean(button.querySelector(".canvas-spinner")),
-        width: button.offsetWidth
-      };
-    });
-    assert.deepEqual(initial, { pinchCaptured: true, label: "Canvas", icon: true, spinner: false, width: 90 });
-    await page.locator(".canvas-entry-icon .canvas-spinner").waitFor();
-    const preparing = await page.locator("[data-unship-toolbar]").evaluate((host) => {
-      const root = host.shadowRoot;
-      const shell = root.querySelector(".canvas-shell");
-      const button = root.querySelector('[data-action="open-canvas"]');
-      return {
-        open: window.__unshipPicker.getState().canvas.open,
-        label: button.textContent,
-        ariaLabel: button.getAttribute("aria-label"),
-        spinner: Boolean(button.querySelector(".canvas-spinner")),
-        width: button.offsetWidth,
-        opacity: getComputedStyle(shell).opacity,
-        pointerEvents: getComputedStyle(shell).pointerEvents,
-        overflow: document.documentElement.style.overflow
-      };
-    });
-    assert.deepEqual(preparing, { open: false, label: "Canvas", ariaLabel: "Preparing Canvas", spinner: true, width: 90, opacity: "0", pointerEvents: "none", overflow: "" });
-
-    releaseImages();
-    await page.getByRole("button", { name: "Back to page" }).waitFor();
-    await page.waitForFunction(() => document.querySelector("[data-unship-toolbar]")?.shadowRoot.querySelector(".canvas-shell.content-visible"));
-    assert.equal(await page.evaluate(() => window.__unshipPicker.getState().canvas.open), true);
-    assert.equal(await page.evaluate(() => document.documentElement.style.overflow), "hidden");
-    const pinchCaptured = () => page.evaluate(() => {
-      const event = new WheelEvent("wheel", { ctrlKey: true, deltaY: 50, cancelable: true, bubbles: true });
-      document.body.dispatchEvent(event);
-      return event.defaultPrevented;
-    });
-    assert.equal(await pinchCaptured(), true, "pinch over toolbar/page is claimed while Canvas is open");
-    await page.getByRole("button", { name: "Back to page" }).click();
-    assert.equal(await pinchCaptured(), false, "page zoom returns on exit");
-    await page.getByRole("button", { name: "Open Canvas" }).click();
-    assert.equal(await pinchCaptured(), true, "cached reopen claims pinch immediately too");
-    await page.evaluate(() => window.__unshipPicker.destroy());
-    assert.equal(await pinchCaptured(), false, "destroy releases page zoom");
-  } finally {
-    releaseImages?.();
-    await browser.close();
-  }
-});
-
-test("Canvas matrix previews default to Desktop and toggle all responsive widths together", async () => {
-  await withCanvas(async (page) => {
-    const host = page.locator("[data-unship-toolbar]");
-    const scaleBefore = await host.evaluate((node) => Number(node.shadowRoot.querySelector(".canvas-world").style.transform.match(/scale\(([^)]+)\)/)[1]));
-    const responsiveToggle = await host.evaluate(async (node) => {
-      const root = node.shadowRoot;
-      const anchor = root.querySelector('.canvas-matrix .canvas-frame:not(.viewport-hidden)');
-      const button = root.querySelector('.canvas-responsive-toggle');
-      const left = () => anchor.getBoundingClientRect().left;
-      const before = left();
-      button.click();
-      const sync = left();
-      await new Promise(requestAnimationFrame);
-      const firstFrame = left();
-      await new Promise(requestAnimationFrame);
-      return { before, sync, firstFrame, secondFrame: left() };
-    });
-    for (const [phase, left] of Object.entries(responsiveToggle)) {
-      if (phase === "before") continue;
-      assert.equal(Math.abs(left - responsiveToggle.before) < 0.5, true, `responsive toggle shifted the existing Frame during ${phase}`);
-    }
-    await page.waitForTimeout(250);
-    const visible = await host.evaluate((node) => {
-      const frames = Array.from(node.shadowRoot.querySelectorAll('.canvas-matrix .canvas-frame:not(.viewport-hidden)'));
-      const scale = Number(node.shadowRoot.querySelector(".canvas-world").style.transform.match(/scale\(([^)]+)\)/)[1]);
-      return { widths: frames.map((frame) => frame.dataset.width), heights: frames.map((frame) => frame.querySelector("iframe").offsetHeight), scale };
-    });
-    assert.deepEqual(visible.widths, ["1280", "768", "390", "1280", "768", "390"]);
-    assert.equal(visible.heights.every((height) => height > 100), true, "revealed responsive Frames must be remeasured");
-    assert.equal(Math.abs(visible.scale - scaleBefore) < 0.0001, true, "responsive toggles must not refit or zoom the Canvas");
-
-    const responsiveButton = page.getByRole("button", { name: "Show desktop-only previews" });
-    assert.equal(await responsiveButton.getAttribute("aria-pressed"), "true");
-    await responsiveButton.click();
-    const desktopOnly = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll('.canvas-matrix .canvas-frame:not(.viewport-hidden)')).map((frame) => frame.dataset.width));
-    assert.deepEqual(desktopOnly, ["1280", "1280"]);
-    assert.equal(await page.getByRole("button", { name: "Show responsive previews" }).getAttribute("aria-pressed"), "false");
-  });
-});
-
 test("Canvas button zoom animates fixed ten-point steps smoothly", async () => {
   await withCanvas(async (page) => {
     const host = page.locator("[data-unship-toolbar]");
@@ -231,7 +88,6 @@ test("Canvas button zoom animates fixed ten-point steps smoothly", async () => {
 test("Canvas zoom stays anchored to the cursor and accumulates rapid controls", async () => {
   await withCanvas(async (page) => {
     const host = page.locator("[data-unship-toolbar]");
-    await page.getByRole("button", { name: "Show responsive previews" }).click();
     await page.waitForTimeout(250);
     const point = { x: 900, y: 400 };
     const worldAtPoint = () => host.evaluate((node, cursor) => {
@@ -320,7 +176,7 @@ test("Canvas zoom stays anchored to the cursor and accumulates rapid controls", 
     assert.equal(Math.abs(afterTrackpadPan.y - afterPinchOut.y) > 1, true);
 
     const framePoint = await host.evaluate((node) => {
-      const rect = node.shadowRoot.querySelector('.canvas-frame[data-group="1"][data-option="0"][data-width="768"]').getBoundingClientRect();
+      const rect = node.shadowRoot.querySelector('.canvas-frame[data-group="1"][data-option="0"]').getBoundingClientRect();
       return { x: rect.x + rect.width / 2, y: rect.y + 12 };
     });
     await page.mouse.move(framePoint.x, framePoint.y);
@@ -410,65 +266,6 @@ test("Canvas entry remains available in a narrow desktop preview", async () => {
   }
 });
 
-test("Canvas keeps a warm prepared session across close and reopen", async () => {
-  await withCanvas(async (page) => {
-    const host = page.locator("[data-unship-toolbar]");
-    const dockIdentity = await host.evaluate((node) => {
-      const dock = node.shadowRoot.querySelector(".canvas-dock");
-      window.__unshipCanvasDock = dock;
-      return Boolean(dock);
-    });
-    assert.equal(dockIdentity, true);
-    await page.getByRole("button", { name: "Use dark Canvas theme" }).click();
-    await page.getByRole("button", { name: "Zoom in" }).click();
-    await page.waitForTimeout(240);
-    const controls = await host.evaluate((node) => ({
-      theme: node.shadowRoot.querySelector(".canvas-shell").dataset.theme,
-      zoom: node.shadowRoot.querySelector(".canvas-zoom-value").textContent,
-      sameDock: node.shadowRoot.querySelector(".canvas-dock") === window.__unshipCanvasDock
-    }));
-    assert.equal(controls.theme, "dark");
-    assert.match(controls.zoom, /%$/);
-    assert.equal(controls.sameDock, true, "theme changes must update the existing dock instead of remounting it");
-
-    const cachedBefore = await host.evaluate((node) => {
-      const root = node.shadowRoot;
-      window.__unshipCachedFrame = root.querySelector(".canvas-frame");
-      return root.querySelector(".canvas-world").style.transform;
-    });
-
-    await page.getByRole("button", { name: "Back to page" }).click();
-    await page.waitForTimeout(220);
-    const closed = await host.evaluate((node) => {
-      const shell = node.shadowRoot.querySelector(".canvas-shell");
-      return {
-        cached: window.__unshipPicker.getState().canvas.cached,
-        preparing: window.__unshipPicker.getState().canvas.preparing,
-        shell: Boolean(shell),
-        visible: shell?.classList.contains("visible"),
-        pointerEvents: shell ? getComputedStyle(shell).pointerEvents : "missing"
-      };
-    });
-    assert.deepEqual(closed, { cached: true, preparing: false, shell: true, visible: false, pointerEvents: "none" });
-    assert.equal(await page.getByRole("button", { name: "Open Canvas" }).isVisible(), true);
-    assert.equal(await page.getByRole("button", { name: "Open Canvas" }).evaluate((button) => button === button.getRootNode().activeElement), true);
-    assert.equal(await page.evaluate(() => document.documentElement.style.overflow), "");
-
-    await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => window.__unshipPicker.getState().canvas.open);
-    const reopened = await host.evaluate((node) => {
-      const root = node.shadowRoot;
-      return {
-        sameFrame: root.querySelector(".canvas-frame") === window.__unshipCachedFrame,
-        transform: root.querySelector(".canvas-world").style.transform,
-        theme: root.querySelector(".canvas-shell").dataset.theme,
-        preparing: window.__unshipPicker.getState().canvas.preparing
-      };
-    });
-    assert.deepEqual(reopened, { sameFrame: true, transform: cachedBefore, theme: "dark", preparing: false });
-  });
-});
-
 test("Canvas Keep actions accumulate one choice per Group", async () => {
   await withCanvas(async (page) => {
     await page.evaluate(() => {
@@ -487,7 +284,7 @@ test("Canvas Keep actions accumulate one choice per Group", async () => {
     assert.match(copied, /Unship selection: "B" for "Header"/);
     assert.match(copied, /Unship selection: "Direct" for "Hero"/);
     const kept = await host.evaluate((node) => Array.from(node.shadowRoot.querySelectorAll(".canvas-frame.kept")).map((frame) => `${frame.dataset.group}:${frame.dataset.option}`));
-    assert.deepEqual(kept, ["0:1", "1:1", "1:1", "1:1"]);
+    assert.deepEqual(kept, ["0:1", "1:1"]);
     assert.equal(await page.locator(".canvas-keep").textContent(), "Copied — paste into your AI chat");
     await host.evaluate((node) => node.shadowRoot.querySelector('.canvas-frame[data-group="0"][data-option="0"]').dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
     assert.equal(await page.locator(".canvas-keep").textContent(), "Hold to copy choice");
@@ -536,35 +333,13 @@ test("Canvas does not mark failed copies as kept", async () => {
   });
 });
 
-test("Canvas rebuilds cached frames after in-place source edits", async () => {
-  await withCanvas(async (page) => {
-    await page.getByRole("button", { name: "Back to page" }).click();
-    await page.getByRole("button", { name: "Open Canvas" }).waitFor();
-    await page.evaluate(() => {
-      const option = document.querySelector('.hero [data-unship-option="Proof"]');
-      option.firstChild.data = "Updated proof";
-      option.style.color = "rgb(255, 0, 0)";
-    });
-    await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => {
-      const frame = document.querySelector('[data-unship-toolbar]').shadowRoot.querySelector('.canvas-iframe[data-group="1"]');
-      return frame?.contentDocument?.querySelector('.hero [data-unship-option="Proof"]')?.textContent === 'Updated proof';
-    });
-    const color = await page.locator('[data-unship-toolbar]').evaluate(host => {
-      const frame = host.shadowRoot.querySelector('.canvas-iframe[data-group="1"]');
-      return frame.contentWindow.getComputedStyle(frame.contentDocument.querySelector('.hero [data-unship-option="Proof"]')).color;
-    });
-    assert.equal(color, "rgb(255, 0, 0)");
-  });
-});
-
 test("Canvas resolves valid groups after an empty group", async () => {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setContent(PAGE.replace('<main>', '<main><section data-unship-pick="Empty"></section>'));
     await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('.canvas-frame.ready').length === 10);
+    await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('.canvas-frame.ready').length === 6);
     const frame = page.locator('[data-unship-toolbar] .canvas-frame[data-group="1"]').first();
     await frame.focus();
     await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async text => { window.__copied = text; } } }));
@@ -589,31 +364,73 @@ test("Canvas contains keyboard focus and Escape returns to the page", async () =
 });
 
 
-test("Canvas preserves grid sibling space when isolating a group", async () => {
-  const browser = await launchBrowser();
-  try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    await page.setContent(`<style>body{margin:0}.app{display:grid;grid-template-columns:216px minmax(0,1fr)}main{padding:32px}aside{min-height:600px}</style><div class="app"><aside>Navigation</aside><main><section data-unship-pick="Content" data-unship-canvas="matrix"><div data-unship-option="A">Content</div><div data-unship-option="B" hidden>Other</div></section></main></div><script>${picker}</script>`);
-    const expected = await page.locator('[data-unship-pick]').evaluate((group) => group.getBoundingClientRect().width);
-    await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('.canvas-frame.ready').length === 6);
-    const actual = await page.locator('[data-unship-toolbar]').evaluate((host) => host.shadowRoot.querySelector('iframe').contentDocument.querySelector('[data-unship-pick]').getBoundingClientRect().width);
-    assert.equal(actual, expected);
-    await page.getByRole("button", { name: "Show responsive previews", exact: true }).click();
-    await page.waitForFunction(() => Array.from(document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('iframe')).every((frame) => Math.abs(frame.contentDocument.querySelector('[data-unship-pick]').getBoundingClientRect().top) < 1));
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("button", { name: "Fit Canvas", exact: true }).click();
-    await page.waitForTimeout(220);
-    const bounds = await page.locator('[data-unship-toolbar]').evaluate((host) => {
-      const rect = host.shadowRoot.querySelector('.canvas-world').getBoundingClientRect();
-      return { left: rect.left, right: rect.right };
-    });
-    assert.ok(bounds.left >= 0 && bounds.right <= 390, "Fit includes every responsive column on a phone");
-  } finally {
-    await browser.close();
-  }
-});
-
 test("Canvas leaves keyboard zoom and browser tab shortcuts alone", async () => {
   await withCanvas(checkCanvasShortcuts);
+});
+
+test('live Canvas restores nodes, layout and styles and keeps state after repeated entry', async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`<style>[hidden]{display:none!important}.card{padding:20px}</style><section data-unship-pick="Form"><div class="card" style="color:blue" data-unship-option="A"><input value="Before"><button>Count 0</button></div><div class="card" data-unship-option="B" hidden>Other</div></section><script>window.saved=document.querySelector('input');window.savedParent=saved.parentNode;let count=0;document.querySelector('button').onclick=e=>e.target.textContent='Count '+(++count);</script><script>${picker}</script>`);
+    const styles = await page.locator('[data-unship-option]').evaluateAll(nodes => nodes.map(n => n.style.cssText || null));
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole('button', { name: 'Open Canvas', exact: true }).click();
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-live-option]')).visibility === 'visible');
+      await page.locator('input').fill('Edited');
+      await page.locator('.card button').click();
+      await page.getByRole('button', { name: 'Back to page', exact: true }).click();
+      await page.getByRole('button', { name: 'Open Canvas', exact: true }).waitFor();
+    }
+    assert.equal(await page.evaluate(() => saved === document.querySelector('input') && saved.parentNode === window.savedParent), true);
+    assert.equal(await page.locator('input').inputValue(), 'Edited');
+    assert.equal(await page.locator('.card button').textContent(), 'Count 2');
+    assert.deepEqual(await page.locator('[data-unship-option]').evaluateAll(nodes => nodes.map(n => n.style.cssText || null)), styles);
+    assert.equal(await page.locator('[data-live-option]').count(), 0);
+    assert.equal(await page.locator('iframe').count(), 0);
+  } finally { await browser.close(); }
+});
+
+test('Canvas returns to the interacting option for a portal without losing the overlay', async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`<style>[hidden]{display:none!important}</style><section data-unship-pick="Menu"><div data-unship-option="A">First</div><div data-unship-option="B" hidden><button onclick="const menu=document.createElement('button');menu.id='portal';menu.style.cssText='position:fixed;top:20px;left:20px';menu.textContent='Portal action';document.body.append(menu)">Open menu</button></div></section><script>${picker}</script>`);
+    await page.getByRole('button', { name: 'Open Canvas', exact: true }).click();
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await page.waitForFunction(() => !__unshipPicker.getState().canvas.open);
+    await page.getByRole('button', { name: 'Portal action', exact: true }).click();
+    assert.equal(await page.locator('[data-unship-option="B"]').evaluate(n => n.hidden), false);
+    assert.equal(await page.locator('[data-unship-option="A"]').evaluate(n => n.hidden), true);
+  } finally { await browser.close(); }
+});
+
+test('Canvas safely restores remaining options when a component is removed', async () => {
+  await withCanvas(async page => {
+    await page.locator('[data-unship-option="Direct"]').evaluate(n => n.remove());
+    await page.waitForFunction(() => !__unshipPicker.getState().canvas.open);
+    assert.equal(await page.locator('[data-live-option]').count(), 0);
+    assert.equal(await page.locator('[data-unship-option][popover]').count(), 0);
+    assert.equal(await page.locator('[data-unship-option="Proof"]').isVisible(), true);
+  });
+});
+
+test('Canvas preserves inline changes made by the app during comparison', async () => {
+  await withCanvas(async page => {
+    await page.locator('[data-unship-option="Proof"]').evaluate(n => n.style.color = 'rgb(10, 20, 30)');
+    await page.getByRole('button', { name: 'Back to page', exact: true }).click();
+    assert.equal(await page.locator('[data-unship-option="Proof"]').evaluate(n => n.style.color), 'rgb(10, 20, 30)');
+  });
+});
+
+test('Canvas leaves app-owned popover option roots untouched', async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`<section data-unship-pick="Popover"><div data-unship-option="A" popover="manual">A</div></section><script>${picker}</script>`);
+    await page.getByRole('button', { name: 'Open Canvas', exact: true }).click();
+    assert.equal(await page.evaluate(() => __unshipPicker.getState().canvas.open), false);
+    assert.equal(await page.locator('[data-unship-option]').getAttribute('popover'), 'manual');
+    assert.equal(await page.locator('[data-live-option]').count(), 0);
+  } finally { await browser.close(); }
 });

@@ -219,12 +219,12 @@ export function scanReadiness(file, rawText) {
         code: "canvas-dynamic",
         message: "data-unship-canvas value is dynamic; verify the Canvas Arrangement manually."
       });
-    } else if (canvasHint && !["stack", "grid", "matrix"].includes(canvasHint.value)) {
+    } else if (canvasHint && !["stack", "grid"].includes(canvasHint.value)) {
       findings.push({
         level: "fail",
         line: startLine,
         code: "canvas-value",
-        message: `data-unship-canvas must be "stack", "grid", or "matrix", found "${canvasHint.value}".`
+        message: `data-unship-canvas must be "stack" or "grid", found "${canvasHint.value}".`
       });
     }
 

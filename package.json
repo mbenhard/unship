@@ -12,7 +12,7 @@
     "prototype",
     "cli"
   ],
-  "homepage": "https://github.com/mbenhard/unship#readme",
+  "homepage": "https://unship.dev",
   "bugs": {
     "url": "https://github.com/mbenhard/unship/issues"
   },
@@ -40,7 +40,8 @@
     "e2e": "node e2e/toolbar-readiness.mjs",
     "demo": "node e2e/preview.mjs",
     "test": "node --test",
-    "verify": "npm run check && npm test && npm run e2e && npm pack --dry-run"
+    "verify": "npm run check && npm test && npm run e2e && npm run e2e:live && npm pack --dry-run",
+    "e2e:live": "node e2e/live-canvas/run.mjs"
   },
   "devDependencies": {
     "playwright": "^1.53.0"

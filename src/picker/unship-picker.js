@@ -4,20 +4,16 @@
   const OPTION_ATTR = "data-unship-option";
   const CANVAS_ATTR = "data-unship-canvas";
   const GROUP_SELECTOR = "[data-unship-pick]";
-  const CANVAS_LAYOUTS = new Set(["stack", "grid", "matrix"]);
-  const MATRIX_WIDTHS = [1280, 768, 390];
+  const CANVAS_LAYOUTS = new Set(["stack", "grid"]);
   const CANVAS_ICONS = {
-    desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>',
     backToPage: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-2"/><path d="M5 12h8m-2.5-2.5 2.5 2.5-2.5 2.5"/></svg>',
     frames: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5"/><rect x="10" y="11" width="11" height="9" rx="2"/></svg>',
-    responsive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 15.5H4.5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2V9M10 15.5v4m-4 0h6"/><rect x="13" y="9" width="8.5" height="12" rx="2"/></svg>',
     sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>',
     moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.2 3.6a8.6 8.6 0 1 0 10.2 10.2A7 7 0 0 1 10.2 3.6Z"></path></svg>'
   };
   const CANVAS_MIN_ZOOM = 0.05;
   const CANVAS_MAX_ZOOM = 2;
   const CANVAS_ZOOM_MOTION = { duration: 190, step: 0.1, pinch: 2.4 };
-  const CANVAS_CACHE_MS = 45_000;
   // Hold-to-keep timing: the commit timer equals the fill animation's delay
   // plus duration, so the pill is fully filled exactly when the copy fires.
   const HOLD_FILL_DELAY_MS = 120;
@@ -67,12 +63,8 @@
   let canvasRevealTimer = null;
   let canvasEntryTimer = null;
   let canvasContentTimer = null;
-  let canvasCacheTimer = null;
   let canvasDockEntering = false;
-  let canvasSnapshot = "";
-  let canvasDirty = false;
   let canvasKeepQueue = Promise.resolve();
-  let canvasSourceIdentity = [];
   let canvasZoom = 1;
   let canvasTheme = "light";
   let canvasPreviousOverflow = "";
@@ -87,7 +79,6 @@
   let canvasPanGesture = null;
   let canvasFrameTarget = null;
   let canvasFrameHideTimer = null;
-  const canvasVisibleWidths = new Set([MATRIX_WIDTHS[0]]);
   const canvasKeeps = new Map();
 
   const api = {
@@ -98,7 +89,6 @@
   };
 
   function rescan() {
-    if (canvasShell) canvasDirty = true;
     groups = Array.from(document.querySelectorAll(GROUP_SELECTOR)).map(toGroup).filter(Boolean);
     groups.forEach((group, index) => { group.index = index; });
     disambiguateGroupLabels(groups);
@@ -137,10 +127,9 @@
       canvas: {
         open: canvasOpen,
         preparing: canvasPreparing,
-        cached: Boolean(canvasShell && !canvasOpen && !canvasPreparing),
+        cached: false,
         theme: canvasTheme,
         zoom: canvasZoom,
-        visibleWidths: Array.from(canvasVisibleWidths),
         groups: groups.map((group) => ({ label: group.displayLabel, layout: group.canvasLayout }))
       }
     };
@@ -197,6 +186,7 @@
   }
 
   function applyGroupVisibility(group) {
+    if (canvasOpen || canvasPreparing) return;
     pauseObserver(() => {
       group.activeOptionIndex = clamp(group.activeOptionIndex, group.options.length);
       group.options.forEach((option, index) => {
@@ -351,7 +341,8 @@
     if (!root) return;
     if (canvasOpen) {
       host.setAttribute("role", "dialog");
-      host.setAttribute("aria-modal", "true");
+      // Live options keep their DOM parents outside this host.
+      host.removeAttribute("aria-modal");
       host.setAttribute("aria-label", "Unship Canvas");
     } else {
       host.removeAttribute("role");
@@ -428,26 +419,15 @@
 
   function canvasRowMarkup() {
     const percent = Math.round(canvasZoom * 100);
-    const responsive = canvasResponsiveMarkup();
     return `<button class="canvas-zoom nav" type="button" data-action="canvas-zoom-out" aria-label="Zoom out"></button>
       <span class="canvas-zoom-value" aria-label="Canvas zoom ${percent}%">${percent}%</span>
       <button class="canvas-zoom canvas-zoom-in nav" type="button" data-action="canvas-zoom-in" aria-label="Zoom in"></button>
       <button class="canvas-fit" type="button" data-action="canvas-fit" aria-label="Fit Canvas">Fit</button>
-      ${responsive ? `<i class="canvas-divider" aria-hidden="true"></i>${responsive}` : ""}
       ${canvasThemeMarkup()}
       <i class="canvas-divider" aria-hidden="true"></i>
       <button class="canvas-close nav" type="button" data-action="close-canvas" aria-label="Back to page" title="Back to page">${CANVAS_ICONS.backToPage}</button>`;
   }
 
-  function canvasResponsiveMarkup() {
-    if (!groups.some((group) => group.canvasLayout === "matrix")) return "";
-    const responsive = canvasVisibleWidths.size > 1;
-    const action = responsive ? "Show desktop-only previews" : "Show responsive previews";
-    return `<button class="canvas-state-toggle canvas-responsive-toggle" type="button" data-action="canvas-responsive" aria-label="${action}" aria-pressed="${responsive}" title="${action}">
-      <span class="canvas-state-icon canvas-state-primary">${CANVAS_ICONS.desktop}</span>
-      <span class="canvas-state-icon canvas-state-secondary">${CANVAS_ICONS.responsive}</span>
-    </button>`;
-  }
 
   function canvasThemeMarkup() {
     const dark = canvasTheme === "dark";
@@ -461,27 +441,25 @@
   function openCanvas() {
     if (canvasOpen || canvasPreparing || !groups.length) return;
     clearTimeout(canvasCloseTimer);
-    clearTimeout(canvasCacheTimer);
-    if (canvasShell) {
-      if (canReuseCanvas()) {
-        reopenCanvas();
-        return;
-      }
-      disposeCanvasCache();
+    if (canvasShell) disposeCanvasCache();
+    // Keep ordinary page comparisons available on older browsers and when an
+    // option is itself a popover/dialog. Never take over an app-owned top layer.
+    if (!HTMLElement.prototype.showPopover || document.querySelector(':modal') ||
+      groups.some(group => group.options.some(({ element }) => element.hasAttribute('popover') || element.tagName === 'DIALOG'))) {
+      liveRegion.textContent = 'Canvas is unavailable for this comparison. Compare options on the page.';
+      return;
     }
     canvasPreparing = true;
     document.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
     minimized = false;
     menuOpen = false;
     canvasKeeps.clear();
-    canvasSnapshot = snapshotDocument();
-    canvasDirty = false;
-    canvasSourceIdentity = canvasIdentity();
     canvasPreviousOverflow = document.documentElement.style.overflow;
     canvasShell = buildCanvasShell();
     canvasShell.inert = true;
     canvasShell.setAttribute("aria-hidden", "true");
     root.append(canvasShell);
+    startLiveCanvas();
     setCanvasEntryPreparing(true);
     initCanvasCamera();
     document.addEventListener("keydown", handleCanvasKeydown);
@@ -490,34 +468,7 @@
     requestAnimationFrame(maybeRevealCanvas);
   }
 
-  function canReuseCanvas() {
-    const current = canvasIdentity();
-    return !canvasDirty && current.length === canvasSourceIdentity.length && current.every((item, index) => item === canvasSourceIdentity[index]);
-  }
 
-  function canvasIdentity() {
-    return groups.flatMap((group) => [group.element, group.canvasLayout, ...group.options.map((option) => option.element)]);
-  }
-
-  function reopenCanvas() {
-    if (!canvasShell || !canvasCamera) return;
-    canvasOpen = true;
-    document.addEventListener("wheel", handleCanvasWheel, { passive: false, capture: true });
-    canvasPreviousOverflow = document.documentElement.style.overflow;
-    pauseObserver(() => { document.documentElement.style.overflow = "hidden"; });
-    canvasShell.classList.remove("leaving");
-    canvasShell.inert = false;
-    canvasShell.setAttribute("aria-hidden", "false");
-    canvasDockEntering = true;
-    renderedSignature = "";
-    render();
-    canvasDockEntering = false;
-    document.addEventListener("keydown", handleCanvasKeydown);
-    requestAnimationFrame(() => {
-      canvasShell?.classList.add("visible", "content-visible");
-      root?.querySelector(".canvas-close")?.focus({ preventScroll: true });
-    });
-  }
 
   function setCanvasEntryPreparing(preparing) {
     clearTimeout(canvasEntryTimer);
@@ -569,15 +520,14 @@
     });
   }
 
-  function closeCanvas({ renderAfter = true } = {}) {
+  function closeCanvas({ renderAfter = true, restoreFocus = true } = {}) {
     if (!canvasOpen && !canvasShell) return;
-    const wasPreparing = canvasPreparing;
     canvasOpen = false;
     canvasPreparing = false;
+    stopLiveCanvas();
     setCanvasEntryPreparing(false);
     clearTimeout(canvasRevealTimer);
     clearTimeout(canvasContentTimer);
-    clearTimeout(canvasCacheTimer);
     clearTimeout(canvasFrameHideTimer);
     canvasFrameTarget = null;
     canvasCursor = null;
@@ -603,12 +553,9 @@
     const finish = () => {
       if (canvasShell === closingShell) {
         closingShell?.classList.remove("leaving");
-        if (!renderAfter || wasPreparing || !wasVisible) disposeCanvasCache();
-        else canvasCacheTimer = setTimeout(() => {
-          if (!canvasOpen && !canvasPreparing) disposeCanvasCache();
-        }, CANVAS_CACHE_MS);
+        disposeCanvasCache();
       }
-      if (renderAfter) root?.querySelector('[data-action="open-canvas"]')?.focus({ preventScroll: true });
+      if (renderAfter && restoreFocus) root?.querySelector('[data-action="open-canvas"]')?.focus({ preventScroll: true });
     };
     clearTimeout(canvasCloseTimer);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -617,25 +564,15 @@
   }
 
   function disposeCanvasCache() {
-    clearTimeout(canvasCacheTimer);
     clearTimeout(canvasCloseTimer);
     stopCanvasZoomAnimation();
     stopCanvasPinch();
     canvasCamera = null;
     canvasShell?.remove();
     canvasShell = null;
-    canvasSnapshot = "";
-    canvasSourceIdentity = [];
   }
 
-  function snapshotDocument() {
-    const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll("script,[data-unship-toolbar]").forEach((node) => node.remove());
-    const base = clone.ownerDocument.createElement("base");
-    base.href = location.href;
-    clone.querySelector("head")?.prepend(base);
-    return `<!doctype html>${clone.outerHTML}`;
-  }
+
 
   function buildCanvasShell() {
     const shell = document.createElement("div");
@@ -661,8 +598,7 @@
         const optionRow = document.createElement("div");
         optionRow.className = "canvas-option-row";
         optionRow.dataset.option = String(option.index);
-        const widths = group.canvasLayout === "matrix" ? MATRIX_WIDTHS : [naturalWidth];
-        widths.forEach((width) => optionRow.append(buildCanvasFrame(group, option, width)));
+        optionRow.append(buildCanvasFrame(group, option, naturalWidth));
         optionsNode.append(optionRow);
       });
       world.append(section);
@@ -679,135 +615,9 @@
     return group.canvasLayout === "grid" ? Math.min(560, Math.max(280, measured)) : Math.min(1440, Math.max(320, measured));
   }
 
-  function buildCanvasFrame(group, option, width) {
-    const frame = document.createElement("article");
-    frame.className = "canvas-frame";
-    frame.dataset.group = String(group.index);
-    frame.dataset.option = String(option.index);
-    frame.dataset.width = String(width);
-    if (group.canvasLayout === "matrix" && !canvasVisibleWidths.has(width)) {
-      frame.classList.add("viewport-hidden");
-      frame.setAttribute("aria-hidden", "true");
-    }
-    frame.style.width = `${width}px`;
-    frame.tabIndex = 0;
-    frame.setAttribute("aria-label", `${group.displayLabel}: ${option.label} at ${width} pixels. Press Enter to copy this choice, then paste into your AI chat`);
-    const iframe = document.createElement("iframe");
-    iframe.className = "canvas-iframe";
-    iframe.title = `${group.displayLabel}: ${option.label} at ${width} pixels`;
-    iframe.width = String(width);
-    iframe.tabIndex = -1;
-    iframe.dataset.group = String(group.index);
-    iframe.dataset.option = String(option.index);
-    iframe.setAttribute("sandbox", "allow-same-origin");
-    iframe.setAttribute("scrolling", "no");
-    iframe.addEventListener("load", () => prepareCanvasFrame(iframe));
-    iframe.srcdoc = canvasSnapshot;
-    frame.append(iframe);
-    return frame;
-  }
 
-  function prepareCanvasFrame(iframe) {
-    const doc = iframe.contentDocument;
-    const view = iframe.contentWindow;
-    if (!doc || !view) return;
-    const group = doc.querySelectorAll(GROUP_SELECTOR)[groups[Number(iframe.dataset.group)]?.sourceIndex];
-    const options = group ? Array.from(group.children).filter((child) => child.hasAttribute(OPTION_ATTR)) : [];
-    const option = options[Number(iframe.dataset.option)];
-    const sourceOption = groups[Number(iframe.dataset.group)]?.options[Number(iframe.dataset.option)]?.element;
-    if (!group || !option) {
-      iframe.closest(".canvas-frame")?.classList.add("failed");
-      maybeRevealCanvas();
-      return;
-    }
 
-    options.forEach((candidate) => {
-      candidate.hidden = candidate !== option;
-      if (candidate === option) {
-        const originalDisplay = sourceOption ? originalDisplayByOption.get(sourceOption) : "";
-        if (originalDisplay) candidate.style.display = originalDisplay;
-        else candidate.style.removeProperty("display");
-      }
-      else candidate.style.setProperty("display", "none", "important");
-    });
-    let current = group;
-    while (current?.parentElement && current !== doc.body) {
-      Array.from(current.parentElement.children).forEach((sibling) => {
-        if (sibling !== current) sibling.style.setProperty("opacity", "0", "important");
-      });
-      current = current.parentElement;
-    }
-    doc.documentElement.style.setProperty("scroll-behavior", "auto", "important");
-    doc.documentElement.style.setProperty("overflow", "hidden", "important");
-    doc.documentElement.style.setProperty("background", "transparent", "important");
-    doc.body.style.setProperty("background", "transparent", "important");
-    option.querySelectorAll("img").forEach((image) => { image.loading = "eager"; });
 
-    let assetsReady = false;
-    const measure = () => {
-      doc.body.style.transform = "none";
-      const rect = group.getBoundingClientRect();
-      doc.body.style.transformOrigin = "0 0";
-      doc.body.style.transform = `translate(${-rect.left}px,${-rect.top}px)`;
-      const height = Math.max(48, Math.ceil(rect.height));
-      const nextHeight = `${height}px`;
-      if (iframe.style.height !== nextHeight) iframe.style.height = nextHeight;
-      view.scrollTo({ left: 0, top: 0, behavior: "auto" });
-      const frame = iframe.closest(".canvas-frame");
-      const wasReady = frame?.classList.contains("ready");
-      if (assetsReady) frame?.classList.add("ready");
-      if (assetsReady && !wasReady) maybeRevealCanvas();
-      if (canvasOpen) requestAnimationFrame(updateCanvasZoomLabel);
-    };
-    iframe.__unshipMeasure = measure;
-    requestAnimationFrame(() => requestAnimationFrame(measure));
-    const images = Array.from(option.querySelectorAll("img"));
-    Promise.allSettled([doc.fonts?.ready, ...images.map((image) => image.decode?.())]).then(() => {
-      assetsReady = true;
-      requestAnimationFrame(() => requestAnimationFrame(measure));
-    });
-  }
-
-  function toggleCanvasResponsive() {
-    const responsive = canvasVisibleWidths.size === 1;
-    const button = root?.querySelector(".canvas-responsive-toggle");
-    const action = responsive ? "Show desktop-only previews" : "Show responsive previews";
-    const revealedFrames = [];
-    const anchor = canvasShell?.querySelector(`.canvas-matrix .canvas-frame[data-width="${MATRIX_WIDTHS[0]}"]:not(.viewport-hidden)`)
-      || canvasShell?.querySelector(".canvas-frame:not(.viewport-hidden)");
-    const anchorBefore = anchor?.getBoundingClientRect();
-    canvasVisibleWidths.clear();
-    canvasVisibleWidths.add(MATRIX_WIDTHS[0]);
-    if (responsive) MATRIX_WIDTHS.slice(1).forEach((width) => canvasVisibleWidths.add(width));
-    if (button) {
-      button.setAttribute("aria-pressed", String(responsive));
-      button.setAttribute("aria-label", action);
-      button.title = action;
-    }
-    canvasShell?.querySelectorAll(".canvas-matrix .canvas-frame").forEach((frame) => {
-      const visible = canvasVisibleWidths.has(Number(frame.dataset.width));
-      const wasHidden = frame.classList.contains("viewport-hidden");
-      frame.classList.toggle("viewport-hidden", !visible);
-      frame.setAttribute("aria-hidden", String(!visible));
-      if (visible && wasHidden) revealedFrames.push(frame);
-    });
-    const world = canvasShell?.querySelector(".canvas-world");
-    if (anchor && anchorBefore && canvasCamera && world) {
-      const anchorAfter = anchor.getBoundingClientRect();
-      const scale = canvasCamera.scale;
-      const pan = canvasCamera;
-      const next = constrainCanvasPan(
-        pan.x + (anchorBefore.left - anchorAfter.left) / scale,
-        pan.y + (anchorBefore.top - anchorAfter.top) / scale,
-        scale
-      );
-      setCanvasTransform(next.x, next.y);
-    }
-    hideCanvasFrameToolbar();
-    requestAnimationFrame(() => {
-      revealedFrames.forEach((frame) => frame.querySelector(".canvas-iframe")?.__unshipMeasure?.());
-    });
-  }
 
   function activateCanvasOption(groupIndex, optionIndex) {
     const group = groups[groupIndex];
@@ -1157,7 +967,9 @@
   function handleCanvasWheel(event) {
     if (!canvasOpen && !canvasPreparing) return;
     const target = event.composedPath()[0] || event.target;
-    if (!event.ctrlKey && !target.closest?.(".canvas-viewport")) return;
+    const overLiveOption = event.composedPath().some(node => node.hasAttribute?.('data-live-option'));
+    if (!event.ctrlKey && !target.closest?.(".canvas-viewport") && !overLiveOption) return;
+    if (!event.ctrlKey && overLiveOption && liveScrollConsumes(event)) return;
     // Claim pinch from the entry click, before prepared previews take pointer input.
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -1285,7 +1097,6 @@
     else if (action === "canvas-zoom-in") stepCanvasZoom(1);
     else if (action === "canvas-fit") fitCanvas();
     else if (action === "canvas-theme") toggleCanvasTheme();
-    else if (action === "canvas-responsive") toggleCanvasResponsive();
     else if (action === "canvas-keep") {
       if (button.dataset.held === "true") delete button.dataset.held;
       else keepCanvasOption(Number(button.dataset.group), Number(button.dataset.option));
@@ -1693,9 +1504,28 @@
   }
 
   function queueRescan(records) {
-    if (canvasShell) canvasDirty = true;
-    // Text and presentation changes invalidate snapshots without rebuilding
-    // the picker; structural and option metadata changes still rescan.
+    if ((canvasOpen || canvasPreparing) && records) {
+      const nodes = records.flatMap(record => record.type === 'childList' ? [...record.addedNodes] :
+        record.target.matches?.('[role="menu"],[role="dialog"],[role="listbox"],[aria-modal="true"],dialog') ? [record.target] : []);
+      const externalOverlay = nodes.some(node => {
+        if (node.nodeType !== 1 || node === host || host.contains(node) ||
+          liveRecords.some(record => record.element.contains(node))) return false;
+        return [node, ...node.querySelectorAll('[role="menu"],[role="dialog"],[role="listbox"],[aria-modal="true"],dialog')].some(element => {
+          const style = getComputedStyle(element);
+          return element.getClientRects().length && style.visibility !== 'hidden' &&
+            (style.position === 'fixed' || style.position === 'absolute' || element.matches(':modal'));
+        });
+      });
+      const structureChanged = liveRecords.some(record => !record.element.isConnected) || records.some(record =>
+        record.type === 'attributes' && ['data-unship-pick', OPTION_ATTR, CANVAS_ATTR].includes(record.attributeName) ||
+        record.type === 'childList' && [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches(GROUP_SELECTOR + ',[' + OPTION_ATTR + ']') || node.querySelector(GROUP_SELECTOR + ',[' + OPTION_ATTR + ']'))));
+      if (externalOverlay || structureChanged) {
+        if (externalOverlay && liveInteraction) activateCanvasOption(Number(liveInteraction.frame.dataset.group), Number(liveInteraction.frame.dataset.option));
+        closeCanvas({ restoreFocus: !externalOverlay });
+        if (externalOverlay) liveRegion.textContent = 'Returned to the page for an overlay interaction.';
+      } else return;
+    }
+    // Ordinary text and style changes do not need to rebuild the picker.
     if (records?.every((record) => record.type === "characterData" ||
       (record.type === "attributes" && ["style", "class", "src", "href"].includes(record.attributeName)))) return;
     if (rescanFrame) return;
@@ -1856,6 +1686,9 @@
 
   function css() {
     return `
+      .canvas-shell[popover]{margin:0;padding:0;border:0;width:100vw;height:100vh;max-width:none;max-height:none;overflow:hidden}
+      .canvas-dock[popover]{margin:0;inset:auto;left:var(--unship-left,50%);bottom:14px;border:0}
+      .canvas-frame-toolbar[popover]{margin:0;inset:auto;border:0}
       .dock{--ease:cubic-bezier(.32,.72,0,1);--dur:.28s;--h:34px;--nav:34px;--r:999px;--gap:6px;--navfs:18px;--fs:12.5px;position:fixed;left:var(--unship-left,50%);bottom:var(--unship-bottom,max(14px,env(safe-area-inset-bottom)));transform:translateX(-50%);z-index:2147483647;box-sizing:border-box;width:min(328px,var(--unship-max-width,calc(100vw - 20px)));max-width:calc(100vw - 20px);display:block;padding:var(--gap);border-radius:24px;background:#000;color:#fff;font:500 var(--fs)/1.2 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.02em}
       .dock.top{top:var(--unship-top,max(14px,env(safe-area-inset-top)));bottom:auto}
       button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
@@ -1950,8 +1783,6 @@
       .canvas-frame:hover,.canvas-frame:focus-within{z-index:4}
       .canvas-frame:focus-visible{outline:2px solid #111;outline-offset:4px}
       .canvas-shell[data-theme="dark"] .canvas-frame:focus-visible{outline-color:#fff}
-      .canvas-iframe{display:block;width:100%;height:180px;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .16s ease}
-      .canvas-frame.ready .canvas-iframe{opacity:1}
       .canvas-frame.viewport-hidden{display:none}
       .canvas-frame.failed{min-height:96px;background:rgba(127,127,127,.08)}
       .canvas-frame-toolbar{position:fixed;z-index:7;display:flex;align-items:center;gap:4px;min-height:40px;box-sizing:border-box;max-width:calc(100vw - 24px);padding:4px 6px 4px 4px;border-radius:999px;background:#050505;color:#fff;font-size:11px;box-shadow:0 5px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translate(-50%,6px) scale(.96);transition:opacity .14s ease,transform .16s cubic-bezier(.32,.72,0,1);white-space:nowrap}
@@ -1972,12 +1803,10 @@
       .canvas-divider{width:1px;height:22px;flex:none;background:rgba(255,255,255,.14)}
       .canvas-state-toggle{position:relative;width:var(--h);height:var(--h);min-width:var(--h);padding:0;border-radius:50%;overflow:hidden;background:transparent;transition:background .16s ease,transform .12s ease}
       .canvas-state-toggle:active{transform:scale(.9)}
-      .canvas-responsive-toggle[aria-pressed="true"]{background:#f5f5f3;color:#050505}
       .canvas-theme-toggle{background:transparent}
       .canvas-theme-toggle:hover,.canvas-theme-toggle:focus-visible{background:#ffffff16}
       .canvas-state-icon{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .16s ease,transform .2s cubic-bezier(.32,.72,0,1)}
       .canvas-enter svg,.canvas-state-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-      .canvas-responsive-toggle .canvas-state-secondary svg{width:20px;height:20px}
       .canvas-state-primary{opacity:1;transform:rotate(0) scale(1)}
       .canvas-state-secondary{opacity:0;transform:rotate(-28deg) scale(.6)}
       .canvas-state-toggle[aria-pressed="true"] .canvas-state-primary{opacity:0;transform:rotate(28deg) scale(.6)}
@@ -2022,6 +1851,201 @@
     observer = new MutationObserver(queueRescan);
     observeDocument();
     if (useGlobalShortcuts) document.addEventListener("keydown", handleGlobalKeydown);
+  }
+
+  // Same-document Canvas: preserve framework ownership and component state.
+  let liveRecords = [];
+  let liveFrameRequest = 0;
+  let liveResizeObserver;
+  let liveWheelCleanups = [];
+  let liveInteraction = null;
+
+  function liveSet(record, property, value) {
+    if (!record.styles.has(property)) record.styles.set(property, [record.originalStyle.getPropertyValue(property), record.originalStyle.getPropertyPriority(property)]);
+    if (record.element.style.getPropertyValue(property) !== value || record.element.style.getPropertyPriority(property) !== 'important') {
+      record.element.style.setProperty(property, value, 'important');
+      record.applied.set(property, record.element.style.getPropertyValue(property));
+    }
+  }
+
+  function buildCanvasFrame(group, option, width) {
+    const frame = document.createElement('article');
+    frame.className = 'canvas-frame ready';
+    frame.dataset.group = String(group.index);
+    frame.dataset.option = String(option.index);
+    frame.dataset.width = String(width);
+    frame.style.width = `${width}px`;
+    frame.tabIndex = 0;
+    frame.setAttribute('aria-label', `${group.displayLabel}: ${option.label}`);
+    const originalStyle = document.createElement('span').style;
+    originalStyle.cssText=option.element.style.cssText;
+    liveRecords.push({element:option.element, frame, width, originalStyle, styles:new Map(), hidden:option.element.hidden, applied:new Map(), popover:option.element.getAttribute('popover')});
+    return frame;
+  }
+
+  function startLiveCanvas() {
+    canvasShell.popover = 'manual';
+    canvasShell.showPopover();
+    liveResizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const record = liveRecords.find(record => record.element === entry.target);
+        if (record) record.frame.style.height = `${Math.max(48, record.element.offsetHeight)}px`;
+      }
+    });
+    pauseObserver(() => {
+      for (const record of liveRecords) {
+        const element = record.element;
+        element.hidden = false;
+        // Reveal options whose author CSS needed an explicit hidden override.
+        liveSet(record, 'display', originalDisplayByOption.get(element) || getComputedStyle(element).display.replace(/^none$/, 'block'));
+        const style = getComputedStyle(element);
+        for (const property of ['padding-top','padding-right','padding-bottom','padding-left','border-top','border-right','border-bottom','border-left','background-color','color','overflow']) liveSet(record, property, style.getPropertyValue(property));
+        for (const [property,value] of Object.entries({position:'fixed',right:'auto',bottom:'auto',left:'0px',top:'0px',margin:'0px',width:`${record.width}px`,'max-width':'none','max-height':'none','box-sizing':'border-box','transform-origin':'0 0',transition:'none'})) liveSet(record,property,value);
+        element.setAttribute('data-live-option','');
+        element.popover = 'manual';
+        element.showPopover();
+        record.frame.style.height = `${Math.max(48,element.offsetHeight)}px`;
+        record.onEnter = () => {
+          showCanvasFrameToolbar(record.frame);
+          const toolbar = canvasShell.querySelector('.canvas-frame-toolbar');
+          toolbar.popover = 'manual';
+          if (!toolbar.matches(':popover-open')) toolbar.showPopover();
+        };
+        record.onLeave = scheduleCanvasFrameToolbarHide;
+        record.onInteract = () => { liveInteraction = record; };
+        element.addEventListener('pointerdown', record.onInteract, true);
+        element.addEventListener('focusin', record.onInteract);
+        element.addEventListener('focusin', record.onEnter);
+        element.addEventListener('pointerenter',record.onEnter);
+        element.addEventListener('pointerleave',record.onLeave);
+        liveResizeObserver.observe(element);
+        bridgeLiveFrames(element);
+      }
+    });
+    document.addEventListener('keydown', liveTab, true);
+    followLiveFrames();
+  }
+
+  function followLiveFrames() {
+    if (!canvasShell || (!canvasOpen && !canvasPreparing)) return;
+    for (const record of liveRecords) {
+      if (!record.element.isConnected) { closeCanvas(); rescan(); return; }
+      const rect = record.frame.getBoundingClientRect();
+      liveSet(record,'transform',`translate(${rect.left}px,${rect.top}px) scale(${rect.width / record.width})`);
+      liveSet(record,'visibility',canvasShell.classList.contains('content-visible') ? 'visible' : 'hidden');
+    }
+    const dock = root.querySelector('.canvas-dock');
+    if (dock && !dock.matches(':popover-open')) { dock.popover='manual'; dock.showPopover(); }
+    liveFrameRequest=requestAnimationFrame(followLiveFrames);
+  }
+
+  function liveTab(event) {
+    if (!canvasOpen || event.key !== 'Tab' || document.querySelector(':modal')) return;
+    const controls = [];
+    const collect = container => {
+      for (const node of container?.children || []) {
+        if (node.hidden || node.inert || getComputedStyle(node).visibility === 'hidden') continue;
+        if (node.tabIndex >= 0 && !node.disabled && node.getClientRects().length) controls.push(node);
+        collect(node.shadowRoot || node);
+      }
+    };
+    for (const record of liveRecords) collect(record.element);
+    collect(root.querySelector('.canvas-frame-toolbar'));
+    collect(root.querySelector('.canvas-dock'));
+    let active = document.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    controls[wrap(controls.indexOf(active) + (event.shiftKey ? -1 : 1), controls.length)]?.focus({ preventScroll: true });
+  }
+
+  function stopLiveCanvas() {
+    cancelAnimationFrame(liveFrameRequest);
+    liveResizeObserver?.disconnect();
+    liveWheelCleanups.forEach(cleanup => cleanup());
+    liveWheelCleanups = [];
+    document.removeEventListener('keydown',liveTab,true);
+    pauseObserver(() => {
+      for (const record of liveRecords) {
+        const element=record.element;
+        if(element.matches(':popover-open'))element.hidePopover();
+        if(record.popover===null)element.removeAttribute('popover');else element.setAttribute('popover',record.popover);
+        element.removeAttribute('data-live-option');
+        for (const [property,[value,priority]] of record.styles) {
+          // Preserve host-app edits made while Canvas was open.
+          if (element.style.getPropertyValue(property) !== record.applied.get(property)) continue;
+          if(value)element.style.setProperty(property,value,priority);else element.style.removeProperty(property);
+        }
+        if(!element.style.length)element.removeAttribute('style');
+        element.hidden=record.hidden;
+        element.removeEventListener('pointerdown', record.onInteract, true);
+        element.removeEventListener('focusin', record.onInteract);
+        element.removeEventListener('focusin', record.onEnter);
+        element.removeEventListener('pointerenter',record.onEnter);
+        element.removeEventListener('pointerleave',record.onLeave);
+      }
+      groups.forEach(applyGroupVisibility);
+    });
+    liveRecords=[];
+    liveInteraction = null;
+    if(canvasShell?.matches(':popover-open'))canvasShell.hidePopover();
+  }
+
+
+
+  function liveScrollConsumes(event) {
+    const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+    const delta = horizontal ? event.deltaX : event.deltaY;
+    if (!delta) return false;
+    for (const node of event.composedPath()) {
+      if (node.nodeType !== 1) continue;
+      const style = node.ownerDocument.defaultView.getComputedStyle(node);
+      const overflow = horizontal ? style.overflowX : style.overflowY;
+      const position = horizontal ? node.scrollLeft : node.scrollTop;
+      const maximum = horizontal ? node.scrollWidth-node.clientWidth : node.scrollHeight-node.clientHeight;
+      if (maximum > 1 && (/auto|scroll/.test(overflow) || node === node.ownerDocument.scrollingElement)) {
+        if (delta < 0 ? position > 0 : position < maximum-1) return true;
+        const overscroll = horizontal ? style.overscrollBehaviorX : style.overscrollBehaviorY;
+        if (overscroll === 'contain' || overscroll === 'none') return true;
+      }
+      if (node.hasAttribute('data-live-option')) break;
+    }
+    return false;
+  }
+
+  // Wheel events do not cross iframe documents; bridge accessible local frames.
+  function bridgeLiveFrames(container) {
+    for (const frame of container.querySelectorAll('iframe')) {
+      let attachedDocument;
+      const attach = () => {
+        let doc;
+        try { doc = frame.contentDocument; } catch { return; }
+        if (!doc || doc === attachedDocument) return;
+        attachedDocument = doc;
+        const relay = event => {
+          if ((!canvasOpen && !canvasPreparing) || (!event.ctrlKey && liveScrollConsumes(event))) return;
+          const rect = frame.getBoundingClientRect();
+          const scaleX = rect.width / (frame.offsetWidth || rect.width);
+          const scaleY = rect.height / (frame.offsetHeight || rect.height);
+          const view = frame.ownerDocument.defaultView;
+          const forwarded = new view.WheelEvent('wheel', {
+            deltaX:event.deltaX, deltaY:event.deltaY, deltaMode:event.deltaMode,
+            ctrlKey:event.ctrlKey, shiftKey:event.shiftKey,
+            clientX:rect.left+(event.clientX+frame.clientLeft)*scaleX,
+            clientY:rect.top+(event.clientY+frame.clientTop)*scaleY,
+            bubbles:true, composed:true, cancelable:true
+          });
+          frame.dispatchEvent(forwarded);
+          if (forwarded.defaultPrevented) { event.preventDefault(); event.stopImmediatePropagation(); }
+        };
+        doc.addEventListener('wheel',relay,{capture:true,passive:false});
+        liveWheelCleanups.push(() => doc.removeEventListener('wheel',relay,true));
+        bridgeLiveFrames(doc);
+      };
+      frame.addEventListener('load',attach);
+      liveWheelCleanups.push(() => frame.removeEventListener('load',attach));
+      attach();
+    }
   }
 
   window.__unshipPicker = api;

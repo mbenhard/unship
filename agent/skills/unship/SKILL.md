@@ -64,17 +64,11 @@ Doctor is optional troubleshooting, not a step in every iteration. Use `doctor -
 
 ## Canvas
 
-Canvas is built into every comparison. The human can open it from the picker without a special prompt or setup. Previews are created only when opened. Groups use `stack` by default; optionally set an arrangement to suit the content:
+Canvas opens from every comparison. It displays the original live options in the same document, preserving DOM parents, event handlers, component state, canvas pixels, and existing iframe content. Use `stack` (default) for wide sections or `data-unship-canvas="grid"` for compact components.
 
-```html
-<section data-unship-pick="Header" data-unship-canvas="stack">...</section>
-<section data-unship-pick="Cards" data-unship-canvas="grid">...</section>
-<section data-unship-pick="Hero" data-unship-canvas="matrix">...</section>
-```
+All options share the browser viewport. Resize the real browser to test viewport media queries; there is no responsive toggle. Container queries can respond to the component's width.
 
-Choose `stack` for wide, shallow options, `grid` for compact components, and `matrix` for responsive comparison at 1280, 768, and 390 pixels. Matrix opens at Desktop; the responsive toggle reveals Tablet and Mobile. Choose the arrangement from the content rather than asking the user to manage layout controls.
-
-Canvas frames are script-free snapshots. For content dependent on canvas pixels, shadow DOM, or client JavaScript, use a smaller static preview that represents the decision faithfully. Keep the marked group self-contained.
+Canvas requires a browser with the Popover API. Keep option roots self-contained: app-owned popovers or dialogs remain page comparisons. Detected external overlays return to the page with the interacting option selected. Arbitrary portal implementations and cross-origin iframe gestures have limits; verify those interactions on the page and report incompatibilities. Keep Canvas out of production builds.
 
 ## Verification and Handoff
 

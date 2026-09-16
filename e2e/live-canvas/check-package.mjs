@@ -7,10 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { candidateVersion } from './compile.mjs';
+const { version: candidateVersion } = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
 const root = new URL('../../', import.meta.url);
-execFileSync(process.execPath,[fileURLToPath(new URL('pack.mjs',import.meta.url))],{cwd:root});
-const archive=fileURLToPath(new URL(`.unship/releases/${candidateVersion}/unship-cli-${candidateVersion}.tgz`,root));
+const packDir = await mkdtemp(join(tmpdir(), 'unship-release-pack-'));
+execFileSync('npm', ['pack', '--pack-destination', packDir], {cwd:root});
+const archive = join(packDir, `unship-cli-${candidateVersion}.tgz`);
 const temp=await mkdtemp(join(tmpdir(),'unship-live-package-'));
 let browser,server;
 try {
@@ -50,5 +51,5 @@ try {
   assert.deepEqual(errors,[]);
   console.log('PASS: packed CLI, stale-asset update, matching skill, version, live state, copy-pill inset, and restoration in a fresh app.');
 } finally {
-  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));await rm(temp,{recursive:true,force:true});
+  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));await rm(temp,{recursive:true,force:true});await rm(packDir,{recursive:true,force:true});
 }
