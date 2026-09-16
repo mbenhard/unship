@@ -22,10 +22,24 @@ const scroll=page.locator('#wheel-scroll');await scroll.hover();const before=awa
 await scroll.evaluate(n=>n.scrollTop=n.scrollHeight);const edge=await wheelOver(scroll);
 await scroll.evaluate(n=>n.style.overscrollBehavior='contain');await scroll.hover();const contained=await camera();await page.mouse.wheel(0,40);await page.waitForTimeout(100);assert.deepEqual(await camera(),contained);
 const pinch=await first.evaluate(n=>{const e=new WheelEvent('wheel',{ctrlKey:true,deltaY:20,bubbles:true,cancelable:true,clientX:500,clientY:300});n.dispatchEvent(e);return e.defaultPrevented;});assert.equal(pinch,true);
+const modifiedZoom = [];
+for (const modifier of ['ctrlKey', 'metaKey']) {
+  for (const [name, target] of [['inner scroll', scroll], ['iframe', first.locator('iframe').contentFrame().locator('button')]]) {
+    const before = await camera();
+    const prevented = await target.evaluate((node, modifier) => {
+      const event = new node.ownerDocument.defaultView.WheelEvent('wheel', { [modifier]: true, deltaY: -20, clientX: 20, clientY: 20, bubbles: true, composed: true, cancelable: true });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    }, modifier);
+    assert.equal(prevented, true, `${modifier} over ${name} must suppress native zoom`);
+    await page.waitForFunction(scale => __unshipPicker.getState().canvas.zoom > scale, before.scale);
+    modifiedZoom.push({modifier, target: name, nativeZoomPrevented: true});
+  }
+}
 await page.getByRole('button',{name:'Back to page',exact:true}).click();await page.getByRole('button',{name:'Open Canvas',exact:true}).waitFor();
 await scroll.evaluate(n=>n.remove());await open();const reopened=await wheelOver(first.locator('iframe'));
 await page.getByRole('button',{name:'Back to page',exact:true}).click();
 assert.deepEqual(errors,[]);
-const result={card,shadow,iframe,innerScrollPreserved:true,edge,overscrollContainRespected:true,pinchCaptured:pinch,reopened,errors};
+const result={card,shadow,iframe,innerScrollPreserved:true,edge,overscrollContainRespected:true,pinchCaptured:pinch,modifiedZoom,reopened,errors};
 await writeFile('.unship/live-canvas/wheel-results.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{await browser.close();}

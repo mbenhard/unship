@@ -1,6 +1,6 @@
 {
   "name": "@unship/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Tiny local picker for comparing agent-made alternatives in real source.",
   "keywords": [
     "ui",

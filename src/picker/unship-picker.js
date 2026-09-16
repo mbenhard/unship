@@ -82,7 +82,7 @@
   const canvasKeeps = new Map();
 
   const api = {
-    version: "0.2.0",
+    version: "0.2.1",
     rescan,
     destroy,
     getState
@@ -966,18 +966,19 @@
 
   function handleCanvasWheel(event) {
     if (!canvasOpen && !canvasPreparing) return;
+    const modifiedZoom = event.ctrlKey || event.metaKey;
     const target = event.composedPath()[0] || event.target;
     const overLiveOption = event.composedPath().some(node => node.hasAttribute?.('data-live-option'));
-    if (!event.ctrlKey && !target.closest?.(".canvas-viewport") && !overLiveOption) return;
-    if (!event.ctrlKey && overLiveOption && liveScrollConsumes(event)) return;
-    // Claim pinch from the entry click, before prepared previews take pointer input.
+    if (!modifiedZoom && !target.closest?.(".canvas-viewport") && !overLiveOption) return;
+    if (!modifiedZoom && overLiveOption && liveScrollConsumes(event)) return;
+    // Claim pinch and Ctrl/Cmd + wheel from entry, suppressing browser zoom.
     event.preventDefault();
     event.stopImmediatePropagation();
     if (!canvasOpen || !canvasCamera) return;
     const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY;
     const focal = { clientX: event.clientX, clientY: event.clientY };
     canvasCursor = focal;
-    if (event.ctrlKey) {
+    if (modifiedZoom) {
       stopCanvasZoomAnimation();
       // A pinch is a continuous gesture, so it must never inherit the
       // transition used by button/fit zooms. Clear it synchronously before
@@ -2023,14 +2024,14 @@
         if (!doc || doc === attachedDocument) return;
         attachedDocument = doc;
         const relay = event => {
-          if ((!canvasOpen && !canvasPreparing) || (!event.ctrlKey && liveScrollConsumes(event))) return;
+          if ((!canvasOpen && !canvasPreparing) || (!event.ctrlKey && !event.metaKey && liveScrollConsumes(event))) return;
           const rect = frame.getBoundingClientRect();
           const scaleX = rect.width / (frame.offsetWidth || rect.width);
           const scaleY = rect.height / (frame.offsetHeight || rect.height);
           const view = frame.ownerDocument.defaultView;
           const forwarded = new view.WheelEvent('wheel', {
             deltaX:event.deltaX, deltaY:event.deltaY, deltaMode:event.deltaMode,
-            ctrlKey:event.ctrlKey, shiftKey:event.shiftKey,
+            ctrlKey:event.ctrlKey, metaKey:event.metaKey, shiftKey:event.shiftKey,
             clientX:rect.left+(event.clientX+frame.clientLeft)*scaleX,
             clientY:rect.top+(event.clientY+frame.clientTop)*scaleY,
             bubbles:true, composed:true, cancelable:true

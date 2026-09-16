@@ -20,7 +20,7 @@ For stateful Canvas development, see the [React browser fixture](e2e/live-canvas
 
 ```bash
 npm pack
-npm install -g ./unship-cli-0.2.0.tgz
+npm install -g ./unship-cli-0.2.1.tgz
 unship install --repair --yes --no-project
 ```
 

@@ -435,3 +435,50 @@ test('Canvas leaves app-owned popover option roots untouched', async () => {
     assert.equal(await page.locator('[data-live-option]').count(), 0);
   } finally { await browser.close(); }
 });
+
+test('Ctrl and Cmd wheel zoom Canvas and suppress browser defaults only while open', async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(PAGE);
+    const dispatch = (modifier, target) => page.evaluate(({modifier, target}) => {
+      const root = document.querySelector('[data-unship-toolbar]').shadowRoot;
+      const node = target === 'controls' ? root.querySelector('.canvas-close') :
+        target === 'option' ? document.querySelector('[data-live-option]') : document.body;
+      const event = new WheelEvent('wheel', { [modifier]: true, deltaY: -20, clientX: 300, clientY: 200, bubbles: true, composed: true, cancelable: true });
+      node.dispatchEvent(event);
+      return event.defaultPrevented;
+    }, {modifier, target});
+    for (const modifier of ['ctrlKey', 'metaKey']) assert.equal(await dispatch(modifier, 'body'), false);
+    const entryCaptured = await page.evaluate(() => {
+      document.querySelector('[data-unship-toolbar]').shadowRoot.querySelector('[data-action="open-canvas"]').click();
+      return ['ctrlKey', 'metaKey'].map(modifier => {
+        const event = new WheelEvent('wheel', { [modifier]: true, deltaY: -20, bubbles: true, cancelable: true });
+        document.body.dispatchEvent(event);
+        return event.defaultPrevented;
+      });
+    });
+    assert.deepEqual(entryCaptured, [true, true]);
+    await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelector('.canvas-shell.content-visible'));
+    const viewport = await page.evaluate(() => [innerWidth, devicePixelRatio, visualViewport.scale]);
+    for (const modifier of ['Meta', 'Control']) {
+      const before = await page.evaluate(() => __unshipPicker.getState().canvas.zoom);
+      await page.mouse.move(300, 200);
+      await page.keyboard.down(modifier);
+      await page.mouse.wheel(0, -35);
+      await page.keyboard.up(modifier);
+      await page.waitForFunction(before => __unshipPicker.getState().canvas.zoom > before, before);
+      assert.deepEqual(await page.evaluate(() => [innerWidth, devicePixelRatio, visualViewport.scale]), viewport);
+    }
+    for (const modifier of ['ctrlKey', 'metaKey']) {
+      for (const target of ['body', 'controls', 'option']) {
+        const before = await page.evaluate(() => __unshipPicker.getState().canvas.zoom);
+        assert.equal(await dispatch(modifier, target), true);
+        await page.waitForFunction(before => __unshipPicker.getState().canvas.zoom > before, before);
+      }
+    }
+    assert.deepEqual(await page.evaluate(() => [innerWidth, devicePixelRatio, visualViewport.scale]), viewport);
+    await page.getByRole('button', {name:'Back to page', exact:true}).click();
+    for (const modifier of ['ctrlKey', 'metaKey']) assert.equal(await dispatch(modifier, 'body'), false);
+  } finally { await browser.close(); }
+});

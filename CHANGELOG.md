@@ -2,6 +2,11 @@
 
 All notable changes to Unship are documented here.
 
+## 0.2.1 - 2026-09-16
+
+- Support Cmd + scroll for Canvas zoom alongside Ctrl + scroll and trackpad pinch, including accessible embedded frames.
+- Suppress native browser wheel zoom throughout Canvas entry and while open; restore normal wheel behavior on exit. Browser keyboard shortcuts remain unchanged.
+
 ## 0.2.0 - 2026-09-16
 
 ### Live Canvas

@@ -21,6 +21,8 @@ Restart your agent or reload its skills. If detection misses your agent, name it
 
 **New in 0.2:** live Canvas, broader agent installation, and safer picker updates. See the [release notes](CHANGELOG.md).
 
+**0.2.1:** Cmd + scroll now zooms Canvas on Mac, alongside Ctrl + scroll and pinch. Native browser wheel zoom stays suppressed while Canvas is open.
+
 ## Use
 
 ```text
