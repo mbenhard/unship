@@ -38,7 +38,8 @@ async function withCanvas(callback) {
     await page.getByRole("button", { name: "Open Canvas" }).click();
     await page.waitForFunction(() => {
       const root = document.querySelector("[data-unship-toolbar]")?.shadowRoot;
-      return root?.querySelectorAll(".canvas-frame.ready").length === 6;
+      return root?.querySelectorAll(".canvas-frame.ready").length === 6 &&
+        root.querySelector(".canvas-shell")?.classList.contains("content-visible");
     });
     return await callback(page);
   } finally {
@@ -339,7 +340,7 @@ test("Canvas resolves valid groups after an empty group", async () => {
     const page = await browser.newPage();
     await page.setContent(PAGE.replace('<main>', '<main><section data-unship-pick="Empty"></section>'));
     await page.getByRole("button", { name: "Open Canvas" }).click();
-    await page.waitForFunction(() => document.querySelector('[data-unship-toolbar]').shadowRoot.querySelectorAll('.canvas-frame.ready').length === 6);
+    await page.waitForFunction(() => { const root = document.querySelector('[data-unship-toolbar]').shadowRoot; return root.querySelectorAll('.canvas-frame.ready').length === 6 && root.querySelector('.canvas-shell')?.classList.contains('content-visible'); });
     const frame = page.locator('[data-unship-toolbar] .canvas-frame[data-group="1"]').first();
     await frame.focus();
     await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async text => { window.__copied = text; } } }));
